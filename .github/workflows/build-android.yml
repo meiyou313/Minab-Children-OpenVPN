@@ -128,14 +128,30 @@ jobs:
           prerelease: true
           files: main/build/outputs/apk/**/debug/Minab-debug-Beta-${{ github.ref_name }}.apk
           body: |
-            Minab debug Beta v0.9.4 — Android only, debug build signed with the permanent Minab key.
-            Installs over v0.9.3 normally (no uninstall needed).
+            Minab debug Beta v0.9.5 — Android only, debug build signed with the permanent Minab key.
+            Installs over v0.9.4 normally (no uninstall needed).
 
             OpenVPN client based on ics-openvpn (GPLv2, Arne Schwabe),
             with bulk import of many .ovpn files / a .zip, one username
             and password for all, profile groups (manual + automatic
             by country), and bulk ping test of all profiles or one
             group.
+
+            New in v0.9.5 — ending the tab-switch crash for real:
+            switching tabs has closed the app since v0.9.1, and three
+            rounds of fixes reasoned from the code did not stop it,
+            because no crash trace ever existed. This version records
+            one itself: a crash report (full stack trace) and the
+            last steps before the close are saved on the phone, and
+            the next launch shows them in a "گزارش خرابی" dialog
+            with Share — if it still closes on a tab switch, please
+            share that report, and the exact cause can finally be
+            fixed instead of guessed. The audit in this version also
+            guarded the last unguarded switch paths (Settings resume,
+            Configs view creation, the Graph timer handler, the Home
+            always-on lookup). All v0.9.3 / v0.9.4 Home fixes are
+            kept (own IP before connecting, tunnel IP + country
+            flag after, smaller server names).
 
             New in v0.9.4 — urgent fix: v0.9.3 crashed on launch
             (only the app logo showed, then it closed, before any
