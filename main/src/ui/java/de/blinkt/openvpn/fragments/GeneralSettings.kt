@@ -138,19 +138,31 @@ class GeneralSettings : PreferenceFragmentCompat(), Preference.OnPreferenceClick
 
     override fun onResume() {
         super.onResume()
-        val vpn = ProfileManager.getAlwaysOnVPN(activity)
-        val sb = StringBuffer(getString(R.string.defaultvpnsummary))
-        sb.append('\n')
-        if (vpn == null) sb.append(getString(R.string.novpn_selected)) else sb.append(
-            getString(
-                R.string.vpnselected,
-                vpn.name
+        // Minab Beta v0.9.5 — AUDIT: mAlwaysOnVPN is a lateinit
+        // assigned inside onCreatePreferences' try block (0.9.4).
+        // If anything there threw, the field stays uninitialized
+        // and this unguarded access crashed the app with
+        // UninitializedPropertyAccessException on EVERY switch to
+        // the Settings tab. Guard it: a half-built Settings tab
+        // shows what it has instead of killing the app.
+        try {
+            if (!::mAlwaysOnVPN.isInitialized) return
+            val vpn = ProfileManager.getAlwaysOnVPN(activity)
+            val sb = StringBuffer(getString(R.string.defaultvpnsummary))
+            sb.append('\n')
+            if (vpn == null) sb.append(getString(R.string.novpn_selected)) else sb.append(
+                getString(
+                    R.string.vpnselected,
+                    vpn.name
+                )
             )
-        )
-        mAlwaysOnVPN.summary = sb.toString()
-        // Minab Beta v0.9.1 — show the active per-app VPN mode
-        // (fix #2) in the "Apps using the VPN" row.
-        refreshPerAppSummary()
+            mAlwaysOnVPN.summary = sb.toString()
+            // Minab Beta v0.9.1 — show the active per-app VPN mode
+            // (fix #2) in the "Apps using the VPN" row.
+            refreshPerAppSummary()
+        } catch (e: Exception) {
+            android.util.Log.e("GeneralSettings", "Minab: onResume failed", e)
+        }
     }
 
     /** Minab Beta v0.9.1 — the Settings row says which per-app VPN
