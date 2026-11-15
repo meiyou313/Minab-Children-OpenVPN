@@ -137,6 +137,13 @@ class ConfigsFragment : ListFragment() {
         savedInstanceState: Bundle?
     ): View {
         val v = inflater.inflate(R.layout.configs_fragment, container, false)
+        // Minab Beta v0.9.5 — AUDIT: this is the only tab
+        // fragment whose onCreateView had no guard (Home's is
+        // partly guarded, Graph / Settings / About were guarded
+        // in 0.9.4). A throw while wiring the tab would close the
+        // app on the first switch to Configs; now the tab shows
+        // an empty view instead.
+        try {
         chipsContainer = v.findViewById(R.id.minab_configs_chips)
         v.findViewById<Button>(R.id.minab_configs_credentials_group)?.setOnClickListener {
             showCredentialsDialog(selectedCategory)
@@ -210,6 +217,9 @@ class ConfigsFragment : ListFragment() {
                 searchDebounceHandler.postDelayed(searchDebounceRunnable, 250)
             }
         })
+        } catch (e: Exception) {
+            android.util.Log.e("ConfigsFragment", "Minab: onCreateView failed", e)
+        }
         return v
     }
 
