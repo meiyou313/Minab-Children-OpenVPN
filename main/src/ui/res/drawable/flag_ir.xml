@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Minab Beta v0.9.3 — simplified flag of Iran (4:3). Hand-drawn
+  ~ geometric approximation, same style as the other bundled flags:
+  ~ green-white-red horizontal stripes with a simplified red central
+  ~ emblem (sword + two crescents) in the white stripe. The small
+  ~ takbir text along the stripe edges is omitted at this size.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="18dp"
+    android:viewportWidth="24"
+    android:viewportHeight="18">
+    <path android:fillColor="#239F40" android:pathData="M0,0h24v6.0h-24z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M0,6.0h24v6.0h-24z"/>
+    <path android:fillColor="#DA0001" android:pathData="M0,12.0h24v6.0h-24z"/>
+    <path android:fillColor="#DA0001" android:pathData="M11.5,6.8h1.0v4.4h-1.0z"/>
+    <path android:fillColor="#DA0001" android:pathData="M12.0,5.8l0.7,1.2h-1.4z"/>
+    <path android:fillColor="#DA0001" android:pathData="M10.4,7.2c-1.2,0.0 -2.0,0.8 -2.0,1.8s0.8,1.8 2.0,1.8c-0.7,-0.4 -1.1,-1.0 -1.1,-1.8s0.4,-1.4 1.1,-1.8z"/>
+    <path android:fillColor="#DA0001" android:pathData="M13.6,7.2c1.2,0.0 2.0,0.8 2.0,1.8s-0.8,1.8 -2.0,1.8c0.7,-0.4 1.1,-1.0 1.1,-1.8s-0.4,-1.4 -1.1,-1.8z"/>
+</vector>
