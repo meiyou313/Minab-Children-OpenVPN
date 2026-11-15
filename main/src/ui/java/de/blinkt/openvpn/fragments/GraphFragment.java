@@ -107,6 +107,10 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.graph, container, false);
+        // Minab Beta v0.9.4 — the Graph tab must never kill the
+        // launch: a failure while wiring the charts / data card is
+        // caught and logged, and the tab shows an empty view.
+        try {
         mListView = v.findViewById(R.id.graph_listview);
         mSpeedStatus = v.findViewById(R.id.speedStatus);
         CheckBox logScaleView = v.findViewById(R.id.useLogScale);
@@ -166,6 +170,9 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         mHandler = new Handler();
 
         renderDataUsed();
+        } catch (Exception e) {
+            android.util.Log.e("GraphFragment", "Minab: onCreateView failed", e);
+        }
 
         return v;
 
