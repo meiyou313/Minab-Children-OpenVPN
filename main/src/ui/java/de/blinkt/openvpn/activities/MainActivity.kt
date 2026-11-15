@@ -12,14 +12,18 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import de.blinkt.openvpn.BuildConfig
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.activities.BulkImportActivity
 import de.blinkt.openvpn.core.ConnectionStatus
 import de.blinkt.openvpn.core.GlobalPreferences
 import de.blinkt.openvpn.core.VpnStatus
+import de.blinkt.openvpn.minab.MinabCrashReporter
 import de.blinkt.openvpn.minab.MinabFailover
 import de.blinkt.openvpn.minab.MinabWidgetProvider
 import de.blinkt.openvpn.fragments.*
@@ -34,6 +38,15 @@ class MainActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Minab Beta v0.9.5 — if the last run crashed (or was
+        // killed mid-switch with no trace), show the recorded
+        // report FIRST, before this session writes its own first
+        // breadcrumb — the check reads the previous session's
+        // files, so it must run before anything appends to them.
+        try {
+            MinabCrashReporter.showPendingReportDialogIfAny(this)
+        } catch (e: Exception) {
+        }
         val view = layoutInflater.inflate(R.layout.main_activity, null)
 
         // Instantiate a ViewPager and a PagerAdapter.
@@ -102,6 +115,66 @@ class MainActivity : BaseActivity() {
             android.util.Log.e("MainActivity", "Minab: tab mediator failed", e)
         }
 
+        // Minab Beta v0.9.5 — breadcrumbs for the crash reporter:
+        // one line per tab selection and per fragment lifecycle
+        // event, so the next launch can show exactly where the app
+        // died — even for an ANR/kill, where no exception exists.
+        // Registered once, here: the callbacks cover every tab
+        // fragment without touching each fragment's code.
+        try {
+            supportFragmentManager.registerFragmentLifecycleCallbacks(
+                object : FragmentManager.FragmentLifecycleCallbacks() {
+                    private fun crumb(f: Fragment, event: String) {
+                        try {
+                            MinabCrashReporter.breadcrumb(
+                                this@MainActivity,
+                                "FRAG " + f.javaClass.simpleName + " " + event
+                            )
+                        } catch (ignored: Exception) {
+                        }
+                    }
+
+                    override fun onFragmentCreated(fm: FragmentManager, f: Fragment, savedInstanceState: Bundle?) {
+                        crumb(f, "onCreate")
+                    }
+
+                    override fun onFragmentViewCreated(fm: FragmentManager, f: Fragment, v: View, savedInstanceState: Bundle?) {
+                        crumb(f, "onCreateView")
+                    }
+
+                    override fun onFragmentResumed(fm: FragmentManager, f: Fragment) {
+                        crumb(f, "onResume")
+                    }
+
+                    override fun onFragmentPaused(fm: FragmentManager, f: Fragment) {
+                        crumb(f, "onPause")
+                    }
+
+                    override fun onFragmentViewDestroyed(fm: FragmentManager, f: Fragment) {
+                        crumb(f, "onDestroyView")
+                    }
+                }, true
+            )
+            mPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    try {
+                        val title = try {
+                            mPagerAdapter.getPageTitle(position).toString()
+                        } catch (e: Exception) {
+                            "?"
+                        }
+                        MinabCrashReporter.breadcrumb(
+                            this@MainActivity,
+                            "TAB selected $position $title"
+                        )
+                    } catch (ignored: Exception) {
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Minab: breadcrumb setup failed", e)
+        }
+
         setUpEdgeEdgeInsetsListener(view, R.id.root_linear_layout)
         // Minab Beta v0.9 — the FAQ overlay is a sibling of the tab
         // content, so it needs the same top inset: without it the
@@ -138,6 +211,14 @@ class MainActivity : BaseActivity() {
                 }
             }
         })
+
+        // Minab Beta v0.9.5 — mark the start of this session in
+        // the breadcrumb log (written AFTER the pending-report
+        // check above, so it cannot mask the previous session).
+        try {
+            MinabCrashReporter.breadcrumb(this, "APP launched " + BuildConfig.VERSION_NAME)
+        } catch (ignored: Exception) {
+        }
     }
 
     /** Minab Beta v0.5 — show the FAQ full-screen over the tabs.
@@ -174,6 +255,14 @@ class MainActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Minab Beta v0.9.5 — the app is in the foreground again
+        // (also after returning from another activity): without
+        // this, a later crash would look like the app had been
+        // backgrounded.
+        try {
+            MinabCrashReporter.breadcrumb(this, "APP foregrounded")
+        } catch (ignored: Exception) {
+        }
         // Minab Beta v0.9 — failover + widget refresh. The listener
         // only lives while the app is in the foreground (starting a
         // VPN from the background is blocked by Android), so
@@ -199,7 +288,25 @@ class MainActivity : BaseActivity() {
 
     override fun onPause() {
         VpnStatus.removeStateListener(minabStateListener)
+        // Minab Beta v0.9.5 — a normal backgrounding must not be
+        // mistaken for a crash on the next launch: this is the
+        // last breadcrumb line of a clean session.
+        try {
+            MinabCrashReporter.breadcrumb(this, "APP backgrounded")
+        } catch (ignored: Exception) {
+        }
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        // Minab Beta v0.9.5 — a normal exit (back button, swipe
+        // from recents) marks the session clean, so the next
+        // launch does not offer a crash report for it.
+        try {
+            MinabCrashReporter.breadcrumb(this, "APP closed cleanly")
+        } catch (ignored: Exception) {
+        }
+        super.onDestroy()
     }
 
     /** Minab Beta v0.9 — connection-state listener for failover
