@@ -69,25 +69,38 @@ class MainActivity : BaseActivity() {
             mPagerAdapter.addTab(R.string.openvpn_log, LogFragment::class.java)
 
         mPagerAdapter.addTab(R.string.about, AboutFragment::class.java)
-        mPager.setAdapter(mPagerAdapter)
 
-        // Minab Beta v0.9.3 — keep every tab's view alive (the
-        // default offscreen limit is 1): switching tabs used to
-        // destroy and recreate the fragment views on every switch,
-        // re-running the whole Home/Configs populate + row-measure
-        // work each time — with dozens of imported profiles that
-        // froze the UI past the ANR threshold and the app "hung and
-        // closed" on every switch (0.9.1, 0.9.2). Five small tab
-        // views in memory is cheap; recreating them per switch is not.
-        mPager.offscreenPageLimit = 4
+        // Minab Beta v0.9.4 — LAZY tab loading again: v0.9.3 set
+        // offscreenPageLimit = 4, so all five tab fragments were
+        // created eagerly at startup — and v0.9.3 crashed on launch
+        // (only the logo showed, then it closed, before any screen
+        // appeared), while v0.9.2 with the default limit (1) opened
+        // fine. No single throwing line could be pinned in the
+        // 0.9.3 diff, so the eager creation is reverted: tabs are
+        // created when first shown again. A launching app that may
+        // still hang on tab switches is far better than an app that
+        // never opens — and the 0.9.3 per-switch work (signature
+        // cache, ViewHolders, guards) stays, so switches should
+        // still be cheaper than in 0.9.2.
+        try {
+            mPager.setAdapter(mPagerAdapter)
+        } catch (e: Exception) {
+            // Never let pager setup kill the launch: the app still
+            // opens (toolbar + empty content) instead of closing.
+            android.util.Log.e("MainActivity", "Minab: pager adapter failed", e)
+        }
 
         // Minab Beta v0.8 — tab swiping was too eager; a longer
         // drag is needed to change pages now (tab taps unaffected).
         MinabPagerSensitivity.reduceSensitivity(mPager)
 
-        TabLayoutMediator(tablayout, mPager) { tab, position ->
-            tab.text = mPagerAdapter.getPageTitle(position)
-        }.attach()
+        try {
+            TabLayoutMediator(tablayout, mPager) { tab, position ->
+                tab.text = mPagerAdapter.getPageTitle(position)
+            }.attach()
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Minab: tab mediator failed", e)
+        }
 
         setUpEdgeEdgeInsetsListener(view, R.id.root_linear_layout)
         // Minab Beta v0.9 — the FAQ overlay is a sibling of the tab
