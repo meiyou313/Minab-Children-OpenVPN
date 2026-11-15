@@ -66,6 +66,10 @@ public class AboutFragment extends Fragment implements View.OnClickListener {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.about, container, false);
+        // Minab Beta v0.9.4 — the About tab must never kill the
+        // launch: a failure while wiring the version / update check
+        // is caught and logged, and the tab shows an empty view.
+        try {
         TextView ver = (TextView) v.findViewById(R.id.version);
 
         String version;
@@ -132,6 +136,9 @@ public class AboutFragment extends Fragment implements View.OnClickListener {
                     return WindowInsetsCompat.CONSUMED;
                 }
         );
+        } catch (Exception e) {
+            android.util.Log.e("AboutFragment", "Minab: onCreateView failed", e);
+        }
         return v;
     }
 
