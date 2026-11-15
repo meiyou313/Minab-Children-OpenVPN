@@ -198,6 +198,18 @@
                         android:textColor="@color/minab_text_secondary"
                         android:textSize="11sp" />
 
+                    <!-- Minab Beta v0.9.3 — flag of the country the
+                         shown IP belongs to, right before the IP
+                         value. Hidden (gone) when the country is
+                         unknown. Same 20x15dp size as the row flags. -->
+                    <ImageView
+                        android:id="@+id/minab_conn_ip_flag"
+                        android:layout_width="20dp"
+                        android:layout_height="15dp"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="6dp"
+                        android:visibility="gone" />
+
                     <TextView
                         android:id="@+id/minab_conn_ip"
                         android:layout_width="0dp"
