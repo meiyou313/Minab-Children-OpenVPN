@@ -41,6 +41,10 @@ class GeneralSettings : PreferenceFragmentCompat(), Preference.OnPreferenceClick
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         // Load the preferences from an XML resource
         addPreferencesFromResource(R.xml.general_settings)
+        // Minab Beta v0.9.4 — the Settings tab must never kill the
+        // launch: the !! / as lookups below throw if a preference
+        // is missing or mistyped, so the whole setup is guarded.
+        try {
         registerPermissionReceiver()
         checkForLocalNetworkAccessPermission()
 
@@ -127,6 +131,9 @@ class GeneralSettings : PreferenceFragmentCompat(), Preference.OnPreferenceClick
             }
 
         setClearApiSummary()
+        } catch (e: Exception) {
+            android.util.Log.e("GeneralSettings", "Minab: onCreatePreferences failed", e)
+        }
     }
 
     override fun onResume() {
