@@ -101,6 +101,8 @@ object FlagHelper {
         "gr" to R.drawable.flag_gr,
         "israel" to R.drawable.flag_il,
         "il" to R.drawable.flag_il,
+        "iran" to R.drawable.flag_ir,
+        "ir" to R.drawable.flag_ir,
         "new zealand" to R.drawable.flag_nz,
         "nz" to R.drawable.flag_nz,
         "thailand" to R.drawable.flag_th,
@@ -125,6 +127,17 @@ object FlagHelper {
         // generic globe; anything else (a hand-made group name) also
         // gets the globe rather than a wrong flag.
         return R.drawable.minab_flag_globe
+    }
+
+    /**
+     * Minab Beta v0.9.3 — the flag for a 2-letter country code
+     * (e.g. "IR" from ipinfo.io), for the IP row on Home. Returns
+     * 0 when the code is empty or has no bundled flag — the caller
+     * then shows no flag (never a broken image).
+     */
+    fun flagResForCountryCode(code: String?): Int {
+        if (code.isNullOrBlank()) return 0
+        return byName[code.trim().lowercase(Locale.US)] ?: 0
     }
 
     /**
