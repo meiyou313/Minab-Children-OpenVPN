@@ -64,7 +64,6 @@ import de.blinkt.openvpn.core.ProfileManager
 import de.blinkt.openvpn.core.VpnStatus
 import de.blinkt.openvpn.core.VpnStatus.StateListener
 import de.blinkt.openvpn.minab.CategoryStore
-import de.blinkt.openvpn.minab.CountryCodes
 import de.blinkt.openvpn.minab.FlagHelper
 import de.blinkt.openvpn.minab.MinabCategoryReorder
 import de.blinkt.openvpn.minab.MinabFailover
@@ -166,13 +165,36 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
     /** Signature of the last chip bar built; rebuildCategoryChips
         is a no-op when nothing about the tabs changed. */
     private var chipsSignature: String? = null
+    /** Minab Beta v0.9.3 — the visible list's content signature
+        (see listSignature): when a populate produces the same
+        signature as the list already on screen, the adapter rebuild
+        and the row re-measure are skipped — a tab switch lands here
+        and must be nearly free. */
+    private var lastListSignature: String? = null
+    /** Minab Beta v0.9.3 — the cached expandListView result: the
+        signature + ListView width it was measured for, and the
+        total height. Rows are only re-measured when the content or
+        the width actually changed. */
+    private var lastExpandSignature: String? = null
+    private var lastExpandWidth: Int = 0
+    private var lastExpandHeight: Int = 0
     // --- Minab v0.4: update notice banner ---
     private var updateBanner: TextView? = null
     // --- Minab v0.9: search + favorites + best server + IP check ---
     /** Search text typed in the Home search box (empty = no filter). */
     private var searchQuery: String = ""
-    /** UUID the IP check already ran for (one check per connection). */
-    private var ipCheckedForUuid: String? = null
+    /** Minab Beta v0.9.3 — which IP the panel is showing the check
+        for: "own" (the device's own public IP, before connecting)
+        or "conn:<uuid>" (the tunnel's exit IP). The check only runs
+        when this key changes, and a connection check only counts
+        when it ran while CONNECTED (ipCheckKeyConnected) — the old
+        code checked once per connection on the FIRST state update,
+        i.e. while still CONNECTING, so the request went out before
+        the tunnel was up and the result was wrong or "—" forever. */
+    private var ipCheckKey: String? = null
+    private var ipCheckKeyConnected: Boolean = false
+    /** Flag of the country the shown IP belongs to (next to the IP). */
+    private var connIpFlagView: ImageView? = null
 
     override fun updateState(
         state: String?,
@@ -181,19 +203,30 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         level: ConnectionStatus?,
         intent: Intent?
     ) {
-        requireActivity().runOnUiThread(Runnable {
-            lastLevel = level
-            mLastStatusMessage = VpnStatus.getLastCleanLogMessage(getActivity())
-            mLastIntent = intent
-            mArrayadapter!!.notifyDataSetChanged()
-            updateOrbState()
-            // Minab Beta v0.9 — keep the home-screen widget in sync
-            // with the connection state. getActivity() (not
-            // requireActivity()): this runs later, and the fragment
-            // may be gone by then.
-            getActivity()?.let { MinabWidgetProvider.updateAllWidgets(it) }
-            showUserRequestDialogIfNeeded(level, intent)
-        })
+        // Minab Beta v0.9.3 — this runs under the VpnStatus lock,
+        // from any thread (the service binder included), and the
+        // posted runnable can land after a tab switch detached us:
+        // never let a state update kill the app (requireActivity()
+        // and mArrayadapter!! both threw here).
+        val activity = activity ?: return
+        try {
+            activity.runOnUiThread(Runnable {
+                try {
+                    lastLevel = level
+                    mLastStatusMessage = VpnStatus.getLastCleanLogMessage(activity)
+                    mLastIntent = intent
+                    mArrayadapter?.notifyDataSetChanged()
+                    updateOrbState()
+                    // Minab Beta v0.9 — keep the home-screen widget in sync
+                    // with the connection state.
+                    MinabWidgetProvider.updateAllWidgets(activity)
+                    showUserRequestDialogIfNeeded(level, intent)
+                } catch (e: Exception) {
+                    // A stale state update must not crash the app.
+                }
+            })
+        } catch (e: Exception) {
+        }
     }
 
     private fun showUserRequestDialogIfNeeded(level: ConnectionStatus?, intent: Intent?): Boolean {
@@ -472,6 +505,9 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         connStatusView = v.findViewById<View?>(R.id.minab_conn_status) as TextView?
         connNameView = v.findViewById<View?>(R.id.minab_conn_name) as TextView?
         connIpView = v.findViewById<View?>(R.id.minab_conn_ip) as TextView?
+        // Minab Beta v0.9.3 — flag of the country the shown IP
+        // belongs to, right before the IP value.
+        connIpFlagView = v.findViewById<View?>(R.id.minab_conn_ip_flag) as ImageView?
         connPingView = v.findViewById<View?>(R.id.minab_conn_ping) as TextView?
         categoryChipsContainer = v.findViewById<View?>(R.id.minab_category_chips) as LinearLayout?
         pingProgressRow = v.findViewById<View?>(R.id.minab_ping_progress_row)
@@ -599,6 +635,67 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // after the fragment is detached; requireActivity() below
         // would throw. Never populate when not attached.
         if (!isAdded) return
+        try {
+            populateVpnListInner()
+        } catch (e: Exception) {
+            // Minab Beta v0.9.3 — one bad profile (or a corrupt
+            // state) must never kill the app on a tab switch: keep
+            // the list that is already on screen instead of crashing.
+        }
+    }
+
+    /** Signature of the visible list: filter/sort + order + everything
+        a row shows (name, group, ping/real results, favorite, profile
+        version — a save bumps mVersion, so an edit that changes e.g.
+        the warning text is caught too). Two populates with the same
+        signature show the same rows. */
+    private fun listSignature(ordered: List<VpnProfile?>): String {
+        val favorites = try {
+            MinabFavorites.getAll(requireContext())
+        } catch (e: Exception) {
+            emptySet<String>()
+        }
+        val defaultUuid = try {
+            ProfileManager.getAlwaysOnVPN(requireContext())?.getUUIDString() ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+        val sb = StringBuilder()
+        sb.append(selectedCategory ?: "all").append('|')
+            .append(searchQuery).append('|').append(sortMode).append('|')
+            .append(defaultUuid).append('|').append(ordered.size)
+        for (p in ordered) {
+            if (p == null) {
+                sb.append("|null")
+                continue
+            }
+            sb.append('|').append(p.getUUIDString())
+                .append(',').append(p.mVersion)
+                .append(',').append(p.mLastPingMs)
+                .append(',').append(p.mLastPingResult)
+                .append(',').append(p.mLastRealMs)
+                .append(',').append(p.mLastRealResult)
+                .append(',').append(favorites.contains(p.getUUIDString()))
+                .append(',').append(p.mName ?: "")
+                .append(',').append(p.getCategory() ?: "")
+        }
+        return sb.toString()
+    }
+
+    /** True when the ListView is already showing our adapter (so a
+        populate that changes nothing can skip re-attaching it — the
+        attach itself re-lays out every row). */
+    private fun isAdapterShowing(): Boolean {
+        val adapter = mArrayadapter ?: return false
+        val list = try {
+            listView
+        } catch (e: IllegalStateException) {
+            return false
+        }
+        return list.adapter === adapter
+    }
+
+    private fun populateVpnListInner() {
         val sortByLRU = Preferences.getDefaultSharedPreferences(requireActivity()).getBoolean(
             PREF_SORT_BY_LRU, false
         )
@@ -643,11 +740,28 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         val ordered = sortedset.sortedWith(
             compareByDescending<VpnProfile?> { it != null && favorites.contains(it.getUUIDString()) }
         )
-        mArrayadapter!!.clear()
-        mArrayadapter!!.addAll(ordered)
+        val signature = listSignature(ordered)
+        // Minab Beta v0.9.3 — a tab switch lands here with the same
+        // rows already on screen: skip the adapter rebuild and the
+        // re-measure entirely (the old code rebuilt and re-measured
+        // every row on every switch — the main per-switch cost).
+        // The chip bar is still rebuilt (it is signature-cached and
+        // can change while the list does not, e.g. a new empty group).
+        if (signature == lastListSignature && isAdapterShowing()) {
+            rebuildCategoryChips()
+            // Still post the expand: it is cached (a no-op when the
+            // width did not change) but re-measures when it did
+            // (e.g. multi-window resize).
+            view?.post { expandListView() }
+            return
+        }
+        lastListSignature = signature
+        val adapter = mArrayadapter ?: return
+        adapter.clear()
+        adapter.addAll(ordered)
 
-        setListAdapter(mArrayadapter)
-        mArrayadapter!!.notifyDataSetChanged()
+        setListAdapter(adapter)
+        adapter.notifyDataSetChanged()
         rebuildCategoryChips()
         // Minab v0.5: the list is part of the page's single scroll,
         // so size the ListView to its content (no inner scroll).
@@ -705,24 +819,47 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         val list = try { listView } catch (e: IllegalStateException) { return }
         val adapter = mArrayadapter ?: return
         if (adapter.count == 0) {
+            lastExpandSignature = null
+            lastExpandWidth = 0
+            lastExpandHeight = 0
             list.layoutParams.height = 0
             list.requestLayout()
             return
         }
-        val width = if (list.width > 0) list.width
-            else resources.displayMetrics.widthPixels - dp(32)
+        // Minab Beta v0.9.3 — measure with the ListView's TRUE
+        // width: the old code measured with a guessed width when the
+        // real one was not known yet, which wrapped long names
+        // differently than the real layout — two-line names came out
+        // shorter than laid out and their subtitle was cut off at
+        // the row's bottom edge. If the width is not known yet,
+        // wait for the layout pass instead of guessing.
+        val width = list.width
+        if (width <= 0) {
+            view?.post { expandListView() }
+            return
+        }
+        // Minab Beta v0.9.3 — cached: the same rows at the same
+        // width have the same height. Re-measuring every row on
+        // every populate was the main per-switch cost.
+        val signature = adapterSignature()
+        if (signature != null && signature == lastExpandSignature && width == lastExpandWidth) {
+            if (list.layoutParams.height != lastExpandHeight) {
+                list.layoutParams.height = lastExpandHeight
+                list.requestLayout()
+            }
+            return
+        }
         val widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
         val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         var totalHeight = 0
-        // Minab Beta v0.9.1 — recycle ONE convertView through the
-        // rows (fix #4): measuring used to inflate a fresh row view
-        // for every row on every populate, which is the main cost
-        // when switching to this tab.
-        var convertView: View? = null
         for (i in 0 until adapter.count) {
             try {
-                val item = adapter.getView(i, convertView, list)
-                convertView = item
+                // Minab Beta v0.9.3 — a FRESH view per row: the
+                // recycled convertView carried the previous row's
+                // measured state (badges shown/hidden), which made
+                // two-line names measure shorter than they lay out.
+                // Measuring is now cached, so this runs rarely.
+                val item = adapter.getView(i, null, list)
                 item.measure(widthSpec, heightSpec)
                 totalHeight += item.measuredHeight
             } catch (e: Exception) {
@@ -732,9 +869,46 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             }
         }
         totalHeight += list.dividerHeight * (adapter.count - 1)
+        // A few px of slack for rounding (one row's text metrics).
+        totalHeight += dp(4)
+        lastExpandSignature = signature
+        lastExpandWidth = width
+        lastExpandHeight = totalHeight
         val params = list.layoutParams
         params.height = totalHeight
         list.layoutParams = params
+    }
+
+    /** Signature of the rows the adapter is currently showing (same
+        shape as listSignature, read from the adapter so the expand
+        cache stays valid across populates). Null when the adapter
+        is not ready. */
+    private fun adapterSignature(): String? {
+        val adapter = mArrayadapter ?: return null
+        val favorites = try {
+            MinabFavorites.getAll(requireContext())
+        } catch (e: Exception) {
+            emptySet<String>()
+        }
+        val sb = StringBuilder()
+        sb.append(adapter.count)
+        for (i in 0 until adapter.count) {
+            val p = try {
+                adapter.getItem(i)
+            } catch (e: Exception) {
+                null
+            } ?: continue
+            sb.append('|').append(p.getUUIDString())
+                .append(',').append(p.mVersion)
+                .append(',').append(p.mLastPingMs)
+                .append(',').append(p.mLastPingResult)
+                .append(',').append(p.mLastRealMs)
+                .append(',').append(p.mLastRealResult)
+                .append(',').append(favorites.contains(p.getUUIDString()))
+                .append(',').append(p.mName ?: "")
+                .append(',').append(p.getCategory() ?: "")
+        }
+        return sb.toString()
     }
 
     // --- Minab Children: categories ---
@@ -1072,8 +1246,9 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         "Disconnected" otherwise. Name: the connected server's
         name (or the server the button would connect when
         disconnected) — small, up to 3 lines, never cut. IP: the
-        public IP + country through the tunnel (see updateIpInfo).
-        Ping: the server's last ping as a coloured pill (green
+        public IP + country flag: the device's own public IP
+        before connecting, the tunnel's exit IP after (see
+        updateIpInfo). Ping: the server's last ping as a coloured
         < 100 ms, amber 100–299 ms, grey >= 300 ms / Timeout /
         Failed) — tap it to re-test that server now. */
     private fun updateOrbState() {
@@ -1109,9 +1284,6 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                 if (connected) R.color.minab_connected else R.color.minab_busy,
                 requireContext().theme))
             nameView?.text = profile?.mName ?: ""
-            // Minab Beta v0.9 — public IP + country through the
-            // tunnel, checked once per connection (see updateIpInfo).
-            updateIpInfo(uuid)
             if (profile != null && pingView != null) {
                 setPanelPing(profile)
             }
@@ -1122,10 +1294,6 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // The server the button would connect to.
             val target = orbTargetProfile()
             nameView?.text = target?.mName ?: ""
-            // Minab Beta v0.9 — forget which connection the IP line
-            // belonged to, so the next connection checks again.
-            connIpView?.text = "—"
-            ipCheckedForUuid = null
             if (target != null && pingView != null) {
                 setPanelPing(target)
             } else {
@@ -1133,6 +1301,10 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                 pingView?.background = null
             }
         }
+        // Minab Beta v0.9.3 — the IP line: the device's own public
+        // IP before connecting, the tunnel's exit IP after. One call
+        // here covers both branches (see updateIpInfo).
+        updateIpInfo(uuid)
     }
 
     /** The panel's Ping row: the server's last ping ("94 ms" /
@@ -1179,30 +1351,64 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         startVPN(best)
     }
 
-    /** Minab Beta v0.9 — the public IP + country in the panel's IP
-        row. Checked once per connection (ipCheckedForUuid), through
-        the tunnel, off the UI thread (MinabIpCheck posts its callback
-        on the main thread). Shows "—" on failure, never blocks.
+    /** Minab Beta v0.9.3 — the public IP + country in the panel's
+        IP row. Two cases, one key each ("own" / "conn:<uuid>"):
+        - BEFORE connecting, the device's own current public IP
+          (normal network, not the tunnel);
+        - AFTER connecting, the IP seen through the tunnel (the
+          server's exit IP), checked only once the state is really
+          CONNECTED. The v0.9 code checked on the first state update
+          of a connection — while still CONNECTING — so the request
+          went out before the tunnel was up and the field stayed "—"
+          for the whole connection; and it never checked at all
+          while disconnected.
+        The check runs only when the key changes. While a check is
+        in flight the previous value stays (never blanked); on
+        failure the field shows "—". The country flag (FlagHelper)
+        appears right before the IP value; unknown country → no flag.
         The result is only shown when it still belongs to the same
-        connection (the VPN may have switched meanwhile). */
+        key (the VPN may have switched meanwhile). Off the UI thread
+        (MinabIpCheck posts its callback on the main thread). */
     private fun updateIpInfo(uuid: String?) {
-        val infoView = connIpView ?: return
-        if (uuid == null) {
-            infoView.text = "—"
-            ipCheckedForUuid = null
-            return
+        if (connIpView == null) return
+        if (VpnStatus.isVPNActive()) {
+            // The tunnel must actually be up: a check started while
+            // CONNECTING goes over the normal network (or fails on
+            // the route change) and would show the wrong IP.
+            val connected = lastLevel == ConnectionStatus.LEVEL_CONNECTED || lastLevel == null
+            if (!connected) return
+            val key = "conn:$uuid"
+            if (ipCheckKey == key && ipCheckKeyConnected) return
+            ipCheckKey = key
+            ipCheckKeyConnected = true
+            runIpCheck(key, uuid)
+        } else {
+            if (ipCheckKey == "own") return
+            ipCheckKey = "own"
+            ipCheckKeyConnected = false
+            runIpCheck("own", null)
         }
-        if (ipCheckedForUuid == uuid) return
-        ipCheckedForUuid = uuid
-        infoView.text = getString(R.string.minab_ip_checking)
-            .removePrefix("IP: ").trim()
+    }
+
+    private fun runIpCheck(key: String, uuid: String?) {
         MinabIpCheck.check { info ->
             if (!isAdded) return@check
-            if (!VpnStatus.isVPNActive() || VpnStatus.getLastConnectedVPNProfile() != uuid) return@check
-            connIpView?.text = when {
-                info == null -> "—"
-                info.countryCode.isEmpty() -> info.ip
-                else -> info.ip + " · " + CountryCodes.nameForCode(info.countryCode)
+            if (ipCheckKey != key) return@check
+            if (uuid != null) {
+                if (!VpnStatus.isVPNActive() || VpnStatus.getLastConnectedVPNProfile() != uuid) return@check
+            } else {
+                if (VpnStatus.isVPNActive()) return@check
+            }
+            connIpView?.text = info?.ip ?: "—"
+            val flagView = connIpFlagView
+            if (flagView != null) {
+                val res = if (info == null) 0 else FlagHelper.flagResForCountryCode(info.countryCode)
+                if (res != 0) {
+                    flagView.setImageResource(res)
+                    flagView.visibility = View.VISIBLE
+                } else {
+                    flagView.visibility = View.GONE
+                }
             }
         }
     }
@@ -1857,12 +2063,29 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         }
     }
 
+    /** Minab Beta v0.9.3 — row ViewHolder: getView used to call
+        findViewById ~10 times per row on every layout/measure, and
+        the Home list lays out every row on every populate (the
+        ListView is sized to its full content). Caching the views on
+        the row's tag makes re-binding a row nearly free. */
+    private class RowHolder(val view: View) {
+        val title: TextView = view.findViewById(R.id.vpn_item_title)
+        val subtitle: TextView = view.findViewById(R.id.vpn_item_subtitle)
+        val left: View = view.findViewById(R.id.vpn_list_item_left)
+        val settings: View = view.findViewById(R.id.quickedit_settings)
+        val flag: ImageView = view.findViewById(R.id.minab_flag)
+        val pingBadge: TextView = view.findViewById(R.id.minab_ping_badge)
+        val realBadge: TextView = view.findViewById(R.id.minab_real_badge)
+        val star: ImageView = view.findViewById(R.id.minab_favorite_star)
+    }
+
     private inner class VPNArrayAdapter(
         context: Context, resource: Int,
         textViewResourceId: Int
     ) : ArrayAdapter<VpnProfile>(context, resource, textViewResourceId) {
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val v = super.getView(position, convertView, parent)
+            val holder = (v.tag as? RowHolder) ?: RowHolder(v).also { v.tag = it }
 
             val profile = getListAdapter()!!.getItem(position) as VpnProfile
 
@@ -1879,19 +2102,19 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             } else {
                 v.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
-            val titleText = v.findViewById<TextView>(R.id.vpn_item_title)
+            val titleText = holder.title
             titleText.setTextColor(
                 resources.getColor(
                     if (connected) R.color.minab_connected else R.color.minab_text_primary,
                     requireContext().theme))
 
-            val titleview = v.findViewById<View>(R.id.vpn_list_item_left)
+            val titleview = holder.left
             titleview.setOnClickListener(View.OnClickListener { v1: View? -> startOrStopVPN(profile) })
 
-            val settingsview = v.findViewById<View>(R.id.quickedit_settings)
+            val settingsview = holder.settings
             settingsview.setOnClickListener(View.OnClickListener { view: View? -> editVPN(profile) })
 
-            val subtitle = v.findViewById<TextView>(R.id.vpn_item_subtitle)
+            val subtitle = holder.subtitle
             val warningText = getWarningText(requireContext(), profile)
 
             if (profile === defaultVPN) {
@@ -1928,10 +2151,10 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // country name / code in the name and host, so EVERY
             // server gets a flag — even an Uncategorized one — and
             // the flag column is never empty.
-            val flagView = v.findViewById<android.widget.ImageView>(R.id.minab_flag)
+            val flagView = holder.flag
             flagView.setImageResource(FlagHelper.flagResForProfile(profile))
             flagView.visibility = View.VISIBLE
-            val badge = v.findViewById<TextView>(R.id.minab_ping_badge)
+            val badge = holder.pingBadge
             // Minab v0.7: "> 0" (not ">= 0") — a 0 ms value is not
             // a measurement (see VpnProfile migration guard), and
             // the else-branch ignores a stale "0 ms" result text.
@@ -1957,7 +2180,7 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // Shown only when a real test result exists for this
             // profile ("Real: 850 ms" when the server really bypasses
             // filtering, "Blocked" when it does not).
-            val realBadge = v.findViewById<TextView>(R.id.minab_real_badge)
+            val realBadge = holder.realBadge
             // Minab v0.7: "> 0" (not ">= 0") — a 0 ms value is not
             // a measurement (see VpnProfile migration guard), and
             // the else-branch ignores a stale "Real: 0 ms" text.
@@ -1985,7 +2208,7 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // top). The star has its own listener, so tapping it
             // does not also connect the VPN (the row's connect
             // click lives on the left title area only).
-            val star = v.findViewById<ImageView>(R.id.minab_favorite_star)
+            val star = holder.star
             val isFavorite = MinabFavorites.isFavorite(requireContext(), profile.getUUIDString())
             star.setImageResource(
                 if (isFavorite) R.drawable.minab_star_on else R.drawable.minab_star_off
