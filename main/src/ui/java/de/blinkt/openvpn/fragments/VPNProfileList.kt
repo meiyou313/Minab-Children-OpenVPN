@@ -399,9 +399,14 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // Minab Beta v0.9.4 — startup must not die here: if the
         // initial populate or the orb state throws, the fragment
         // shows an empty/stale list instead of killing the app.
+        // Minab Beta v0.9.5 — AUDIT: this used to sit outside
+        // the try below, so requireContext() throwing (fragment
+        // detached mid-resume) killed the app on a tab switch.
+        // It is inside the guard now.
         try {
             setListAdapter()
             updateOrbState()
+            defaultVPN = ProfileManager.getAlwaysOnVPN(requireContext())
         } catch (e: Exception) {
             android.util.Log.e("VPNProfileList", "Minab: onResume populate failed", e)
         }
@@ -418,7 +423,6 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             }.start()
         }
         VpnStatus.addStateListener(this)
-        defaultVPN = ProfileManager.getAlwaysOnVPN(requireContext())
     }
 
     override fun onPause() {
