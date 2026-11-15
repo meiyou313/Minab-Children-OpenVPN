@@ -396,8 +396,15 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // Minab v0.6: we are back (e.g. after our own LaunchVPN
         // round-trip) — do not stop a running real test for it.
         realTestPauseHandler.removeCallbacks(realTestPauseStop)
-        setListAdapter()
-        updateOrbState()
+        // Minab Beta v0.9.4 — startup must not die here: if the
+        // initial populate or the orb state throws, the fragment
+        // shows an empty/stale list instead of killing the app.
+        try {
+            setListAdapter()
+            updateOrbState()
+        } catch (e: Exception) {
+            android.util.Log.e("VPNProfileList", "Minab: onResume populate failed", e)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
             // Minab Beta v0.9.1 — the shortcut refresh (ShortcutManager
             // IPC + icon work) used to run on the UI thread on every
@@ -537,8 +544,14 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // of the panel; it re-tests the target server when
         // disconnected).
         connPingView?.setOnClickListener { retestConnectedPing() }
-        updateOrbState()
-        rebuildCategoryChips()
+        // Minab Beta v0.9.4 — same guard as onResume: a failure
+        // while building the orb / chips must not kill the launch.
+        try {
+            updateOrbState()
+            rebuildCategoryChips()
+        } catch (e: Exception) {
+            android.util.Log.e("VPNProfileList", "Minab: onCreateView orb/chips failed", e)
+        }
         registerForContextMenu(v.findViewById(android.R.id.list))
 
         // Minab v0.4: update notice banner (hidden unless a newer
@@ -1404,7 +1417,15 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             if (flagView != null) {
                 val res = if (info == null) 0 else FlagHelper.flagResForCountryCode(info.countryCode)
                 if (res != 0) {
-                    flagView.setImageResource(res)
+                    // Minab Beta v0.9.4 — a bad flag drawable (e.g.
+                    // a vector that fails to inflate) must not kill
+                    // the app from this async callback.
+                    try {
+                        flagView.setImageResource(res)
+                    } catch (e: Exception) {
+                        flagView.visibility = View.GONE
+                        return@check
+                    }
                     flagView.visibility = View.VISIBLE
                 } else {
                     flagView.visibility = View.GONE
@@ -2084,10 +2105,28 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         textViewResourceId: Int
     ) : ArrayAdapter<VpnProfile>(context, resource, textViewResourceId) {
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-            val v = super.getView(position, convertView, parent)
+            // Minab Beta v0.9.4 — a row must never kill the app: a
+            // failure here runs during ListView layout on the main
+            // thread, so it is caught and the row is left unbound.
+            val v = try {
+                super.getView(position, convertView, parent)
+            } catch (e: Exception) {
+                android.util.Log.e("VPNProfileList", "Minab: row inflate failed at $position", e)
+                return convertView ?: View(parent.context)
+            }
+            try {
+                bindRow(v, position)
+            } catch (e: Exception) {
+                android.util.Log.e("VPNProfileList", "Minab: row bind failed at $position", e)
+            }
+            return v
+        }
+
+        /** The old getView body, extracted so it can be guarded. */
+        private fun bindRow(v: View, position: Int) {
             val holder = (v.tag as? RowHolder) ?: RowHolder(v).also { v.tag = it }
 
-            val profile = getListAdapter()!!.getItem(position) as VpnProfile
+            val profile = getListAdapter()?.getItem(position) as? VpnProfile ?: return
 
             // Minab v0.7: highlight the connected server's row in
             // green, so it is obvious at a glance. Both branches
@@ -2217,8 +2256,6 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                 MinabFavorites.toggle(requireContext(), profile.getUUIDString())
                 populateVpnList()
             }
-
-            return v
         }
     }
 
