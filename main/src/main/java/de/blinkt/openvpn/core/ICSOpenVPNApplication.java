@@ -26,12 +26,21 @@ import java.util.concurrent.Executors;
 import de.blinkt.openvpn.BuildConfig;
 import de.blinkt.openvpn.R;
 import de.blinkt.openvpn.api.AppRestrictions;
+import de.blinkt.openvpn.minab.MinabCrashReporter;
 
 public class ICSOpenVPNApplication extends Application {
     private StatusListener mStatus;
 
     @Override
     public void onCreate() {
+        // Minab Beta v0.9.5 — install the crash reporter FIRST:
+        // every later fix for the tab-switch crash depends on the
+        // trace this records, and a crash during startup must be
+        // captured too.
+        try {
+            MinabCrashReporter.install(this);
+        } catch (Exception ignored) {
+        }
         if (BuildConfig.BUILD_TYPE.equals("debug"))
             enableStrictModes();
 
