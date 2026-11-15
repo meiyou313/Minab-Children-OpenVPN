@@ -71,6 +71,16 @@ class MainActivity : BaseActivity() {
         mPagerAdapter.addTab(R.string.about, AboutFragment::class.java)
         mPager.setAdapter(mPagerAdapter)
 
+        // Minab Beta v0.9.3 — keep every tab's view alive (the
+        // default offscreen limit is 1): switching tabs used to
+        // destroy and recreate the fragment views on every switch,
+        // re-running the whole Home/Configs populate + row-measure
+        // work each time — with dozens of imported profiles that
+        // froze the UI past the ANR threshold and the app "hung and
+        // closed" on every switch (0.9.1, 0.9.2). Five small tab
+        // views in memory is cheap; recreating them per switch is not.
+        mPager.offscreenPageLimit = 4
+
         // Minab Beta v0.8 — tab swiping was too eager; a longer
         // drag is needed to change pages now (tab taps unaffected).
         MinabPagerSensitivity.reduceSensitivity(mPager)
