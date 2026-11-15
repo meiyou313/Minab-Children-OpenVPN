@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -232,9 +233,19 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         // the flexible weight-1 columns.
         boolean daily = (mDataMode == DATA_DAILY);
         int colWidthPx = (int) (40 * density);
-        mDataBars.setLayoutParams(new ViewGroup.LayoutParams(
-                daily ? ViewGroup.LayoutParams.WRAP_CONTENT
-                        : ViewGroup.LayoutParams.MATCH_PARENT,
+        // Minab Beta v0.9.6 — these params MUST be
+        // FrameLayout.LayoutParams (a MarginLayoutParams): mDataBars
+        // is the direct child of the HorizontalScrollView in
+        // graph_data_used.xml, and HorizontalScrollView
+        // .measureChildWithMargins casts the child's params to
+        // MarginLayoutParams. The v0.9.1 code used plain
+        // ViewGroup.LayoutParams here, which threw
+        // ClassCastException on the main thread every time the
+        // Graph page was laid out during a tab switch — the phone's
+        // own crash report (0.9.5, twice identical) proved it.
+        mDataBars.setLayoutParams(new FrameLayout.LayoutParams(
+                daily ? FrameLayout.LayoutParams.WRAP_CONTENT
+                        : FrameLayout.LayoutParams.MATCH_PARENT,
                 (int) (130 * density)));
         for (DataUsageStore.Bucket b : buckets) {
             LinearLayout col = new LinearLayout(ctx);
