@@ -54,17 +54,19 @@
             android:gravity="center_vertical"
             android:orientation="vertical">
 
-            <!-- Minab Beta v0.9.1 — the name is shown FULLY (fix
-                 #13b): small (12sp), up to 2 lines, wrapping —
-                 never cut in half. -->
+            <!-- Minab Beta v0.9.3 — the name is shown FULLY:
+                 smaller (11sp, was 12sp), up to 2 lines, wrapping,
+                 with "…" if it still does not fit — never cut in
+                 half at the row's bottom edge. -->
             <TextView
                 android:id="@+id/vpn_item_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
                 android:maxLines="2"
                 android:textColor="@color/minab_text_primary"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 tools:text="Vpn Name" />
 
             <TextView
@@ -76,7 +78,7 @@
                 android:fontFamily="@font/vazirmatn"
                 android:singleLine="true"
                 android:textColor="@color/minab_text_secondary"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 tools:text="Not connected!" />
         </LinearLayout>
 
