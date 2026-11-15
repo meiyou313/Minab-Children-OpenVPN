@@ -191,7 +191,9 @@ class ConfigsFragment : ListFragment() {
                 Toast.makeText(requireContext(), R.string.minab_ping_cancelled, Toast.LENGTH_SHORT).show()
             }
         }
-        v.findViewById<ListView>(android.R.id.list).setOnItemLongClickListener { _, _, position, _ ->
+        // Minab Beta v0.9.4 — safe call: a missing ListView must
+        // not kill the launch.
+        v.findViewById<ListView>(android.R.id.list)?.setOnItemLongClickListener { _, _, position, _ ->
             val profile = mArrayadapter?.getItem(position) ?: return@setOnItemLongClickListener false
             toggleSelection(profile)
             true
@@ -357,14 +359,32 @@ class ConfigsFragment : ListFragment() {
                 context, R.layout.minab_config_row, ArrayList(sorted)
             ) {
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = convertView
-                        ?: LayoutInflater.from(context).inflate(R.layout.minab_config_row, parent, false)
+                    // Minab Beta v0.9.4 — a row must never kill the
+                    // app: a failure here runs during ListView
+                    // layout on the main thread, so it is caught
+                    // and the row is left unbound (see Home).
+                    val view = try {
+                        convertView
+                            ?: LayoutInflater.from(context).inflate(R.layout.minab_config_row, parent, false)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ConfigsFragment", "Minab: row inflate failed at $position", e)
+                        return convertView ?: View(parent.context)
+                    }
+                    try {
+                        bindConfigRow(view, position)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ConfigsFragment", "Minab: row bind failed at $position", e)
+                    }
+                    return view
+                }
+                /** The old getView body, extracted so it can be guarded. */
+                private fun bindConfigRow(view: View, position: Int) {
                     // Minab Beta v0.9.3 — row ViewHolder (same as
                     // Home): getView called findViewById ~8 times
                     // per row on every layout/measure.
                     val holder = (view.tag as? ConfigRowHolder)
                         ?: ConfigRowHolder(view).also { view.tag = it }
-                    val profile = getItem(position)!!
+                    val profile = getItem(position) ?: return
                     holder.name.text = profile.mName
                     // Minab Beta v0.9.1 — the subtitle is just the
                     // group (fix #6): the ping / real results live
@@ -403,7 +423,6 @@ class ConfigsFragment : ListFragment() {
                     checkBox.setOnCheckedChangeListener(null)
                     checkBox.isChecked = selectedUuids.contains(profile.getUUIDString())
                     checkBox.setOnCheckedChangeListener { _, _ -> toggleSelection(profile) }
-                    return view
                 }
             }
             listAdapter = mArrayadapter
