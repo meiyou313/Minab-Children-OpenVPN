@@ -77,6 +77,18 @@ class ConfigsFragment : ListFragment() {
     private val searchDebounceHandler = Handler(Looper.getMainLooper())
     private val searchDebounceRunnable = Runnable { refreshList() }
     private var chipsSignature: String? = null
+    /** Minab Beta v0.9.3 — the visible list's content signature
+        (see listSignature): when a refresh produces the same
+        signature as the list already on screen, the adapter rebuild
+        and the row re-measure are skipped — a tab switch lands here
+        and must be nearly free (same as Home). */
+    private var lastListSignature: String? = null
+    /** Minab Beta v0.9.3 — the cached expandListView result (same
+        idea as Home): the signature + ListView width it was
+        measured for, and the total height. */
+    private var lastExpandSignature: String? = null
+    private var lastExpandWidth: Int = 0
+    private var lastExpandHeight: Int = 0
     /** UUIDs of the configs ticked for Delete / Share. */
     private val selectedUuids = mutableSetOf<String>()
     private var selectionRow: View? = null
@@ -232,8 +244,75 @@ class ConfigsFragment : ListFragment() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
+    /** Minab Beta v0.9.3 — row ViewHolder for minab_config_row
+        (same as Home's RowHolder): caches the row's views on the
+        view's tag so getView stops calling findViewById ~8 times
+        per row on every layout/measure. */
+    private class ConfigRowHolder(val view: View) {
+        val name: TextView = view.findViewById(R.id.minab_config_name)
+        val subtitle: TextView = view.findViewById(R.id.minab_config_subtitle)
+        val flag: ImageView = view.findViewById(R.id.minab_config_flag)
+        val pingBadge: TextView = view.findViewById(R.id.minab_config_ping_badge)
+        val realBadge: TextView = view.findViewById(R.id.minab_config_real_badge)
+        val star: ImageView = view.findViewById(R.id.minab_config_star)
+        val edit: ImageView = view.findViewById(R.id.minab_config_edit)
+        val checkBox: CheckBox = view.findViewById(R.id.minab_config_checkbox)
+    }
+
     private fun refreshList() {
         if (!isAdded) return
+        try {
+            refreshListInner()
+        } catch (e: Exception) {
+            // Minab Beta v0.9.3 — one bad profile (or a corrupt
+            // state) must never kill the app on a tab switch: keep
+            // the list that is already on screen instead of crashing.
+        }
+    }
+
+    /** Signature of the visible list: filter/search + order + everything
+        a row shows (name, group, ping/real results, favorite, profile
+        version, selection). Two refreshes with the same signature
+        show the same rows. */
+    private fun listSignature(sorted: Collection<VpnProfile>): String {
+        val favorites = try {
+            MinabFavorites.getAll(requireContext())
+        } catch (e: Exception) {
+            emptySet<String>()
+        }
+        val sb = StringBuilder()
+        sb.append(selectedCategory ?: "all").append('|')
+            .append(searchQuery).append('|')
+            .append(selectedUuids.sorted().joinToString(",")).append('|')
+            .append(sorted.size)
+        for (p in sorted) {
+            sb.append('|').append(p.getUUIDString())
+                .append(',').append(p.mVersion)
+                .append(',').append(p.mLastPingMs)
+                .append(',').append(p.mLastPingResult)
+                .append(',').append(p.mLastRealMs)
+                .append(',').append(p.mLastRealResult)
+                .append(',').append(favorites.contains(p.getUUIDString()))
+                .append(',').append(p.mName ?: "")
+                .append(',').append(p.getCategory() ?: "")
+        }
+        return sb.toString()
+    }
+
+    /** True when the ListView is already showing our adapter (so a
+        refresh that changes nothing can skip re-attaching it — the
+        attach itself re-lays out every row). */
+    private fun isAdapterShowing(): Boolean {
+        val adapter = mArrayadapter ?: return false
+        val list = try {
+            listView
+        } catch (e: IllegalStateException) {
+            return false
+        }
+        return list.adapter === adapter
+    }
+
+    private fun refreshListInner() {
         val context = requireContext()
         val pm = ProfileManager.getInstance(context)
         val all = pm.getProfiles().toList()
@@ -258,6 +337,21 @@ class ConfigsFragment : ListFragment() {
         }
         val sorted = TreeSet<VpnProfile>(Comparator { a, b -> (a.mName ?: "").compareTo(b.mName ?: "") })
         sorted.addAll(searched)
+        // Minab Beta v0.9.3 — a tab switch lands here with the same
+        // rows already on screen: skip the adapter rebuild and the
+        // re-measure entirely. The chip bar and selection bar are
+        // still updated (both are signature-cached / cheap).
+        val signature = listSignature(sorted)
+        if (signature == lastListSignature && isAdapterShowing()) {
+            rebuildChips()
+            updateSelectionBar()
+            // Still post the expand: it is cached (a no-op when the
+            // width did not change) but re-measures when it did
+            // (e.g. multi-window resize).
+            view?.post { expandListView() }
+            return
+        }
+        lastListSignature = signature
         if (mArrayadapter == null) {
             mArrayadapter = object : ArrayAdapter<VpnProfile>(
                 context, R.layout.minab_config_row, ArrayList(sorted)
@@ -265,31 +359,35 @@ class ConfigsFragment : ListFragment() {
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                     val view = convertView
                         ?: LayoutInflater.from(context).inflate(R.layout.minab_config_row, parent, false)
+                    // Minab Beta v0.9.3 — row ViewHolder (same as
+                    // Home): getView called findViewById ~8 times
+                    // per row on every layout/measure.
+                    val holder = (view.tag as? ConfigRowHolder)
+                        ?: ConfigRowHolder(view).also { view.tag = it }
                     val profile = getItem(position)!!
-                    (view.findViewById<TextView>(R.id.minab_config_name)).text = profile.mName
+                    holder.name.text = profile.mName
                     // Minab Beta v0.9.1 — the subtitle is just the
                     // group (fix #6): the ping / real results live
                     // in the badges now, and the username is never
                     // shown under a config.
-                    (view.findViewById<TextView>(R.id.minab_config_subtitle)).text =
+                    holder.subtitle.text =
                         "[" + profile.getCategory() + "]"
                     // Minab Beta v0.9.1 — every server gets a flag
                     // (fix #6): flagResForProfile falls back to the
                     // globe, so the column is never empty.
-                    val flagView = view.findViewById<ImageView>(R.id.minab_config_flag)
-                    flagView.setImageResource(FlagHelper.flagResForProfile(profile))
-                    flagView.visibility = View.VISIBLE
+                    holder.flag.setImageResource(FlagHelper.flagResForProfile(profile))
+                    holder.flag.visibility = View.VISIBLE
                     // Minab Beta v0.9.1 — ping / real badges in neat,
                     // small, regular columns like Home (fix #6).
                     setConfigBadge(
-                        view.findViewById(R.id.minab_config_ping_badge),
+                        holder.pingBadge,
                         profile.mLastPingMs, profile.mLastPingResult)
                     setConfigBadge(
-                        view.findViewById(R.id.minab_config_real_badge),
+                        holder.realBadge,
                         profile.mLastRealMs, profile.mLastRealResult)
                     // Minab Beta v0.9.1 — the favorite star (fix #6):
                     // filled for a favorite, outline otherwise.
-                    val star = view.findViewById<ImageView>(R.id.minab_config_star)
+                    val star = holder.star
                     val isFavorite = MinabFavorites.isFavorite(context, profile.getUUIDString())
                     star.setImageResource(
                         if (isFavorite) R.drawable.minab_star_on else R.drawable.minab_star_off
@@ -300,9 +398,8 @@ class ConfigsFragment : ListFragment() {
                     }
                     // Minab Beta v0.9.1 — the pencil opens the server
                     // editor directly (fix #6).
-                    view.findViewById<ImageView>(R.id.minab_config_edit)
-                        .setOnClickListener { editVPN(profile) }
-                    val checkBox = view.findViewById<CheckBox>(R.id.minab_config_checkbox)
+                    holder.edit.setOnClickListener { editVPN(profile) }
+                    val checkBox = holder.checkBox
                     checkBox.setOnCheckedChangeListener(null)
                     checkBox.isChecked = selectedUuids.contains(profile.getUUIDString())
                     checkBox.setOnCheckedChangeListener { _, _ -> toggleSelection(profile) }
@@ -372,23 +469,46 @@ class ConfigsFragment : ListFragment() {
         val list = try { listView } catch (e: IllegalStateException) { return }
         val adapter = mArrayadapter ?: return
         if (adapter.count == 0) {
+            lastExpandSignature = null
+            lastExpandWidth = 0
+            lastExpandHeight = 0
             list.layoutParams.height = 0
             list.requestLayout()
             return
         }
-        val width = if (list.width > 0) list.width
-            else resources.displayMetrics.widthPixels - dp(32)
+        // Minab Beta v0.9.3 — measure with the ListView's TRUE
+        // width (same fix as Home): a guessed width wrapped long
+        // names differently than the real layout, so two-line names
+        // came out shorter than laid out and their subtitle was cut
+        // off at the row's bottom edge. If the width is not known
+        // yet, wait for the layout pass instead of guessing.
+        val width = list.width
+        if (width <= 0) {
+            view?.post { expandListView() }
+            return
+        }
+        // Minab Beta v0.9.3 — cached: the same rows at the same
+        // width have the same height. Re-measuring every row on
+        // every refresh was the main per-switch cost.
+        val signature = adapterSignature()
+        if (signature != null && signature == lastExpandSignature && width == lastExpandWidth) {
+            if (list.layoutParams.height != lastExpandHeight) {
+                list.layoutParams.height = lastExpandHeight
+                list.requestLayout()
+            }
+            return
+        }
         val widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
         val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         var totalHeight = 0
-        // Minab Beta v0.9.1 — recycle ONE convertView through the
-        // rows (fix #4): measuring used to inflate a fresh row view
-        // for every row on every refresh.
-        var convertView: View? = null
         for (i in 0 until adapter.count) {
             try {
-                val item = adapter.getView(i, convertView, list)
-                convertView = item
+                // Minab Beta v0.9.3 — a FRESH view per row: the
+                // recycled convertView carried the previous row's
+                // measured state (badges shown/hidden), which made
+                // two-line names measure shorter than they lay out.
+                // Measuring is now cached, so this runs rarely.
+                val item = adapter.getView(i, null, list)
                 item.measure(widthSpec, heightSpec)
                 totalHeight += item.measuredHeight
             } catch (e: Exception) {
@@ -398,9 +518,46 @@ class ConfigsFragment : ListFragment() {
             }
         }
         totalHeight += list.dividerHeight * (adapter.count - 1)
+        // A few px of slack for rounding (one row's text metrics).
+        totalHeight += dp(4)
+        lastExpandSignature = signature
+        lastExpandWidth = width
+        lastExpandHeight = totalHeight
         val params = list.layoutParams
         params.height = totalHeight
         list.layoutParams = params
+    }
+
+    /** Signature of the rows the adapter is currently showing (same
+        shape as listSignature, read from the adapter so the expand
+        cache stays valid across refreshes). Null when the adapter
+        is not ready. */
+    private fun adapterSignature(): String? {
+        val adapter = mArrayadapter ?: return null
+        val favorites = try {
+            MinabFavorites.getAll(requireContext())
+        } catch (e: Exception) {
+            emptySet<String>()
+        }
+        val sb = StringBuilder()
+        sb.append(adapter.count)
+        for (i in 0 until adapter.count) {
+            val p = try {
+                adapter.getItem(i)
+            } catch (e: Exception) {
+                null
+            } ?: continue
+            sb.append('|').append(p.getUUIDString())
+                .append(',').append(p.mVersion)
+                .append(',').append(p.mLastPingMs)
+                .append(',').append(p.mLastPingResult)
+                .append(',').append(p.mLastRealMs)
+                .append(',').append(p.mLastRealResult)
+                .append(',').append(favorites.contains(p.getUUIDString()))
+                .append(',').append(p.mName ?: "")
+                .append(',').append(p.getCategory() ?: "")
+        }
+        return sb.toString()
     }
 
     // --- Minab v0.5: selection (delete / share) ---
