@@ -10,8 +10,8 @@
     android:background="@android:color/transparent"
     android:gravity="center_vertical"
     android:minHeight="48dp"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp">
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
 
     <CheckBox
         android:id="@+id/minab_config_checkbox"
@@ -38,16 +38,19 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- Minab Beta v0.9.1 — the name is shown FULLY (fix #6):
-             small (12sp), up to 2 lines, wrapping — never cut. -->
+        <!-- Minab Beta v0.9.3 — the name is shown FULLY:
+             smaller (11sp, was 12sp), up to 2 lines, wrapping,
+             with "…" if it still does not fit — never cut in half
+             at the row's bottom edge. -->
         <TextView
             android:id="@+id/minab_config_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
             android:fontFamily="@font/vazirmatn"
             android:maxLines="2"
             android:textColor="@color/minab_text_primary"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/minab_config_subtitle"
@@ -57,7 +60,7 @@
             android:fontFamily="@font/vazirmatn"
             android:maxLines="1"
             android:textColor="@color/minab_text_secondary"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 
     <!-- Minab Beta v0.9.1 — ping / real results in neat, small,
