@@ -100,7 +100,12 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     private static final int TIME_PERIOD_SECDONS = 0;
     private static final int TIME_PERIOD_MINUTES = 1;
     private static final int TIME_PERIOD_HOURS = 2;
-    private Handler mHandler;
+    // Minab Beta v0.9.5 — AUDIT: this was assigned inside
+    // onCreateView's try block, after lines that can throw — if
+    // the try failed first, onResume / onPause / updateByteCount
+    // crashed with an NPE on every switch to Graph. A Handler
+    // needs no view, so it is created with the field instead.
+    private Handler mHandler = new Handler();
 
 
     @Nullable
@@ -167,8 +172,9 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             getActivity().getPreferences(MODE_PRIVATE).edit().putBoolean(PREF_USE_LOG, isChecked).apply();
         });
 
-        mHandler = new Handler();
-
+        // Minab Beta v0.9.5 — mHandler is created with its field
+        // now (see above): re-assigning it here would orphan the
+        // callbacks already posted to the old one.
         renderDataUsed();
         } catch (Exception e) {
             android.util.Log.e("GraphFragment", "Minab: onCreateView failed", e);
@@ -361,12 +367,17 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                mHandler.removeCallbacks(triggerRefresh);
-                mSpeedStatus.setText(netstat);
-                mChartAdapter.notifyDataSetChanged();
+                // Minab Beta v0.9.5 — AUDIT: this runnable can land
+                // after onCreateView failed early (or after the
+                // view was destroyed): the views and adapter it
+                // touches may be null — a stale tick must not kill
+                // the app on a tab switch.
+                if (mSpeedStatus != null) mSpeedStatus.setText(netstat);
+                if (mChartAdapter != null) mChartAdapter.notifyDataSetChanged();
                 // Minab v0.7: the "Data used" bars grow live while
                 // connected (cheap rebuild of plain Views).
                 renderDataUsed();
+                mHandler.removeCallbacks(triggerRefresh);
                 mHandler.postDelayed(triggerRefresh, OpenVPNManagement.mBytecountInterval * 1500);
             }
         });
