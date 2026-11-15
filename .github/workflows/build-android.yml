@@ -128,14 +128,30 @@ jobs:
           prerelease: true
           files: main/build/outputs/apk/**/debug/Minab-debug-Beta-${{ github.ref_name }}.apk
           body: |
-            Minab debug Beta v0.9.5 — Android only, debug build signed with the permanent Minab key.
-            Installs over v0.9.4 normally (no uninstall needed).
+            Minab debug Beta v0.9.6 — Android only, debug build signed with the permanent Minab key.
+            Installs over v0.9.5 normally (no uninstall needed).
 
             OpenVPN client based on ics-openvpn (GPLv2, Arne Schwabe),
             with bulk import of many .ovpn files / a .zip, one username
             and password for all, profile groups (manual + automatic
             by country), and bulk ping test of all profiles or one
             group.
+
+            New in v0.9.6 — the tab-switch crash is FIXED, and this
+            time the cause is proven, not guessed: the phone's own
+            crash report (sent twice, identical) showed a
+            ClassCastException in HorizontalScrollView
+            .measureChildWithMargins — the "Data used" bar strip on
+            the Graph tab was given plain ViewGroup.LayoutParams,
+            but a HorizontalScrollView's child must have
+            MarginLayoutParams, so measuring the strip crashed the
+            app on the main thread every time the Graph page was
+            laid out during a tab switch (since v0.9.1, when the
+            50-bar Daily strip was added). The strip now gets the
+            correct FrameLayout.LayoutParams. The built-in crash
+            reporter stays, in case anything else ever closes the
+            app. Please test tab switching — tap and swipe, all
+            tabs, connected and not.
 
             New in v0.9.5 — ending the tab-switch crash for real:
             switching tabs has closed the app since v0.9.1, and three
