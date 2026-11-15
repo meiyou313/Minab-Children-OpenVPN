@@ -26,7 +26,15 @@ import java.net.URL;
 import javax.net.ssl.HttpsURLConnection;
 
 public final class MinabIpCheck {
-    private static final String IP_URL = "https://ipinfo.io/json";
+    // Minab Beta v0.9.3 — ipinfo.io can be blocked or fail in
+    // Iran, and ipify returns no country at all: try ipinfo
+    // first, then ip-api.com (also returns the country), then
+    // ipify (IP only). The first endpoint that answers wins.
+    private static final String[] IP_URLS = {
+            "https://ipinfo.io/json",
+            "https://ip-api.com/json",
+            "https://api.ipify.org?format=json"
+    };
     private static final int TIMEOUT_MS = 5000;
 
     /** IP + country code, or null when the check failed. */
@@ -53,32 +61,57 @@ public final class MinabIpCheck {
         final Handler mainHandler = new Handler(Looper.getMainLooper());
         new Thread(() -> {
             IpInfo info = null;
-            HttpsURLConnection conn = null;
-            try {
-                conn = (HttpsURLConnection) new URL(IP_URL).openConnection();
-                conn.setConnectTimeout(TIMEOUT_MS);
-                conn.setReadTimeout(TIMEOUT_MS);
-                conn.setRequestProperty("User-Agent", "Minab");
-                if (conn.getResponseCode() == HttpsURLConnection.HTTP_OK) {
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                    StringBuilder body = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) body.append(line);
-                    reader.close();
-                    JSONObject json = new JSONObject(body.toString());
-                    String ip = json.optString("ip", "");
-                    String country = json.optString("country", "");
-                    if (!ip.isEmpty()) info = new IpInfo(ip, country);
-                }
-            } catch (Exception ignored) {
-                // Offline / service down / tunnel not carrying traffic:
-                // the caller shows "—". Never fatal.
-            } finally {
-                if (conn != null) conn.disconnect();
+            for (String url : IP_URLS) {
+                info = fetch(url);
+                if (info != null) break;
             }
             final IpInfo result = info;
             mainHandler.post(() -> callback.onResult(result));
         }).start();
+    }
+
+    private static IpInfo fetch(String urlString) {
+        HttpsURLConnection conn = null;
+        try {
+            conn = (HttpsURLConnection) new URL(urlString).openConnection();
+            conn.setConnectTimeout(TIMEOUT_MS);
+            conn.setReadTimeout(TIMEOUT_MS);
+            conn.setRequestProperty("User-Agent", "Minab");
+            if (conn.getResponseCode() != HttpsURLConnection.HTTP_OK) return null;
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder body = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) body.append(line);
+            reader.close();
+            return parse(urlString, body.toString());
+        } catch (Exception ignored) {
+            // Offline / service down / tunnel not carrying traffic:
+            // the next endpoint is tried; the caller shows "—".
+            // Never fatal.
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    /** The three endpoints name their fields differently:
+        ipinfo.io {"ip", "country"}, ip-api.com {"query",
+        "countryCode", "status"}, ipify {"ip"} (no country). */
+    private static IpInfo parse(String urlString, String body) {
+        try {
+            JSONObject json = new JSONObject(body);
+            if (urlString.contains("ip-api.com")) {
+                if (!"success".equals(json.optString("status", ""))) return null;
+                String ip = json.optString("query", "");
+                if (ip.isEmpty()) return null;
+                return new IpInfo(ip, json.optString("countryCode", ""));
+            }
+            String ip = json.optString("ip", "");
+            if (ip.isEmpty()) return null;
+            return new IpInfo(ip, json.optString("country", ""));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }
