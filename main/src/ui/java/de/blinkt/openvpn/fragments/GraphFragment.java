@@ -337,6 +337,12 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
 
         long now = (System.currentTimeMillis() / 100) - firstTs;
         int interval = OpenVPNManagement.mBytecountInterval * 10;
+        // Minab Beta v0.9.3 — a byte-count tick can arrive after
+        // the fragment detached (the listener is removed in
+        // onPause, but a tick already in flight keeps going):
+        // getActivity() is null then and the NPE killed the app
+        // on a tab switch.
+        if (getActivity() == null) return;
         Resources res = getActivity().getResources();
 
         final String netstat = String.format(getString(R.string.statusline_bytecount),
