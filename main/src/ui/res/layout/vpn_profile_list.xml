@@ -333,6 +333,13 @@
                 android:tint="@color/minab_teal" />
         </LinearLayout>
 
+        <!-- Minab Beta v0.9.6.2 (fix #1) — the Real test settings
+             panel, directly under the Real test button in the Home
+             header (shared layout with Configs). Hidden until the
+             gear is tapped; green gear while open, blue while
+             closed. -->
+        <include layout="@layout/minab_real_test_settings_panel" />
+
         <!-- Minab Beta v0.9 — connect to the best server: the fastest
              server that passed the real test, or the fastest ping when
              no real test has run yet. Full width, under the three
