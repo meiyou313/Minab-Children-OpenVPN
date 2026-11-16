@@ -56,6 +56,7 @@ import de.blinkt.openvpn.minab.FlagHelper
 import de.blinkt.openvpn.minab.MinabBackup
 import de.blinkt.openvpn.minab.MinabCategoryReorder
 import de.blinkt.openvpn.minab.MinabFavorites
+import de.blinkt.openvpn.minab.MinabRealTestSettings
 import de.blinkt.openvpn.minab.PingTester
 import de.blinkt.openvpn.minab.RealTester
 import de.blinkt.openvpn.minab.SharedCredentials
@@ -108,6 +109,9 @@ class ConfigsFragment : ListFragment() {
     /** True while our real test runs. */
     private var realTestActive: Boolean = false
     private var realTester: RealTester? = null
+    /** Total servers the current run will test (from
+        onRealProgress); 0 when the settings left nothing to test. */
+    private var realTotalCount: Int = 0
     /** Bumped on every start/cancel so listener callbacks from a
         superseded run are ignored. */
     private var realTestRunId = 0
@@ -1300,10 +1304,12 @@ class ConfigsFragment : ListFragment() {
 
     /** Real test: the same two-stage run as Home (ping first when
         stale, then connect each server in ranked order and fetch
-        Telegram Web through it, stopping after 3 passes) — but
-        with a 20 s wait per server instead of Home's 12 s. The
-        runner is shared, so a real test running on Home blocks
-        starting one here (and vice versa). */
+        Telegram Web through it, stopping after 3 passes). The wait
+        per server and the candidate limit come from
+        MinabRealTestSettings (fix #11 — the gear next to the
+        Real test button on Home); the runner is shared, so a real
+        test running on Home blocks starting one here (and vice
+        versa). */
     private fun startRealTest(profiles: List<VpnProfile>) {
         if (profiles.isEmpty()) {
             Toast.makeText(requireContext(), R.string.minab_no_profiles_in_category, Toast.LENGTH_SHORT).show()
@@ -1311,11 +1317,16 @@ class ConfigsFragment : ListFragment() {
         }
         cancelPingTest()
         cancelRealTest()
+        // Minab Beta v0.9.6.1 (fix #11) — reset before the run:
+        // when the settings leave no server to test, onRealProgress
+        // never fires, so onFinished must see the fresh 0 here,
+        // not a previous run's total.
+        realTotalCount = 0
         realTestRunId++
         val runId = realTestRunId
         val tester = RealTester(
             requireContext().applicationContext,
-            CONFIGS_REAL_CONNECT_TIMEOUT_MS,
+            MinabRealTestSettings.getWaitTimeoutMs(requireContext()),
             RealTester.REAL_TEST_TARGET,
             object : RealTester.Listener {
                 override fun onPingProgress(done: Int, total: Int) {
@@ -1334,6 +1345,7 @@ class ConfigsFragment : ListFragment() {
                     done: Int, total: Int, currentName: String?, working: Int
                 ) {
                     if (!isAdded || runId != realTestRunId) return
+                    realTotalCount = total
                     testProgressRow?.visibility = View.VISIBLE
                     testCancelButton?.visibility = View.VISIBLE
                     testProgressBar?.progress =
@@ -1354,10 +1366,16 @@ class ConfigsFragment : ListFragment() {
                     realTester = null
                     realTestActive = false
                     testProgressRow?.visibility = View.GONE
-                    if (!cancelled) {
-                        refreshList()
-                        Toast.makeText(requireContext(), R.string.minab_real_done, Toast.LENGTH_SHORT).show()
+                    if (cancelled) return
+                    // Minab Beta v0.9.6.1 (fix #11) — the settings
+                    // may have left no server to test: say so
+                    // plainly instead of claiming the test finished.
+                    if (realTotalCount == 0) {
+                        Toast.makeText(requireContext(), R.string.minab_real_none_to_test, Toast.LENGTH_LONG).show()
+                        return
                     }
+                    refreshList()
+                    Toast.makeText(requireContext(), R.string.minab_real_done, Toast.LENGTH_SHORT).show()
                 }
 
                 override fun onConnectRequested(profile: VpnProfile) {
@@ -1430,14 +1448,5 @@ class ConfigsFragment : ListFragment() {
                 ).show()
             }
         }.start()
-    }
-
-    companion object {
-        // Minab v0.6: how long the Real test waits for one server
-        // to report CONNECTED from the Configs tab (Home waits
-        // 12 s). Configs is the deliberate, patient choice: a
-        // server that needs longer to connect still gets its
-        // chance here instead of being marked Blocked.
-        private const val CONFIGS_REAL_CONNECT_TIMEOUT_MS = 20_000L
     }
 }
