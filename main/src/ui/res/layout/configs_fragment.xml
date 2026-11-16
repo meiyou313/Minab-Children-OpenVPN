@@ -195,7 +195,25 @@
             android:minHeight="36dp"
             android:text="@string/minab_real_test"
             android:textSize="12sp" />
+
+        <!-- Minab Beta v0.9.6.2 (fix #6) — Real test settings
+             gear, right next to the Real test button, like Home. -->
+        <ImageButton
+            android:id="@+id/minab_configs_btn_real_test_settings"
+            android:layout_width="40dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/minab_real_settings_desc"
+            android:src="@drawable/ic_minab_settings"
+            android:tint="@color/minab_teal" />
     </LinearLayout>
+
+    <!-- Minab Beta v0.9.6.2 (fix #6) — the Real test settings
+         panel, directly under the Real test button (shared layout
+         with Home). Hidden until the gear is tapped; green gear
+         while open, blue while closed. -->
+    <include layout="@layout/minab_real_test_settings_panel" />
 
     <!-- Minab Beta v0.6 — test progress (either test): bar +
          status line + Cancel. Mirrors Home's progress row. -->
