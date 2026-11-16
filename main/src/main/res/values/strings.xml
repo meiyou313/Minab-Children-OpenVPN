@@ -563,6 +563,22 @@
     <!-- Minab Beta v0.9.1: Configs texts shortened (fix #5) -->
     <string name="minab_configs_test_explained">Ping test: fast, checks if the server answers. Real test: connects and opens Telegram Web — slower, but proves it really works.</string>
     <string name="minab_real_already_running">A real test is already running.</string>
+    <!-- Minab Beta v0.9.6.1 — the connected panel while a real test
+         runs (fix #10): the orb and the panel stop flipping and
+         show this steady state instead. -->
+    <string name="minab_status_testing">Testing servers…</string>
+    <!-- Minab Beta v0.9.6.1 — the real-test settings dialog (fix
+         #11) and the "nothing matched the settings" case. -->
+    <string name="minab_real_settings_desc">Real test settings</string>
+    <string name="minab_real_settings_title">Real test settings</string>
+    <string name="minab_real_settings_wait">Wait per server</string>
+    <string name="minab_real_settings_wait_hint">Recommended: 12 seconds</string>
+    <string name="minab_real_settings_max">Servers to test, then stop</string>
+    <string name="minab_real_settings_max_hint">Recommended: 10</string>
+    <string name="minab_real_settings_unpinged">Also test servers that did not answer ping</string>
+    <string name="minab_real_settings_unpinged_hint">Recommended: on</string>
+    <string name="minab_real_settings_reset">Reset to recommended</string>
+    <string name="minab_real_none_to_test">No servers matched the real-test settings.</string>
     <!-- Minab Beta v0.2: short labels for the visible main-screen buttons -->
     <string name="minab_bulk_import_short">Bulk import</string>
     <!-- Minab Beta v0.7: the Home button is short — "Import" fits
@@ -629,6 +645,8 @@
     <string name="minab_data_monthly">Monthly</string>
     <string name="minab_data_total">Total: %1$s</string>
     <string name="minab_data_none_yet">No usage recorded yet — connect to a server and the data you use will appear here.</string>
+    <!-- Minab Beta v0.9.6.1 — jump to the bar for the period we are in (fix #5) -->
+    <string name="minab_data_jump_current_desc">Jump to the current bar</string>
     <string name="minab_live_speed">Live speed</string>
     <string name="minab_backup_configs">Back up configs</string>
     <string name="minab_backup_done">Backed up %1$d config(s).</string>
