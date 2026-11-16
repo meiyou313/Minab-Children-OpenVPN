@@ -319,6 +319,18 @@
                 android:singleLine="true"
                 android:text="@string/minab_real_test"
                 android:textSize="11sp" />
+
+            <!-- Minab Beta v0.9.6.1 (fix #11) — Real test settings
+                 gear, right next to the Real test button. -->
+            <ImageButton
+                android:id="@+id/minab_btn_real_test_settings"
+                android:layout_width="40dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="4dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/minab_real_settings_desc"
+                android:src="@drawable/ic_minab_settings"
+                android:tint="@color/minab_teal" />
         </LinearLayout>
 
         <!-- Minab Beta v0.9 — connect to the best server: the fastest
