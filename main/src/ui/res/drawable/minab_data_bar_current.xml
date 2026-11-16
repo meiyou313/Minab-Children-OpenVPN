@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Minab Beta v0.9.6.1 — the bar for the period we are in
+  ~ (today / this week / this month) in the "Data used" charts
+  ~ (fix #4). Same rounded shape as minab_data_bar, green
+  ~ (@color/minab_connected) instead of indigo, so the current
+  ~ bar stands out from the rest.
+  -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="3dp" />
+    <solid android:color="@color/minab_connected" />
+</shape>
