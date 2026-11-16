@@ -33,8 +33,8 @@
         android:id="@+id/minab_flag"
         android:layout_width="24dp"
         android:layout_height="18dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="6dp"
         android:contentDescription="@string/minab_flag_description"
         android:visibility="gone" />
 
@@ -54,19 +54,26 @@
             android:gravity="center_vertical"
             android:orientation="vertical">
 
-            <!-- Minab Beta v0.9.3 — the name is shown FULLY:
-                 smaller (11sp, was 12sp), up to 2 lines, wrapping,
-                 with "…" if it still does not fit — never cut in
-                 half at the row's bottom edge. -->
+            <!-- Minab Beta v0.9.6.1 (fix #9) — the name still did
+                 not fit: at 11sp on two lines the second line and
+                 the group subtitle were cut at the row's bottom
+                 edge ("us-free-51.protonvpn.tcp"). The texts are
+                 smaller now (name 10sp, subtitle 9sp) and the name
+                 is one line with "…" if it still does not fit, so
+                 name + group always fit inside the row. The badges
+                 are 9sp too ("1967 ms" was cut to "1967..."), and
+                 the pencil/flag spacing is tighter to give the name
+                 more room. Home only — Configs has its own row
+                 layout and never had this problem. -->
             <TextView
                 android:id="@+id/vpn_item_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
-                android:maxLines="2"
+                android:maxLines="1"
                 android:textColor="@color/minab_text_primary"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 tools:text="Vpn Name" />
 
             <TextView
@@ -78,7 +85,7 @@
                 android:fontFamily="@font/vazirmatn"
                 android:singleLine="true"
                 android:textColor="@color/minab_text_secondary"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 tools:text="Not connected!" />
         </LinearLayout>
 
@@ -103,6 +110,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:singleLine="true"
+        android:textSize="9sp"
         android:visibility="gone"
         tools:text="24 ms"
         tools:visibility="visible" />
@@ -117,6 +125,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:singleLine="true"
+        android:textSize="9sp"
         android:visibility="gone"
         tools:text="850 ms"
         tools:visibility="visible" />
@@ -146,10 +155,10 @@
         android:background="?android:attr/selectableItemBackground"
         android:contentDescription="@string/configure_the_vpn"
         android:focusable="true"
-        android:paddingEnd="8dip"
-        android:paddingLeft="8dip"
-        android:paddingRight="8dip"
-        android:paddingStart="8dip"
+        android:paddingEnd="4dip"
+        android:paddingLeft="4dip"
+        android:paddingRight="4dip"
+        android:paddingStart="4dip"
         android:src="@drawable/ic_edit" />
 
 </LinearLayout>
