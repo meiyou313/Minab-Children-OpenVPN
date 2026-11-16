@@ -137,6 +137,37 @@ jobs:
             by country), and bulk ping test of all profiles or one
             group.
 
+            New in v0.9.6.1 — eleven fixes from testing v0.9.6:
+            the update check finally works for real (all Minab
+            releases are pre-releases, so GitHub's "latest release"
+            endpoint always answered 404 — and the web fallback's
+            redirect points at the releases list, not a tag — so
+            the check failed for everyone, always, whatever the
+            connection; it now reads the releases list, API first,
+            then the releases page, and the version comparison
+            already handles four-part versions, so 0.9.6.1 is
+            correctly newer than 0.9.6); Data used: Weekly and
+            Monthly are now 12 bars with 6 visible and the rest by
+            swiping left, the current bar (today / this week /
+            this month) is green in all three modes, a jump icon
+            at the bottom-right of the card jumps to the current
+            bar, tapping any bar shows its date or range, and the
+            tall bar's value ("1.54 GB") is no longer cut to
+            "1...." — the Weekly labels ("9 Nov") are readable
+            now too; Home server rows: names are one line at 10sp
+            with the group below, so nothing is cut at the row's
+            bottom edge (Configs rows were fine and are untouched);
+            during a real test the panel no longer flips between
+            connect and disconnect — it shows a steady "Testing
+            servers… (3 of 12)" state; and a settings gear next to
+            the Real test button lets you choose the wait per
+            server (recommended 12 s), how many ping-answering
+            servers to test (recommended 10), and whether servers
+            that did not answer the ping are tested too
+            (recommended: yes). The crash reporter stays.
+            Please test the update check, the charts, and a real
+            test with the new settings.
+
             New in v0.9.6 — the tab-switch crash is FIXED, and this
             time the cause is proven, not guessed: the phone's own
             crash report (sent twice, identical) showed a
