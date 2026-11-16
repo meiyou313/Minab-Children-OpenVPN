@@ -22,6 +22,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -94,6 +95,11 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     private boolean mScrollDataToEnd = true;
     private TextView mDataTotal;
     private TextView mDataEmpty;
+    // Minab Beta v0.9.6.1 (fixes #5/#7) — the "jump to the
+    // current bar" icon, and the line showing the tapped bar's
+    // date / range.
+    private ImageButton mDataJump;
+    private TextView mDataSelected;
     private Button mDataDaily;
     private Button mDataWeekly;
     private Button mDataMonthly;
@@ -136,6 +142,13 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         mDataBarsScroll = dataHeader.findViewById(R.id.minab_data_bars_scroll);
         mDataTotal = dataHeader.findViewById(R.id.minab_data_total);
         mDataEmpty = dataHeader.findViewById(R.id.minab_data_empty);
+        // Minab Beta v0.9.6.1 (fix #5) — jump to the bar for the
+        // period we are in; (fix #7) the tapped bar's date / range.
+        mDataJump = dataHeader.findViewById(R.id.minab_data_jump_current);
+        mDataSelected = dataHeader.findViewById(R.id.minab_data_selected);
+        if (mDataJump != null) {
+            mDataJump.setOnClickListener(v1 -> jumpToCurrentBar());
+        }
         mDataDaily = dataHeader.findViewById(R.id.minab_data_daily);
         mDataWeekly = dataHeader.findViewById(R.id.minab_data_weekly);
         mDataMonthly = dataHeader.findViewById(R.id.minab_data_monthly);
@@ -224,15 +237,30 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         int maxBarPx = (int) (88 * density);
         int minBarPx = (int) (2 * density);
         int barWidthPx = (int) (20 * density);
-        // Minab Beta v0.9.1 — Daily is a 50-bar strip (46 past days
-        // + today + 3 future empty bars) inside a
-        // HorizontalScrollView, so it scrolls sideways through
-        // history: fixed-width columns (40dp, wide enough for the
-        // "345.6 MB" value label) and a wrap_content strip. Weekly
-        // (8) and Monthly (6) still fit on screen, so they keep
-        // the flexible weight-1 columns.
+        // Minab Beta v0.9.6.1 (fixes #2/#3/#8) — Weekly and Monthly
+        // are 12 bars with exactly 6 visible: fixed columns, one
+        // sixth of the scroll viewport each, inside a WRAP_CONTENT
+        // strip scrolled to the recent end — the same shape as the
+        // Daily strip. The old code gave Weekly/Monthly weight-1
+        // columns in a MATCH_PARENT strip; inside a
+        // HorizontalScrollView the width is UNSPECIFIED, so the
+        // weights collapsed to content width: the whole strip was
+        // only ~1/3 of the screen wide and the value label
+        // ("1.54 GB") was squeezed to "1....". Fixed widths fix
+        // both. The viewport width is only known after layout;
+        // before that, wait for the layout pass instead of guessing.
         boolean daily = (mDataMode == DATA_DAILY);
-        int colWidthPx = (int) (40 * density);
+        int colWidthPx;
+        if (daily) {
+            colWidthPx = (int) (40 * density);
+        } else {
+            int viewportW = mDataBarsScroll != null ? mDataBarsScroll.getWidth() : 0;
+            if (viewportW <= 0) {
+                if (mDataBarsScroll != null) mDataBarsScroll.post(this::renderDataUsed);
+                return;
+            }
+            colWidthPx = viewportW / 6;
+        }
         // Minab Beta v0.9.6 — these params MUST be
         // FrameLayout.LayoutParams (a MarginLayoutParams): mDataBars
         // is the direct child of the HorizontalScrollView in
@@ -244,18 +272,19 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         // Graph page was laid out during a tab switch — the phone's
         // own crash report (0.9.5, twice identical) proved it.
         mDataBars.setLayoutParams(new FrameLayout.LayoutParams(
-                daily ? FrameLayout.LayoutParams.WRAP_CONTENT
-                        : FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
                 (int) (130 * density)));
         for (DataUsageStore.Bucket b : buckets) {
             LinearLayout col = new LinearLayout(ctx);
             col.setOrientation(LinearLayout.VERTICAL);
             col.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-            col.setLayoutParams(daily
-                    ? new LinearLayout.LayoutParams(
-                            colWidthPx, LinearLayout.LayoutParams.MATCH_PARENT)
-                    : new LinearLayout.LayoutParams(
-                            0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+            col.setLayoutParams(new LinearLayout.LayoutParams(
+                    colWidthPx, LinearLayout.LayoutParams.MATCH_PARENT));
+            // Minab Beta v0.9.6.1 (fix #7) — tapping a bar shows
+            // its date / range under the card (showSelectedBar).
+            final DataUsageStore.Bucket bucket = b;
+            col.setClickable(true);
+            col.setOnClickListener(v2 -> showSelectedBar(bucket));
 
             TextView value = new TextView(ctx);
             value.setText(b.bytes > 0 ? DataUsageStore.formatBytes(b.bytes) : "");
@@ -272,7 +301,13 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             View bar = new View(ctx);
             int height = b.bytes <= 0 ? minBarPx
                     : (int) (minBarPx + (b.bytes / (double) max) * maxBarPx);
-            if (b.bytes > 0) {
+            if (b.current) {
+                // Minab Beta v0.9.6.1 (fix #4) — the bar for the
+                // period we are in is green, so it stands out from
+                // the indigo bars (even at 0 bytes, the green
+                // baseline marks the current period).
+                bar.setBackgroundResource(R.drawable.minab_data_bar_current);
+            } else if (b.bytes > 0) {
                 bar.setBackgroundResource(R.drawable.minab_data_bar);
             } else {
                 bar.setBackgroundColor(getResources().getColor(R.color.minab_divider));
@@ -289,7 +324,15 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             label.setGravity(Gravity.CENTER);
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
-            label.setTextColor(getResources().getColor(R.color.minab_text_secondary));
+            // Minab Beta v0.9.6.1 (fix #4/#6) — the current period's
+            // label is green too, so today / this week / this month
+            // is readable at a glance even when its bar is empty;
+            // and with the fixed 1/6-viewport columns the "d MMM"
+            // weekly labels ("9 Nov") finally fit whole instead of
+            // truncating to "9 ...".
+            label.setTextColor(getResources().getColor(b.current
+                    ? R.color.minab_connected
+                    : R.color.minab_text_secondary));
             col.addView(label, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -312,6 +355,29 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             mDataBarsScroll.post(() ->
                     mDataBarsScroll.fullScroll(View.FOCUS_RIGHT));
         }
+    }
+
+    /**
+     * Minab Beta v0.9.6.1 (fix #5) — the "jump to the current bar"
+     * icon: scroll the strip to the recent end, where the bar for
+     * the period we are in lives (today is 4th from the end of the
+     * Daily strip; Weekly/Monthly end on the current week/month).
+     */
+    private void jumpToCurrentBar() {
+        if (mDataBarsScroll == null || mDataBars == null) return;
+        mDataBarsScroll.post(() ->
+                mDataBarsScroll.smoothScrollTo(mDataBars.getWidth(), 0));
+    }
+
+    /**
+     * Minab Beta v0.9.6.1 (fix #7) — tapping a bar shows its date
+     * or range under the card ("Sat 14 Nov 2026 · 1.54 GB",
+     * "9 Nov – 15 Nov 2026 · 840 B", "November 2026 · 0 B").
+     */
+    private void showSelectedBar(DataUsageStore.Bucket b) {
+        if (mDataSelected == null) return;
+        mDataSelected.setText(b.detail + " · " + DataUsageStore.formatBytes(b.bytes));
+        mDataSelected.setVisibility(View.VISIBLE);
     }
 
     /** Minab v0.7: highlight the active Daily / Weekly / Monthly chip. */
