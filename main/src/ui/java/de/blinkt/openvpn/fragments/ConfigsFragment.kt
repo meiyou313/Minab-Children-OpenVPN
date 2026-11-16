@@ -35,6 +35,7 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -57,13 +58,13 @@ import de.blinkt.openvpn.minab.MinabBackup
 import de.blinkt.openvpn.minab.MinabCategoryReorder
 import de.blinkt.openvpn.minab.MinabFavorites
 import de.blinkt.openvpn.minab.MinabRealTestSettings
+import de.blinkt.openvpn.minab.MinabRealTestSettingsPanel
 import de.blinkt.openvpn.minab.PingTester
 import de.blinkt.openvpn.minab.RealTester
 import de.blinkt.openvpn.minab.SharedCredentials
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
-import java.util.TreeSet
 
 class ConfigsFragment : ListFragment() {
     private var selectedCategory: String? = null
@@ -112,6 +113,17 @@ class ConfigsFragment : ListFragment() {
     /** Total servers the current run will test (from
         onRealProgress); 0 when the settings left nothing to test. */
     private var realTotalCount: Int = 0
+    /** Minab Beta v0.9.6.2 (fix #6) — the inline Real test
+        settings panel under the Real test button (shared helper
+        with Home); null until onCreateView wires it. */
+    private var realTestSettingsPanel: MinabRealTestSettingsPanel? = null
+    /** Minab Beta v0.9.6.2 (fix #5) — the Configs sort mode:
+        NONE (name order, as before) or PING (after a ping test:
+        lowest ping first within each group, untested/failed
+        last). Persisted in "MinabPrefs" so it survives the
+        fragment being recreated. Displayed order only — the
+        stored profile/group order is never rewritten. */
+    private var sortMode: Int = SORT_NONE
     /** Bumped on every start/cancel so listener callbacks from a
         superseded run are ignored. */
     private var realTestRunId = 0
@@ -129,6 +141,15 @@ class ConfigsFragment : ListFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Minab Beta v0.9.6.2 (fix #5) — restore the persisted
+        // sort mode BEFORE the first refresh, so the list comes
+        // back ping-sorted the way the last test left it.
+        try {
+            sortMode = requireContext().getSharedPreferences("MinabPrefs", Context.MODE_PRIVATE)
+                .getInt(PREF_SORT_MODE, SORT_NONE)
+        } catch (e: Exception) {
+            sortMode = SORT_NONE
+        }
         backupLauncher = registerForActivityResult(
             ActivityResultContracts.CreateDocument("application/zip")
         ) { uri: Uri? ->
@@ -187,6 +208,19 @@ class ConfigsFragment : ListFragment() {
         }
         v.findViewById<Button>(R.id.minab_configs_test_real)?.setOnClickListener {
             startRealTest(visibleProfiles())
+        }
+        // Minab Beta v0.9.6.2 (fix #6) — Real test settings gear:
+        // opens the inline panel directly under the Real test
+        // button (green gear while open, blue while closed), the
+        // same shared helper as Home.
+        val realTestSettingsButton =
+            v.findViewById<ImageButton>(R.id.minab_configs_btn_real_test_settings)
+        val realTestSettingsPanelView =
+            v.findViewById<View>(R.id.minab_real_settings_panel)
+        if (realTestSettingsButton != null && realTestSettingsPanelView != null) {
+            realTestSettingsPanel = MinabRealTestSettingsPanel(
+                requireContext(), realTestSettingsButton, realTestSettingsPanelView
+            )
         }
         testProgressRow = v.findViewById(R.id.minab_configs_test_progress_row)
         testProgressBar = v.findViewById(R.id.minab_configs_test_progress)
@@ -328,6 +362,57 @@ class ConfigsFragment : ListFragment() {
         return list.adapter === adapter
     }
 
+    /** Set the Configs sort mode and persist it (see the sortMode
+        field). The last completed ping test wins. */
+    private fun setSortMode(mode: Int) {
+        sortMode = mode
+        try {
+            requireContext().getSharedPreferences("MinabPrefs", Context.MODE_PRIVATE)
+                .edit().putInt(PREF_SORT_MODE, mode).apply()
+        } catch (e: Exception) {
+            // Prefs unavailable: the in-memory mode still applies
+            // for this session.
+        }
+    }
+
+    /** The saved group order (chip order, Uncategorized last) for
+        ping sorting: the list stays grouped, only the order inside
+        each group changes. */
+    private fun pingGroupOrder(context: Context): List<String> {
+        return try {
+            val ordered = CategoryStore.getOrderedCategories(context)
+            ordered.filter { it != CategoryStore.DEFAULT_CATEGORY } + CategoryStore.DEFAULT_CATEGORY
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /** Comparator for ping sort: within each group (saved chip
+        order), lowest ping first, untested/failed last, then name. */
+    private fun pingComparator(groupOrder: List<String>): Comparator<VpnProfile> {
+        val groupIndex = groupOrder.withIndex().associate { it.value to it.index }
+        return compareBy<VpnProfile> { groupIndex[it.getCategory()] ?: Int.MAX_VALUE }
+            .thenBy { if (it.mLastPingMs > 0) it.mLastPingMs else Long.MAX_VALUE }
+            .thenBy { it.mName ?: "" }
+    }
+
+    /** Re-sort the rows already in the adapter, live, while a ping
+        test runs — without rebuilding chips or re-measuring the
+        list. No-op unless the current sort mode is PING. */
+    private fun resortConfigsAdapter() {
+        val adapter = mArrayadapter ?: return
+        val items = (0 until adapter.count).mapNotNull { adapter.getItem(it) }
+        val groupOrder = try {
+            pingGroupOrder(requireContext())
+        } catch (e: Exception) {
+            return
+        }
+        val sorted = items.sortedWith(pingComparator(groupOrder))
+        adapter.clear()
+        adapter.addAll(sorted)
+        adapter.notifyDataSetChanged()
+    }
+
     private fun refreshListInner() {
         val context = requireContext()
         val pm = ProfileManager.getInstance(context)
@@ -351,8 +436,19 @@ class ConfigsFragment : ListFragment() {
             val category = profile.getCategory()?.lowercase() ?: ""
             name.contains(query) || category.contains(query)
         }
-        val sorted = TreeSet<VpnProfile>(Comparator { a, b -> (a.mName ?: "").compareTo(b.mName ?: "") })
-        sorted.addAll(searched)
+        // Minab Beta v0.9.6.2 (fix #5) — sort the DISPLAYED
+        // order. NONE: by name, as before. PING: within each
+        // group (saved chip order, so the group structure is
+        // preserved), lowest ping first, untested/failed last,
+        // then name. sortedWith, not TreeSet: a TreeSet drops a
+        // config when the comparator calls it equal to another
+        // (same name), so two same-named configs could silently
+        // lose one row.
+        val sorted: List<VpnProfile> = if (sortMode == SORT_PING) {
+            searched.sortedWith(pingComparator(pingGroupOrder(context)))
+        } else {
+            searched.sortedWith(compareBy { it.mName ?: "" })
+        }
         // Minab Beta v0.9.3 — a tab switch lands here with the same
         // rows already on screen: skip the adapter rebuild and the
         // re-measure entirely. The chip bar and selection bar are
@@ -1244,6 +1340,11 @@ class ConfigsFragment : ListFragment() {
         }
         cancelRealTest()
         cancelPingTest()
+        // Minab Beta v0.9.6.2 (fix #2) — clear ALL old ping
+        // results FIRST (same as Home): every badge goes back to
+        // blank until its server's new result arrives.
+        clearPingResults(profiles)
+        refreshList()
         if (VpnStatus.isVPNActive()) {
             Toast.makeText(requireContext(), R.string.minab_ping_while_vpn, Toast.LENGTH_LONG).show()
         }
@@ -1263,7 +1364,11 @@ class ConfigsFragment : ListFragment() {
                     ProfileManager.saveProfile(requireContext(), result.profile)
                     pingDoneCount++
                     updateTestPingStatus()
-                    mArrayadapter?.notifyDataSetChanged()
+                    // Minab Beta v0.9.6.2 (fix #5) — re-sort live
+                    // as results arrive when the list is
+                    // ping-sorted (same as Home).
+                    if (sortMode == SORT_PING) resortConfigsAdapter()
+                    else mArrayadapter?.notifyDataSetChanged()
                 }
             }
 
@@ -1273,14 +1378,41 @@ class ConfigsFragment : ListFragment() {
                     pingTester = null
                     if (cancelled) {
                         Toast.makeText(requireContext(), R.string.minab_ping_cancelled, Toast.LENGTH_SHORT).show()
+                        testProgressRow?.visibility = View.GONE
                     } else {
+                        // Minab Beta v0.9.6.2 (fix #5) — after a
+                        // ping test the list is sorted by ping
+                        // (lowest first within each group), like
+                        // Home. Keep the progress row as a "done"
+                        // line, same as Home.
+                        setSortMode(SORT_PING)
                         refreshList()
                         Toast.makeText(requireContext(), R.string.minab_ping_done, Toast.LENGTH_SHORT).show()
+                        testProgressRow?.visibility = View.VISIBLE
+                        testProgressBar?.progress = 100
+                        testCancelButton?.visibility = View.GONE
+                        testStatusView?.text = getString(R.string.minab_sort_by_ping)
                     }
-                    testProgressRow?.visibility = View.GONE
                 }
             }
         })
+    }
+
+    /** Minab Beta v0.9.6.2 (fix #2) — wipe the stored ping result
+        of every profile in the run (ms, time and text), so the
+        badges go blank until the new results arrive. A save that
+        fails must not stop the test. */
+    private fun clearPingResults(profiles: List<VpnProfile>) {
+        for (profile in profiles) {
+            profile.mLastPingMs = -1
+            profile.mLastPingTime = 0
+            profile.mLastPingResult = ""
+            try {
+                ProfileManager.saveProfile(requireContext(), profile)
+            } catch (e: Exception) {
+                // Saving must not stop the ping test.
+            }
+        }
     }
 
     private fun updateTestPingStatus() {
@@ -1304,12 +1436,12 @@ class ConfigsFragment : ListFragment() {
 
     /** Real test: the same two-stage run as Home (ping first when
         stale, then connect each server in ranked order and fetch
-        Telegram Web through it, stopping after 3 passes). The wait
-        per server and the candidate limit come from
-        MinabRealTestSettings (fix #11 — the gear next to the
-        Real test button on Home); the runner is shared, so a real
-        test running on Home blocks starting one here (and vice
-        versa). */
+        Telegram Web through it, stopping after the setting's
+        number of healthy servers have passed — v0.9.6.2 fix #4:
+        the number counts successes, not candidates). The wait per
+        server and the target come from MinabRealTestSettings; the
+        runner is shared, so a real test running on Home blocks
+        starting one here (and vice versa). */
     private fun startRealTest(profiles: List<VpnProfile>) {
         if (profiles.isEmpty()) {
             Toast.makeText(requireContext(), R.string.minab_no_profiles_in_category, Toast.LENGTH_SHORT).show()
@@ -1327,7 +1459,7 @@ class ConfigsFragment : ListFragment() {
         val tester = RealTester(
             requireContext().applicationContext,
             MinabRealTestSettings.getWaitTimeoutMs(requireContext()),
-            RealTester.REAL_TEST_TARGET,
+            MinabRealTestSettings.getMaxServers(requireContext()),
             object : RealTester.Listener {
                 override fun onPingProgress(done: Int, total: Int) {
                     if (!isAdded || runId != realTestRunId) return
@@ -1448,5 +1580,12 @@ class ConfigsFragment : ListFragment() {
                 ).show()
             }
         }.start()
+    }
+
+    companion object {
+        // Minab Beta v0.9.6.2 (fix #5): Configs sort modes.
+        private const val SORT_NONE = 0
+        private const val SORT_PING = 1
+        private const val PREF_SORT_MODE = "minab_configs_sort_mode"
     }
 }
