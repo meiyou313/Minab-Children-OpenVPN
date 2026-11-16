@@ -37,14 +37,28 @@ public final class DataUsageStore {
 
     private static final Object LOCK = new Object();
 
-    /** One bar of a chart: its label and the measured bytes. */
+    /**
+     * One bar of a chart: its label, the measured bytes, whether it
+     * is the period we are in right now (today / this week / this
+     * month), and the full date or range shown when the bar is
+     * tapped (fix #7 in v0.9.6.1: "Sat 14 Nov 2026",
+     * "9 Nov – 15 Nov 2026", "November 2026").
+     */
     public static final class Bucket {
         public final String label;
         public final long bytes;
+        public final boolean current;
+        public final String detail;
 
         public Bucket(String label, long bytes) {
+            this(label, bytes, false, label);
+        }
+
+        public Bucket(String label, long bytes, boolean current, String detail) {
             this.label = label;
             this.bytes = bytes;
+            this.current = current;
+            this.detail = detail;
         }
     }
 
@@ -96,44 +110,65 @@ public final class DataUsageStore {
         Map<String, Long> days = getDayMap(context);
         List<Bucket> out = new ArrayList<>(50);
         SimpleDateFormat labelFmt = new SimpleDateFormat("EEE d", Locale.US);
+        SimpleDateFormat detailFmt = new SimpleDateFormat("EEE d MMM yyyy", Locale.US);
         Calendar today = Calendar.getInstance();
         for (int i = 46; i >= -3; i--) {
             Calendar c = (Calendar) today.clone();
             c.add(Calendar.DAY_OF_YEAR, -i);
             out.add(new Bucket(
                     labelFmt.format(c.getTime()),
-                    days.getOrDefault(dayKey(c), 0L)));
+                    days.getOrDefault(dayKey(c), 0L),
+                    i == 0,
+                    detailFmt.format(c.getTime())));
         }
         return out;
     }
 
-    /** Last 8 calendar weeks (Monday start), oldest first. */
+    /**
+     * Minab Beta v0.9.6.1 (fix #2) — last 12 calendar weeks (Monday
+     * start), oldest first, so the Weekly chart shows 6 bars on
+     * screen and the earlier 6 by swiping left (was 8).
+     */
     public static List<Bucket> getWeekly(Context context) {
         Map<String, Long> days = getDayMap(context);
-        List<Bucket> out = new ArrayList<>(8);
+        List<Bucket> out = new ArrayList<>(12);
         SimpleDateFormat labelFmt = new SimpleDateFormat("d MMM", Locale.US);
-        for (int w = 7; w >= 0; w--) {
+        SimpleDateFormat detailStartFmt = new SimpleDateFormat("d MMM", Locale.US);
+        SimpleDateFormat detailEndFmt = new SimpleDateFormat("d MMM yyyy", Locale.US);
+        for (int w = 11; w >= 0; w--) {
             Calendar monday = Calendar.getInstance();
             monday.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
             monday.add(Calendar.WEEK_OF_YEAR, -w);
+            Calendar sunday = (Calendar) monday.clone();
+            sunday.add(Calendar.DAY_OF_YEAR, 6);
             long sum = 0;
             for (int d = 0; d < 7; d++) {
                 Calendar c = (Calendar) monday.clone();
                 c.add(Calendar.DAY_OF_YEAR, d);
                 sum += days.getOrDefault(dayKey(c), 0L);
             }
-            out.add(new Bucket(labelFmt.format(monday.getTime()), sum));
+            out.add(new Bucket(
+                    labelFmt.format(monday.getTime()),
+                    sum,
+                    w == 0,
+                    detailStartFmt.format(monday.getTime())
+                            + " – " + detailEndFmt.format(sunday.getTime())));
         }
         return out;
     }
 
-    /** Last 6 calendar months, oldest first. */
+    /**
+     * Minab Beta v0.9.6.1 (fix #2) — last 12 calendar months, oldest
+     * first, so the Monthly chart shows 6 bars on screen and the
+     * earlier 6 by swiping left (was 6 total).
+     */
     public static List<Bucket> getMonthly(Context context) {
         Map<String, Long> days = getDayMap(context);
-        List<Bucket> out = new ArrayList<>(6);
+        List<Bucket> out = new ArrayList<>(12);
         SimpleDateFormat labelFmt = new SimpleDateFormat("MMM", Locale.US);
+        SimpleDateFormat detailFmt = new SimpleDateFormat("MMMM yyyy", Locale.US);
         int thisYear = Calendar.getInstance().get(Calendar.YEAR);
-        for (int m = 5; m >= 0; m--) {
+        for (int m = 11; m >= 0; m--) {
             Calendar first = Calendar.getInstance();
             first.set(Calendar.DAY_OF_MONTH, 1);
             first.add(Calendar.MONTH, -m);
@@ -148,7 +183,11 @@ public final class DataUsageStore {
             }
             String label = labelFmt.format(first.getTime());
             if (year != thisYear) label += " '" + (year % 100);
-            out.add(new Bucket(label, sum));
+            out.add(new Bucket(
+                    label,
+                    sum,
+                    m == 0,
+                    detailFmt.format(first.getTime())));
         }
         return out;
     }
