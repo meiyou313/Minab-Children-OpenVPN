@@ -24,9 +24,26 @@
  * now ("Could not reach GitHub…"), and the last cached tag is
  * still used when both routes fail.
  *
+ * Minab Beta v0.9.6.1 — that 0.9.1 fix never actually worked, and
+ * the check failed on the phone again in 0.9.6. The real cause was
+ * found by testing both routes from outside the phone: EVERY Minab
+ * release is a pre-release (prerelease: true), and GitHub's
+ * "latest release" endpoint only returns FULL releases — so
+ * api.github.com/.../releases/latest answers 404, always, for
+ * this repo. And /releases/latest on github.com does NOT redirect
+ * to a tag either: with no full release it 302s to the releases
+ * LIST page (no "/tag/" in the Location), so the old fallback
+ * returned null too. Both routes failed for everyone, on every
+ * network — it was never the user's connection. The fix: the API
+ * route now reads the releases LIST (per_page=1), which includes
+ * pre-releases, and the web fallback reads the releases list
+ * page's HTML and takes the first "/releases/tag/<tag>" link.
+ *
  * Version comparison is numeric on the dotted parts ("0.4" vs
  * "0.10"); a "-beta" suffix is ignored for the comparison, so
- * 0.4-beta and 0.4 count as the same version.
+ * 0.4-beta and 0.4 count as the same version. Four-part versions
+ * compare correctly too (0.9.6.1 is newer than 0.9.6: a missing
+ * part counts as 0).
  */
 
 package de.blinkt.openvpn.minab;
@@ -38,7 +55,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 
-import org.json.JSONObject;
+import org.json.JSONArray;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -50,7 +67,13 @@ import de.blinkt.openvpn.BuildConfig;
 public final class MinabUpdateChecker {
     /** Where the user downloads a newer version. */
     public static final String RELEASES_URL = "https://github.com/meiyou313/Minab-Children-OpenVPN/releases";
-    private static final String API_URL = "https://api.github.com/repos/meiyou313/Minab-Children-OpenVPN/releases/latest";
+    /**
+     * Minab Beta v0.9.6.1 — the releases LIST, not /releases/latest:
+     * the "latest" endpoint only returns FULL releases and answers
+     * 404 for this repo (every Minab release is a pre-release).
+     * The list includes pre-releases, newest first.
+     */
+    private static final String API_URL = "https://api.github.com/repos/meiyou313/Minab-Children-OpenVPN/releases?per_page=1";
 
     private static final String PREFS_NAME = "MinabUpdateCheck";
     private static final String KEY_LATEST_TAG = "latest_tag";
@@ -137,16 +160,20 @@ public final class MinabUpdateChecker {
             try {
                 latestTag = fetchLatestTagApi();
             } catch (Exception ignored) {
-                // API unreachable: try the redirect fallback below.
+                // API unreachable: try the web fallback below.
             }
             if (latestTag == null) {
-                // Minab Beta v0.9.1 — fallback: api.github.com is
+                // Minab Beta v0.9.6.1 — fallback: api.github.com is
                 // unreachable from some networks while github.com
-                // itself works. /releases/latest redirects (302) to
-                // the latest release, and the tag is in the Location
-                // header — no JSON, no API subdomain.
+                // itself works. The releases list page (HTML) always
+                // links the newest release first, pre-releases
+                // included — the tag is in the first
+                // "/releases/tag/<tag>" link. (The old fallback used
+                // /releases/latest's 302 Location, which points at
+                // the list page, not a tag, when there is no full
+                // release — it could never work for this repo.)
                 try {
-                    latestTag = fetchLatestTagRedirect();
+                    latestTag = fetchLatestTagWebPage();
                 } catch (Exception ignored) {
                     // Both routes failed: keep the cached tag, if any.
                 }
@@ -166,7 +193,13 @@ public final class MinabUpdateChecker {
         }).start();
     }
 
-    /** The releases API: {"tag_name": "v0.9.1", ...}. Null on any failure. */
+    /**
+     * The releases API list: [{"tag_name": "v0.9.6", ...}, ...],
+     * newest first, pre-releases included. Null on any failure.
+     * Minab Beta v0.9.6.1 — the old /releases/latest endpoint only
+     * returns FULL releases and answered 404 for this repo, because
+     * every Minab release is a pre-release.
+     */
     private static String fetchLatestTagApi() throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(API_URL).openConnection();
         try {
@@ -181,7 +214,9 @@ public final class MinabUpdateChecker {
             String line;
             while ((line = reader.readLine()) != null) body.append(line);
             reader.close();
-            String tag = new JSONObject(body.toString()).optString("tag_name", null);
+            org.json.JSONArray releases = new JSONArray(body.toString());
+            if (releases.length() == 0) return null;
+            String tag = releases.getJSONObject(0).optString("tag_name", null);
             return (tag != null && !tag.isEmpty()) ? tag : null;
         } finally {
             conn.disconnect();
@@ -189,28 +224,49 @@ public final class MinabUpdateChecker {
     }
 
     /**
-     * The /releases/latest redirect: a 302 whose Location header
-     * ends with "/tag/<tag>". Null on any failure (not a redirect,
-     * no Location, or no /tag/ in it).
+     * Minab Beta v0.9.6.1 — the web fallback: fetch the releases
+     * list page (redirects followed) and take the tag from the
+     * first "/releases/tag/<tag>" link in the HTML. The page lists
+     * releases newest first, pre-releases included. Null on any
+     * failure (no tag link found, or the page could not be read).
+     * The read stops as soon as the tag is found and never reads
+     * more than ~512 KB of the page.
      */
-    private static String fetchLatestTagRedirect() throws Exception {
+    private static String fetchLatestTagWebPage() throws Exception {
         HttpURLConnection conn = (HttpURLConnection)
-                new URL(RELEASES_URL + "/latest").openConnection();
+                new URL(RELEASES_URL).openConnection();
         try {
-            conn.setInstanceFollowRedirects(false);
+            conn.setInstanceFollowRedirects(true);
             conn.setConnectTimeout(HTTP_TIMEOUT_MS);
             conn.setReadTimeout(HTTP_TIMEOUT_MS);
             conn.setRequestProperty("User-Agent", "Minab");
             int code = conn.getResponseCode();
-            if (code != HttpURLConnection.HTTP_MOVED_TEMP
-                    && code != HttpURLConnection.HTTP_MOVED_PERM
-                    && code != HttpURLConnection.HTTP_SEE_OTHER) return null;
-            String location = conn.getHeaderField("Location");
-            if (location == null) return null;
-            int tagIdx = location.lastIndexOf("/tag/");
-            if (tagIdx < 0) return null;
-            String tag = location.substring(tagIdx + 5);
-            return tag.isEmpty() ? null : tag;
+            if (code < 200 || code >= 300) return null;
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder body = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                body.append(line).append('\n');
+                if (body.length() > 512 * 1024) break;
+                int idx = body.indexOf("/releases/tag/");
+                if (idx >= 0) {
+                    int start = idx + "/releases/tag/".length();
+                    int end = start;
+                    while (end < body.length()) {
+                        char c = body.charAt(end);
+                        if (c == '"' || c == '\'' || c == '?' || c == '<' || c == ' ') break;
+                        end++;
+                    }
+                    String tag = body.substring(start, end);
+                    if (!tag.isEmpty()) {
+                        reader.close();
+                        return tag;
+                    }
+                }
+            }
+            reader.close();
+            return null;
         } finally {
             conn.disconnect();
         }
