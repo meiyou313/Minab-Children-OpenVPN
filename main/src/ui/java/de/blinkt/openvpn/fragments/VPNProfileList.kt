@@ -27,6 +27,7 @@ import android.text.Editable
 import android.text.Html
 import android.text.TextWatcher
 import android.text.SpannableString
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -35,6 +36,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -69,6 +71,7 @@ import de.blinkt.openvpn.minab.MinabCategoryReorder
 import de.blinkt.openvpn.minab.MinabFailover
 import de.blinkt.openvpn.minab.MinabFavorites
 import de.blinkt.openvpn.minab.MinabIpCheck
+import de.blinkt.openvpn.minab.MinabRealTestSettings
 import de.blinkt.openvpn.minab.MinabUpdateChecker
 import de.blinkt.openvpn.minab.MinabUpdateNotifier
 import de.blinkt.openvpn.minab.MinabVpnControl
@@ -493,6 +496,10 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // fetch web.telegram.org through the tunnel.
         val realTestButton = v.findViewById<View?>(R.id.minab_btn_real_test) as Button?
         realTestButton?.setOnClickListener { startRealTest(visibleProfiles()) }
+        // Minab Beta v0.9.6.1 (fix #11) — Real test settings gear,
+        // right next to the Real test button.
+        val realTestSettingsButton = v.findViewById<View?>(R.id.minab_btn_real_test_settings) as ImageButton?
+        realTestSettingsButton?.setOnClickListener { showRealTestSettingsDialog() }
         // Minab Beta v0.9 — connect to the best server: the fastest
         // healthy server from the last tests (real test first, then
         // ping). Nothing to connect when nothing was tested yet.
@@ -1244,6 +1251,14 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
     }
 
     private fun toggleOrbConnection() {
+        // Minab Beta v0.9.6.1 (fix #10) — while a real test runs,
+        // the runner owns the connection; a tap here would fight
+        // it (and the button is showing the steady "testing"
+        // state, not a connect/disconnect choice).
+        if (realTestActive) {
+            Toast.makeText(requireContext(), R.string.minab_real_already_running, Toast.LENGTH_SHORT).show()
+            return
+        }
         val target = orbTargetProfile()
         if (target == null) {
             Toast.makeText(requireContext(), R.string.minab_no_profiles_yet, Toast.LENGTH_LONG).show()
@@ -1271,11 +1286,38 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
     private fun updateOrbState() {
         val button = orbButton ?: return
         if (!isAdded) return
+        val statusView = connStatusView ?: return
+        // Minab Beta v0.9.6.1 (fix #10) — while a real test runs,
+        // the runner connects and disconnects a server every few
+        // seconds, and every state change used to flip this panel
+        // (disc, Status, Name, IP, Ping) in front of the user, who
+        // read it as the app hanging. Freeze the panel on one
+        // steady "testing" state instead: neutral disc, amber
+        // "Testing servers…", the server under test, and done/total
+        // — the progress row below already carries the same
+        // numbers. The IP row is left untouched (updateIpInfo is
+        // skipped), so it cannot flip either. Restored by the
+        // onFinished / cancelRealTest calls to updateOrbState below.
+        if (realTestActive) {
+            button.setBackgroundResource(R.drawable.minab_orb_disc)
+            statusView.text = getString(R.string.minab_status_testing)
+            statusView.setTextColor(resources.getColor(
+                R.color.minab_busy, requireContext().theme))
+            connNameView?.text = realTestCurrentName ?: getString(R.string.minab_real_test)
+            val pingView = connPingView
+            if (pingView != null) {
+                pingView.text = if (realTotalCount > 0) "$realDoneCount/$realTotalCount" else "—"
+                pingView.background = null
+                pingView.setTextColor(resources.getColor(
+                    R.color.minab_text_secondary, requireContext().theme))
+                pingView.setPadding(0, 0, 0, 0)
+            }
+            return
+        }
         val active = VpnStatus.isVPNActive()
         button.setBackgroundResource(
             if (active) R.drawable.minab_orb_disc_connected
             else R.drawable.minab_orb_disc)
-        val statusView = connStatusView ?: return
         val nameView = connNameView
         val pingView = connPingView
         val uuid = VpnStatus.getLastConnectedVPNProfile()
@@ -1616,12 +1658,13 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
     // with Configs): a fast ping phase first when the ping results
     // are stale, then the real phase — connect each server in
     // ranked order, fetch https://web.telegram.org/ through the
-    // tunnel, stop early after REAL_TEST_TARGET passes. Home waits
-    // HOME_REAL_CONNECT_TIMEOUT_MS per server; Configs waits 20 s.
-    // Cancel (or leaving Home for more than a few seconds) stops
-    // the run and drops the VPN under test. Starting a ping test
-    // cancels a real test and vice versa; a real test running in
-    // Configs blocks starting one here (shared RealTester slot).
+    // tunnel, stop early after REAL_TEST_TARGET passes. The wait
+    // per server and the candidate limit come from
+    // MinabRealTestSettings (fix #11). Cancel (or leaving Home for
+    // more than a few seconds) stops the run and drops the VPN
+    // under test. Starting a ping test cancels a real test and vice
+    // versa; a real test running in Configs blocks starting one
+    // here (shared RealTester slot).
 
     private fun startRealTest(profiles: List<VpnProfile>) {
         if (profiles.isEmpty()) {
@@ -1630,13 +1673,21 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         }
         cancelPingTest()
         cancelRealTest()
+        // Minab Beta v0.9.6.1 (fix #11) — reset the counters
+        // BEFORE the run: when the settings leave no server to
+        // test, onRealProgress never fires, so onFinished must see
+        // the fresh 0 here, not a previous run's total.
+        realDoneCount = 0
+        realTotalCount = 0
+        realWorkingCount = 0
+        realTestCurrentName = null
         // Minab v0.7: do NOT reset the sort here — the finish sets
         // the new mode (last completed test wins).
         realTestRunId++
         val runId = realTestRunId
         val tester = RealTester(
             requireContext().applicationContext,
-            HOME_REAL_CONNECT_TIMEOUT_MS,
+            MinabRealTestSettings.getWaitTimeoutMs(requireContext()),
             RealTester.REAL_TEST_TARGET,
             object : RealTester.Listener {
                 override fun onPingProgress(done: Int, total: Int) {
@@ -1676,6 +1727,18 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                     realTestActive = false
                     if (cancelled) {
                         pingProgressRow?.visibility = View.GONE
+                        updateOrbState()
+                        return
+                    }
+                    // Minab Beta v0.9.6.1 (fix #11) — the settings
+                    // may have left no server to test (e.g. none
+                    // answered the ping and unpinged servers are
+                    // excluded): say so plainly instead of claiming
+                    // the test finished and re-sorting an empty run.
+                    if (realTotalCount == 0) {
+                        pingProgressRow?.visibility = View.GONE
+                        Toast.makeText(requireContext(), R.string.minab_real_none_to_test, Toast.LENGTH_LONG).show()
+                        updateOrbState()
                         return
                     }
                     setSortMode(SORT_REAL)
@@ -1685,6 +1748,7 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                     pingProgressBar?.progress = 100
                     pingCancelButton?.visibility = View.GONE
                     pingStatusView?.text = getString(R.string.minab_sort_by_real)
+                    updateOrbState()
                 }
 
                 override fun onConnectRequested(profile: VpnProfile) {
@@ -1712,6 +1776,107 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         realTester = null
         realTestActive = false
         pingProgressRow?.visibility = View.GONE
+        // Minab Beta v0.9.6.1 (fix #10) — leave the steady
+        // "testing" panel state at once; the runner's disconnect
+        // will refresh it again via updateState anyway.
+        updateOrbState()
+    }
+
+    /**
+     * Minab Beta v0.9.6.1 (fix #11) — the Real test settings, from
+     * the gear next to the Real test button: (a) wait seconds per
+     * server, (b) how many ping-answering servers to test before
+     * stopping, (c) whether servers that did not answer ping are
+     * tested too. Each row shows the app's recommended value.
+     * Saved on OK; "Reset to recommended" restores the defaults
+     * (12 s / 10 servers / test unpinged) and closes the dialog.
+     * The settings apply to the real test wherever it is started
+     * (Home or Configs).
+     */
+    private fun showRealTestSettingsDialog() {
+        val ctx = requireContext()
+        var waitSeconds = MinabRealTestSettings.getWaitSeconds(ctx)
+        var maxServers = MinabRealTestSettings.getMaxServers(ctx)
+        var testUnpinged = MinabRealTestSettings.getTestUnpinged(ctx)
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density + 0.5f).toInt()
+
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(8), dp(24), dp(4))
+        }
+        fun sectionTitle(textRes: Int) = TextView(ctx).apply {
+            text = getString(textRes)
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, dp(12), 0, dp(2))
+        }
+        fun hint(textRes: Int) = TextView(ctx).apply {
+            text = getString(textRes)
+            textSize = 12f
+            setTextColor(resources.getColor(R.color.minab_text_secondary, ctx.theme))
+            setPadding(0, 0, 0, dp(4))
+        }
+        fun stepper(initial: Int, min: Int, max: Int, unit: String,
+                    onChange: (Int) -> Unit): LinearLayout {
+            var value = initial
+            val valueView = TextView(ctx).apply {
+                textSize = 16f
+                gravity = Gravity.CENTER
+                minWidth = dp(72)
+            }
+            fun render() {
+                valueView.text = if (unit.isEmpty()) "$value" else "$value $unit"
+            }
+            render()
+            return LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(Button(ctx).apply {
+                    text = "−"
+                    setOnClickListener {
+                        if (value > min) { value--; render(); onChange(value) }
+                    }
+                })
+                addView(valueView)
+                addView(Button(ctx).apply {
+                    text = "+"
+                    setOnClickListener {
+                        if (value < max) { value++; render(); onChange(value) }
+                    }
+                })
+            }
+        }
+
+        root.addView(sectionTitle(R.string.minab_real_settings_wait))
+        root.addView(hint(R.string.minab_real_settings_wait_hint))
+        root.addView(stepper(waitSeconds,
+            MinabRealTestSettings.MIN_WAIT_SECONDS,
+            MinabRealTestSettings.MAX_WAIT_SECONDS, "s") { waitSeconds = it })
+        root.addView(sectionTitle(R.string.minab_real_settings_max))
+        root.addView(hint(R.string.minab_real_settings_max_hint))
+        root.addView(stepper(maxServers,
+            MinabRealTestSettings.MIN_MAX_SERVERS,
+            MinabRealTestSettings.MAX_MAX_SERVERS, "") { maxServers = it })
+        root.addView(sectionTitle(R.string.minab_real_settings_unpinged))
+        root.addView(hint(R.string.minab_real_settings_unpinged_hint))
+        root.addView(CheckBox(ctx).apply {
+            isChecked = testUnpinged
+            setOnCheckedChangeListener { _, checked -> testUnpinged = checked }
+        })
+
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.minab_real_settings_title)
+            .setView(root)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                MinabRealTestSettings.save(ctx, waitSeconds, maxServers, testUnpinged)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setNeutralButton(R.string.minab_real_settings_reset) { _, _ ->
+                MinabRealTestSettings.resetToRecommended(ctx)
+                Toast.makeText(ctx, R.string.minab_real_settings_reset, Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     /** Progress row while the real phase runs: "Real test 2/5 —
@@ -2301,13 +2466,12 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         private val MENU_ASSIGN_CATEGORY = Menu.FIRST + 8
         private val MENU_PING_ONE = Menu.FIRST + 9
         private const val PREF_SORT_BY_LRU = "sortProfilesByLRU"
-        // Minab v0.6: how long the Real test waits for one server
-        // to report CONNECTED on Home (Configs waits 20 s — its
-        // own constant lives in ConfigsFragment). 5 s would wrongly
+        // Minab Beta v0.9.6.1 (fix #11) — how long the Real test
+        // waits for one server to report CONNECTED now comes from
+        // MinabRealTestSettings (recommended 12 s; the old Home
+        // constant and Configs' 20 s are gone). 5 s would wrongly
         // fail slow-but-working servers (and the first connect of
-        // a run is slower because the VPN service starts cold),
-        // while 12 s still fails dead servers much faster than 20 s.
-        private const val HOME_REAL_CONNECT_TIMEOUT_MS = 12_000L
+        // a run is slower because the VPN service starts cold).
         // Minab v0.7: the Home list sort mode (see sortMode above).
         private const val SORT_NONE = 0
         private const val SORT_PING = 1
