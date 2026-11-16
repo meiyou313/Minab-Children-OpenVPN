@@ -10,7 +10,10 @@
  *      profile has no ping result from the last 5 min. The results
  *      rank the servers for stage 2 (ping OK first by ms, then
  *      never-tested, then Timeout/Failed last — they can still work,
- *      e.g. UDP servers with ICMP blocked).
+ *      e.g. UDP servers with ICMP blocked). When the user turned
+ *      off testing unpinged servers, the ping phase always runs
+ *      (v0.9.6.2 fix #3): the filter that keeps unpinged servers
+ *      out must judge on fresh measurements, not stored ones.
  *   2. REAL PHASE — connect each server in ranked order, fetch
  *      https://web.telegram.org/ through the tunnel, record the
  *      time (or "Blocked"), disconnect, next server. Stops early
@@ -76,9 +79,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.HttpsURLConnection;
 
 public class RealTester implements VpnStatus.StateListener {
-
-    /** The real test stops as soon as this many servers have passed it. */
-    public static final int REAL_TEST_TARGET = 3;
 
     /** Callbacks to the fragment that owns the run. All are posted
         to the UI thread by this class. */
@@ -221,8 +221,21 @@ public class RealTester implements VpnStatus.StateListener {
             if (stopped() || myRunId != runId) return;
             // Stage 1: fast parallel ping, unless every profile
             // already has a ping result from the last 5 minutes.
+            // Minab Beta v0.9.6.2 (fix #3) — when the user turned
+            // OFF "test servers that did not answer ping", the
+            // candidate filter below judges on these results, so
+            // they must be fresh: a stored OK from minutes ago
+            // could otherwise let a server that does not answer
+            // now into the run. (The 0.9.6.1 dialog also only
+            // saved on OK, so a change lost by closing it any
+            // other way looked like the setting was ignored — the
+            // inline panel in fix #1 saves every change at once.)
+            // With the option off, always re-ping — a few seconds
+            // for a filter that can be trusted. With it on, the
+            // 5-minute shortcut stays.
+            boolean testUnpinged = MinabRealTestSettings.getTestUnpinged(appContext);
             long fiveMinAgo = System.currentTimeMillis() - 5 * 60 * 1000L;
-            boolean needPing = false;
+            boolean needPing = !testUnpinged;
             for (VpnProfile p : profiles) {
                 if (p.mLastPingTime <= 0 || p.mLastPingTime < fiveMinAgo
                         || p.mLastPingResult == null || p.mLastPingResult.isEmpty()) {
@@ -235,13 +248,16 @@ public class RealTester implements VpnStatus.StateListener {
             // Stage 2: ranked sequential real tests, stop after
             // targetPasses passes.
             List<VpnProfile> ranked = rankProfilesForRealTest(profiles);
-            // Minab Beta v0.9.6.1 (fix #11) — the real-test
-            // settings: at most maxServers ping-answering servers,
-            // and servers that never answered a ping only when the
-            // user allows them. Applied here, AFTER the ping phase,
-            // so a server whose ping result was just refreshed is
-            // judged on the fresh result.
-            ranked = MinabRealTestSettings.applyCandidateLimit(ranked, appContext);
+            // Minab Beta v0.9.6.2 (fix #4) — the real-test
+            // settings filter: every ping-answering server stays a
+            // candidate, and servers that never answered a ping
+            // only when the user allows them. The number setting
+            // counts SUCCESSES (targetPasses), not candidates, so
+            // there is no cap here — the loop below keeps going
+            // until that many pass. Applied here, AFTER the ping
+            // phase, so a server whose ping result was just
+            // refreshed is judged on the fresh result.
+            ranked = MinabRealTestSettings.applyCandidateFilter(ranked, appContext);
             realTotalCount = ranked.size();
             realDoneCount = 0;
             realWorkingCount = 0;
@@ -250,6 +266,19 @@ public class RealTester implements VpnStatus.StateListener {
             for (VpnProfile profile : ranked) {
                 if (realWorkingCount >= targetPasses) break;
                 if (stopped() || myRunId != runId) break;
+                // Minab Beta v0.9.6.2 (fix #3) — belt and braces:
+                // with "test unpinged" off, a server without a
+                // fresh ping-OK must never be connected, even if
+                // it somehow reached this list. Count it as done
+                // (so the progress stays consistent) but record
+                // no result — it was never tested.
+                if (!testUnpinged && profile.mLastPingMs <= 0) {
+                    if (myRunId == runId && !cancelled.get()) {
+                        realDoneCount++;
+                        postRealProgress();
+                    }
+                    continue;
+                }
                 realCurrentName = profile.mName;
                 postRealProgress();
                 // Minab v0.8: fast pre-check — a server that is
