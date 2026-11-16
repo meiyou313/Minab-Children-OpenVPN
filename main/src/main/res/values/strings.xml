@@ -573,10 +573,11 @@
     <string name="minab_real_settings_title">Real test settings</string>
     <string name="minab_real_settings_wait">Wait per server</string>
     <string name="minab_real_settings_wait_hint">Recommended: 12 seconds</string>
-    <string name="minab_real_settings_max">Servers to test, then stop</string>
-    <string name="minab_real_settings_max_hint">Recommended: 10</string>
+    <string name="minab_real_settings_wait_value">%1$d s</string>
+    <string name="minab_real_settings_max">Healthy servers to find</string>
+    <string name="minab_real_settings_max_hint">Recommended: 5</string>
     <string name="minab_real_settings_unpinged">Also test servers that did not answer ping</string>
-    <string name="minab_real_settings_unpinged_hint">Recommended: on</string>
+    <string name="minab_real_settings_unpinged_hint">Recommended: off</string>
     <string name="minab_real_settings_reset">Reset to recommended</string>
     <string name="minab_real_none_to_test">No servers matched the real-test settings.</string>
     <!-- Minab Beta v0.2: short labels for the visible main-screen buttons -->
