@@ -128,14 +128,37 @@ jobs:
           prerelease: true
           files: main/build/outputs/apk/**/debug/Minab-debug-Beta-${{ github.ref_name }}.apk
           body: |
-            Minab debug Beta v0.9.6 — Android only, debug build signed with the permanent Minab key.
-            Installs over v0.9.5 normally (no uninstall needed).
+            Minab debug Beta v0.9.6.2 — Android only, debug build signed with the permanent Minab key.
+            Installs over v0.9.6.1 normally (no uninstall needed).
 
             OpenVPN client based on ics-openvpn (GPLv2, Arne Schwabe),
             with bulk import of many .ovpn files / a .zip, one username
             and password for all, profile groups (manual + automatic
             by country), and bulk ping test of all profiles or one
             group.
+
+            New in v0.9.6.2 — six fixes from testing v0.9.6.1:
+            the Real test settings are now an inline panel directly
+            under the Real test button (Home AND Configs) instead of
+            the ugly dialog — the gear is green while the panel is
+            open and blue while it is closed, and every change saves
+            at once (the dialog only saved on OK, so a change lost
+            by closing it any other way looked like the setting was
+            ignored). New defaults: 5 healthy servers to find,
+            test-unpinged off, wait 12 s. A ping test now clears all
+            old results first, so the badges go blank until the new
+            results arrive. The real test honours "test unpinged"
+            off: with it off it always re-pings first, so the filter
+            judges fresh results, and it never connects a server
+            without a fresh ping-OK. The number setting now counts
+            SUCCESSES: the run keeps going through the ranked list
+            until that many servers pass, instead of testing only
+            the first N and stopping even when they all fail. And
+            after a ping test the servers are sorted by ping,
+            lowest first, in Home and in Configs (within each group
+            in Configs — the group order is kept). The crash
+            reporter stays. Please test the settings panel, a real
+            test with unpinged off, and the ping sort.
 
             New in v0.9.6.1 — eleven fixes from testing v0.9.6:
             the update check finally works for real (all Minab
