@@ -235,6 +235,13 @@ public class RealTester implements VpnStatus.StateListener {
             // Stage 2: ranked sequential real tests, stop after
             // targetPasses passes.
             List<VpnProfile> ranked = rankProfilesForRealTest(profiles);
+            // Minab Beta v0.9.6.1 (fix #11) — the real-test
+            // settings: at most maxServers ping-answering servers,
+            // and servers that never answered a ping only when the
+            // user allows them. Applied here, AFTER the ping phase,
+            // so a server whose ping result was just refreshed is
+            // judged on the fresh result.
+            ranked = MinabRealTestSettings.applyCandidateLimit(ranked, appContext);
             realTotalCount = ranked.size();
             realDoneCount = 0;
             realWorkingCount = 0;
