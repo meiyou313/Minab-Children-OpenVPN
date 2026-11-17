@@ -136,7 +136,7 @@ class ConfigsFragment : ListFragment() {
     private val realCountdownHandler = Handler(Looper.getMainLooper())
     private var realCountdownSeconds: Int = 0
     private var realCountdownName: String? = null
-    private val realCountdownRunnable = Runnable {
+    private val realCountdownRunnable: Runnable = Runnable {
         if (realTestActive && realCountdownSeconds > 0) {
             realCountdownSeconds--
             updateRealCountdownLine()
