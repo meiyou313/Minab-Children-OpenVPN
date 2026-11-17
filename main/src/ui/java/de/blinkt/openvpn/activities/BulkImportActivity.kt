@@ -42,6 +42,7 @@
 package de.blinkt.openvpn.activities
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -107,7 +108,12 @@ class BulkImportActivity : BaseActivity() {
         replaces the import summary at the end of the run. */
     private var restoreSummary: String? = null
 
-    private var selectedCategory: String = CategoryStore.DEFAULT_CATEGORY
+    /** Minab Beta v0.9.6.3 (fix #5) — the group the new configs go
+        to: null = "All" (the default — no group chosen, so the
+        country auto-detection decides, else "Uncategorized"); a
+        name = the group the user picked in the spinner. An explicit
+        pick always wins over auto-detection. */
+    private var selectedCategory: String? = null
     /** Files the user picked for the import currently running (or 0). */
     private var selectedCount: Int = 0
 
@@ -171,13 +177,20 @@ class BulkImportActivity : BaseActivity() {
             lastSummaryView.text = getString(R.string.minab_last_import, summary)
         }
 
-        val categories = CategoryStore.getCategories(this).toMutableList()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categories)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        categorySpinner.adapter = adapter
+        // Minab Beta v0.9.6.3 (fix #5) — the group picker: "Create
+        // group" FIRST (top of the list, at hand), then "All" (the
+        // default), then the existing groups. "All" means no group
+        // is chosen: the configs land in "all" and the country
+        // auto-detection puts each into its own country group.
+        refreshCategorySpinner(null)
         categorySpinner.setOnItemSelectedListener(object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, pos: Int, id: Long) {
-                selectedCategory = categories[pos]
+                if (pos == 0) {
+                    // "Create group": ask for the name, then select it.
+                    showNewCategoryDialog { name -> refreshCategorySpinner(name) }
+                    return
+                }
+                selectedCategory = if (pos == 1) null else categorySpinnerItems()[pos]
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         })
@@ -260,6 +273,58 @@ class BulkImportActivity : BaseActivity() {
         }
         o.category = selectedCategory
         return o
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #5) — the spinner's items:
+        "Create group" first, "All" second, then the existing
+        groups (without "Uncategorized" — "All" covers the no-group
+        case now). */
+    private fun categorySpinnerItems(): List<String> {
+        val groups = CategoryStore.getCategories(this)
+            .filter { it != CategoryStore.DEFAULT_CATEGORY }
+        return listOf(
+            getString(R.string.minab_import_create_group),
+            getString(R.string.minab_import_category_all)
+        ) + groups
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #5) — rebuild the spinner and
+        select the given group (null = "All"). Called at setup and
+        after a group is created. */
+    private fun refreshCategorySpinner(selectCategory: String?) {
+        val items = categorySpinnerItems()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, items)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        categorySpinner.adapter = adapter
+        selectedCategory = selectCategory
+        val pos = when {
+            selectCategory == null -> 1
+            else -> items.indexOf(selectCategory).takeIf { it >= 0 } ?: 1
+        }
+        categorySpinner.setSelection(pos)
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #5) — ask for a new group name
+        (same dialog as Home/Configs). On cancel or back-press the
+        spinner goes back to showing the current selection, so it
+        never displays "Create group" while another group is
+        actually selected. */
+    private fun showNewCategoryDialog(onCreated: (String) -> Unit) {
+        val entry = EditText(this)
+        entry.setSingleLine()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.minab_new_category)
+            .setView(entry)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val name = CategoryStore.normalise(entry.text.toString())
+                CategoryStore.addCategory(this, name)
+                onCreated(name)
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                refreshCategorySpinner(selectedCategory)
+            }
+            .setOnCancelListener { refreshCategorySpinner(selectedCategory) }
+            .show()
     }
 
     private fun onFilesPicked(uris: List<Uri>) {
@@ -385,7 +450,11 @@ class BulkImportActivity : BaseActivity() {
             // Pass 2 — online lookup only for the rest, in chunks of 8
             // in parallel (ip-api.com is rate-limited; a 429 just
             // leaves that profile uncategorised).
-            if (autoCategorise && result.importedProfiles.isNotEmpty()) {
+            // Minab Beta v0.9.6.3 (fix #5) — auto-detection runs
+            // ONLY when no group was chosen (opts.category == null,
+            // i.e. "All"): a group the user picked always wins, and
+            // the old code overwrote it with the guessed country.
+            if (autoCategorise && opts.category == null && result.importedProfiles.isNotEmpty()) {
                 val total = result.importedProfiles.size
                 val needOnline = ArrayList<VpnProfile>()
                 var done = 0
