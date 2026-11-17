@@ -41,6 +41,17 @@ android {
         minSdk = 23
         targetSdk = 37
         //targetSdkPreview = "UpsideDownCake"
+        // Minab Beta v0.9.6.3 (beta numbering; first non-beta will be 1.0.0).
+        // v0.9.6.3: Lottie connect button (animated power orb: loops
+        // as a spinner while connecting, plays once on connect),
+        // smaller/minimal Real test settings panel, both test columns
+        // cleared at the start of BOTH tests (no stale real results
+        // next to fresh pings), group picker on bulk import ("Create
+        // group" first, "All" default, explicit pick wins, country
+        // auto-detection for vpnbook-style names like de20/us16 and
+        // for single imports), real-test dimmed orb + green halo on
+        // the progress row + per-server countdown. Core already at
+        // ics-openvpn 0.7.69 (verified from the submodule pins).
         // Minab Beta v0.9 (beta numbering; first non-beta will be 1.0.0).
         // v0.9: shorter About (80–90% trimmed, version top + bottom,
         // "Check for updates" button at the top), update notice on
@@ -99,8 +110,8 @@ android {
         // v0.2: light minimal UI + visible entry points for bulk import,
         // bulk ping and categories (v0.1 had the features, but hidden
         // in the overflow menu, so users could not find them).
-        versionCode = 18
-        versionName = "0.9.6.2-beta"
+        versionCode = 19
+        versionName = "0.9.6.3-beta"
         externalNativeBuild {
             cmake {
                 //arguments+= "-DCMAKE_VERBOSE_MAKEFILE=1"
@@ -397,6 +408,7 @@ dependencies {
     uiImplementation(libs.androidx.security.crypto)
     uiImplementation(libs.kotlin)
     uiImplementation(libs.mpandroidchart)
+    uiImplementation(libs.lottie)
     uiImplementation(libs.square.okhttp)
 
     testImplementation(libs.androidx.test.core)
