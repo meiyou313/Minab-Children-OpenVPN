@@ -66,29 +66,44 @@
     <!-- Minab Beta v0.9.1 — ping / real results in neat, small,
          regular columns like Home (fix #6): 54dp badges, ping
          first, real second. -->
-    <TextView
-        android:id="@+id/minab_config_ping_badge"
-        style="@style/Minab.PingBadge"
-        android:layout_width="54dp"
+    <!-- Minab Beta v0.9.6.4 (fix #1) — same fixed LTR pair as
+         Home: ping ALWAYS on the left, real ALWAYS on the right,
+         whatever the phone's locale direction is; an empty column
+         stays INVISIBLE so the other badge never slides into its
+         place. The pair itself is GONE when neither test has run. -->
+    <LinearLayout
+        android:id="@+id/minab_config_badges"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/minab_ping_badge_fast"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:singleLine="true"
-        android:visibility="gone" />
+        android:layoutDirection="ltr"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
 
-    <TextView
-        android:id="@+id/minab_config_real_badge"
-        style="@style/Minab.PingBadge"
-        android:layout_width="54dp"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/minab_ping_badge_fast"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:singleLine="true"
-        android:visibility="gone" />
+        <TextView
+            android:id="@+id/minab_config_ping_badge"
+            style="@style/Minab.PingBadge"
+            android:layout_width="54dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/minab_ping_badge_fast"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:visibility="invisible" />
+
+        <TextView
+            android:id="@+id/minab_config_real_badge"
+            style="@style/Minab.PingBadge"
+            android:layout_width="54dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/minab_ping_badge_fast"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:visibility="invisible" />
+    </LinearLayout>
 
     <!-- Minab Beta v0.9.1 — the favorite star (fix #6): filled
          amber for a favorite, grey outline otherwise. -->

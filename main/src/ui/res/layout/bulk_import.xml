@@ -38,6 +38,41 @@
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/minab_text_secondary" />
 
+        <!-- Minab Beta v0.9.6.4 (fix #2) — the group picker used
+             to sit at the very bottom of this long scrolling page,
+             after the URL import, the restore button and all the
+             credential fields, so it was never seen and read as
+             "not added". It is FIRST now, right under the hint,
+             with a bold label and a boxed spinner: pick a group
+             (or "Create group", or "All") BEFORE picking files. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="@font/vazirmatn"
+            android:text="@string/minab_import_category"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <!-- The spinner keeps its default background (with the
+             dropdown arrow), so it reads as a picker, not a text
+             field. -->
+        <Spinner
+            android:id="@+id/minab_bulk_category"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+
+        <CheckBox
+            android:id="@+id/minab_bulk_auto_category"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:checked="true"
+            android:text="@string/minab_auto_category"
+            android:textColor="@color/minab_text_primary" />
+
         <Button
             android:id="@+id/minab_bulk_pick"
             style="@style/Minab.PrimaryButton"
@@ -170,29 +205,6 @@
             android:layout_marginTop="12dp"
             android:checked="true"
             android:text="@string/minab_apply_to_all"
-            android:textColor="@color/minab_text_primary" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/minab_import_category"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
-
-        <Spinner
-            android:id="@+id/minab_bulk_category"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
-
-        <CheckBox
-            android:id="@+id/minab_bulk_auto_category"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:checked="true"
-            android:text="@string/minab_auto_category"
             android:textColor="@color/minab_text_primary" />
 
         <!-- v0.3 bug fix 1: live progress bar + "Imported X of N…"

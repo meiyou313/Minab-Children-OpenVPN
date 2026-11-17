@@ -100,35 +100,54 @@
          crowding out the server name. The real badge shows just
          the ms value now (the "Real: " prefix is gone from
          minab_real_ms), so both badges fit in 54dp. -->
-    <TextView
-        android:id="@+id/minab_ping_badge"
-        style="@style/Minab.PingBadge"
-        android:layout_width="54dp"
+    <!-- Minab Beta v0.9.6.4 (fix #1) — the two result columns are
+         one fixed LTR pair now: ping ALWAYS on the left, real
+         ALWAYS on the right, whatever the phone's locale direction
+         is. Before, the pair mirrored with RTL, so the ping badge
+         sat on the right of the pair (towards the middle of the
+         row) and read as if the ping result had been written in
+         the wrong column. The pair itself is GONE when neither
+         test has run; an empty column stays INVISIBLE (not GONE)
+         so the other badge never slides into its place. -->
+    <LinearLayout
+        android:id="@+id/minab_badges"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/minab_ping_badge_fast"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:singleLine="true"
-        android:textSize="9sp"
-        android:visibility="gone"
-        tools:text="24 ms"
-        tools:visibility="visible" />
+        android:layoutDirection="ltr"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
 
-    <TextView
-        android:id="@+id/minab_real_badge"
-        style="@style/Minab.PingBadge"
-        android:layout_width="54dp"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/minab_ping_badge_fast"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:singleLine="true"
-        android:textSize="9sp"
-        android:visibility="gone"
-        tools:text="850 ms"
-        tools:visibility="visible" />
+        <TextView
+            android:id="@+id/minab_ping_badge"
+            style="@style/Minab.PingBadge"
+            android:layout_width="54dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/minab_ping_badge_fast"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:textSize="9sp"
+            android:visibility="invisible"
+            tools:text="24 ms"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/minab_real_badge"
+            style="@style/Minab.PingBadge"
+            android:layout_width="54dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/minab_ping_badge_fast"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:textSize="9sp"
+            android:visibility="invisible"
+            tools:text="850 ms"
+            tools:visibility="visible" />
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/minab_favorite_star"

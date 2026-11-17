@@ -217,13 +217,18 @@
 
     <!-- Minab Beta v0.6 — test progress (either test): bar +
          status line + Cancel. Mirrors Home's progress row. -->
+    <!-- Minab Beta v0.9.6.4 (fix #4) — same distinct card as
+         Home's progress row: card background, padding, larger
+         Vazirmatn status line in the primary colour. -->
     <LinearLayout
         android:id="@+id/minab_configs_test_progress_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:background="@drawable/minab_card_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:padding="8dp"
         android:visibility="gone">
 
         <ProgressBar
@@ -242,8 +247,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
+            android:ellipsize="middle"
+            android:fontFamily="@font/vazirmatn"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="12sp" />
 
         <Button
             android:id="@+id/minab_configs_test_cancel_btn"

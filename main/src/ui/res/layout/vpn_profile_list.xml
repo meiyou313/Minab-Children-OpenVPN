@@ -433,13 +433,20 @@
              test runs: bar + "Pinging N profiles… X done" + Cancel.
              After a finished test it shows "Sorted by ping (fastest
              first)" with a full bar until the next test. -->
+        <!-- Minab Beta v0.9.6.4 (fix #4) — the test sentence
+             used to be a bare grey line under the buttons. It is
+             a distinct card now (same card background as the
+             server list), with a larger Vazirmatn line in the
+             primary colour, so the running test is unmissable. -->
         <LinearLayout
             android:id="@+id/minab_ping_progress_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
+            android:background="@drawable/minab_card_bg"
             android:gravity="center_vertical"
             android:orientation="horizontal"
+            android:padding="8dp"
             android:visibility="gone">
 
             <ProgressBar
@@ -458,8 +465,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="@color/minab_text_secondary" />
+                android:ellipsize="middle"
+                android:fontFamily="@font/vazirmatn"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/minab_ping_cancel_btn"
