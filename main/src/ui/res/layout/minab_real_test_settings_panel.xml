@@ -7,15 +7,18 @@
   ~ Shared by Home and Configs through MinabRealTestSettingsPanel,
   ~ so both tabs behave exactly the same. Hidden by default; the
   ~ gear icon is green while it is open, blue while closed.
+  ~ Minab Beta v0.9.6.3 (fix #2) — smaller and more minimal:
+  ~ tighter padding/margins, smaller fonts and steppers, so the
+  ~ panel no longer takes half the screen.
   -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/minab_real_settings_panel"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
+    android:layout_marginTop="6dp"
     android:background="@drawable/minab_card_bg"
     android:orientation="vertical"
-    android:padding="12dp"
+    android:padding="8dp"
     android:visibility="gone">
 
     <LinearLayout
@@ -31,7 +34,7 @@
             android:fontFamily="@font/vazirmatn"
             android:text="@string/minab_real_settings_title"
             android:textColor="@color/minab_text_primary"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
@@ -44,17 +47,17 @@
             android:padding="4dp"
             android:text="@string/minab_real_settings_reset"
             android:textColor="@color/minab_teal"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
     </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="6dp"
         android:fontFamily="@font/vazirmatn"
         android:text="@string/minab_real_settings_wait"
         android:textColor="@color/minab_text_primary"
-        android:textSize="12sp"
+        android:textSize="11sp"
         android:textStyle="bold" />
 
     <TextView
@@ -63,7 +66,7 @@
         android:fontFamily="@font/vazirmatn"
         android:text="@string/minab_real_settings_wait_hint"
         android:textColor="@color/minab_text_secondary"
-        android:textSize="11sp" />
+        android:textSize="10sp" />
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -75,43 +78,43 @@
         <Button
             android:id="@+id/minab_real_settings_wait_minus"
             style="@style/Widget.AppCompat.Button.Borderless"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:minWidth="48dp"
-            android:minHeight="40dp"
+            android:layout_width="40dp"
+            android:layout_height="32dp"
+            android:minWidth="40dp"
+            android:minHeight="32dp"
             android:text="−"
             android:textColor="@color/minab_teal"
-            android:textSize="18sp" />
+            android:textSize="16sp" />
 
         <TextView
             android:id="@+id/minab_real_settings_wait_value"
-            android:layout_width="72dp"
+            android:layout_width="64dp"
             android:layout_height="wrap_content"
             android:fontFamily="@font/vazirmatn"
             android:gravity="center"
             android:textColor="@color/minab_text_primary"
-            android:textSize="16sp" />
+            android:textSize="14sp" />
 
         <Button
             android:id="@+id/minab_real_settings_wait_plus"
             style="@style/Widget.AppCompat.Button.Borderless"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:minWidth="48dp"
-            android:minHeight="40dp"
+            android:layout_width="40dp"
+            android:layout_height="32dp"
+            android:minWidth="40dp"
+            android:minHeight="32dp"
             android:text="+"
             android:textColor="@color/minab_teal"
-            android:textSize="18sp" />
+            android:textSize="16sp" />
     </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="6dp"
         android:fontFamily="@font/vazirmatn"
         android:text="@string/minab_real_settings_max"
         android:textColor="@color/minab_text_primary"
-        android:textSize="12sp"
+        android:textSize="11sp"
         android:textStyle="bold" />
 
     <TextView
@@ -120,7 +123,7 @@
         android:fontFamily="@font/vazirmatn"
         android:text="@string/minab_real_settings_max_hint"
         android:textColor="@color/minab_text_secondary"
-        android:textSize="11sp" />
+        android:textSize="10sp" />
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -132,39 +135,39 @@
         <Button
             android:id="@+id/minab_real_settings_max_minus"
             style="@style/Widget.AppCompat.Button.Borderless"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:minWidth="48dp"
-            android:minHeight="40dp"
+            android:layout_width="40dp"
+            android:layout_height="32dp"
+            android:minWidth="40dp"
+            android:minHeight="32dp"
             android:text="−"
             android:textColor="@color/minab_teal"
-            android:textSize="18sp" />
+            android:textSize="16sp" />
 
         <TextView
             android:id="@+id/minab_real_settings_max_value"
-            android:layout_width="72dp"
+            android:layout_width="64dp"
             android:layout_height="wrap_content"
             android:fontFamily="@font/vazirmatn"
             android:gravity="center"
             android:textColor="@color/minab_text_primary"
-            android:textSize="16sp" />
+            android:textSize="14sp" />
 
         <Button
             android:id="@+id/minab_real_settings_max_plus"
             style="@style/Widget.AppCompat.Button.Borderless"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:minWidth="48dp"
-            android:minHeight="40dp"
+            android:layout_width="40dp"
+            android:layout_height="32dp"
+            android:minWidth="40dp"
+            android:minHeight="32dp"
             android:text="+"
             android:textColor="@color/minab_teal"
-            android:textSize="18sp" />
+            android:textSize="16sp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -175,7 +178,7 @@
             android:fontFamily="@font/vazirmatn"
             android:text="@string/minab_real_settings_unpinged"
             android:textColor="@color/minab_text_primary"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
 
         <CheckBox
             android:id="@+id/minab_real_settings_unpinged_check"
@@ -191,6 +194,6 @@
         android:fontFamily="@font/vazirmatn"
         android:text="@string/minab_real_settings_unpinged_hint"
         android:textColor="@color/minab_text_secondary"
-        android:textSize="11sp" />
+        android:textSize="10sp" />
 
 </LinearLayout>

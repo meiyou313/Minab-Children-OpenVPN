@@ -26,6 +26,7 @@
   ~ list no longer looks like a separate window.
   -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -118,14 +119,25 @@
             android:orientation="horizontal"
             android:padding="12dp">
 
-            <ImageButton
+            <!-- Minab Beta v0.9.6.3 (fix #1) — the connect button is
+                 now a Lottie animation (free power-button asset from
+                 LottieFiles, Lottie Simple License, strokes recoloured
+                 white in minab_power_button.json so it reads on both
+                 discs): the disc background still carries the state
+                 colour (indigo off / green on); the animation adds
+                 the motion — it loops as a spinner while connecting
+                 and plays once on connect. Driven from
+                 VPNProfileList.updateOrbState; same id, same size,
+                 same click. -->
+            <com.airbnb.lottie.LottieAnimationView
                 android:id="@+id/minab_power_orb"
                 android:layout_width="72dp"
                 android:layout_height="72dp"
                 android:background="@drawable/minab_orb_disc"
                 android:contentDescription="@string/minab_tap_to_connect"
-                android:scaleType="center"
-                android:src="@drawable/ic_minab_power" />
+                app:lottie_autoPlay="false"
+                app:lottie_loop="false"
+                app:lottie_rawRes="@raw/minab_power_button" />
 
             <LinearLayout
                 android:layout_width="0dp"
