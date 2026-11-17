@@ -555,7 +555,7 @@
     <!-- Minab Beta v0.9.6.3 (fix #6) — the same line with the
          per-server countdown: seconds left for the server under
          test (the wait set in the real-test settings). -->
-    <string name="minab_real_running_countdown">Real test %1$d/%2$d — %3$s (%4$d working) · %5$d s left</string>
+    <string name="minab_real_running_countdown">Real test %1$d/%2$d — %3$s (%4$d working) · %5$d s left in total</string>
     <!-- Minab Beta v0.9.1: the real-test badge is small — no "Real:" prefix (fix #13b) -->
     <string name="minab_real_ms">%1$d ms</string>
     <string name="minab_real_blocked">Blocked</string>
