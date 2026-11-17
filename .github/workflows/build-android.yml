@@ -127,11 +127,16 @@ jobs:
           draft: false
           prerelease: true
           files: main/build/outputs/apk/**/debug/Minab-debug-Beta-${{ github.ref_name }}.apk
-          # Release body = THIS version only. Older notes live in CHANGELOG.md;
-          # when adding a version, move the previous version's section there first.
+          # Release body = THIS version only. Older notes live in CHANGELOG.md.
+          # Minab Beta v0.9.6.4 (fix #8) — the version in this body
+          # used to be hardcoded text, so it could name the wrong
+          # version after a bump. It now comes from the tag itself
+          # (${{ github.ref_name }}), and the notes below are this
+          # version's only — when adding a version, replace this
+          # section and move the old one to CHANGELOG.md first.
           body: |
-            Minab debug Beta v0.9.6.3 — Android only, debug build signed with the permanent Minab key.
-            Installs over v0.9.6.2 normally (no uninstall needed).
+            Minab debug Beta ${{ github.ref_name }} — Android only, debug build signed with the permanent Minab key.
+            Installs over the previous version normally (no uninstall needed).
 
             OpenVPN client based on ics-openvpn (GPLv2, Arne Schwabe),
             with bulk import of many .ovpn files / a .zip, one username
@@ -139,30 +144,32 @@ jobs:
             by country), and bulk ping test of all profiles or one
             group.
 
-            New in v0.9.6.3 — seven items from testing v0.9.6.2:
-            the connect button is now an animated Lottie power orb
-            (it loops as a spinner while connecting and plays once on
-            connect; the disc still shows the state colour). The Real
-            test settings panel is smaller and more minimal, with
-            smaller fonts and steppers. Both test columns are now
-            cleared at the start of BOTH tests, so an old real-test
-            result can never sit next to fresh ping values — the code
-            has no path that writes a ping result into the real-test
-            column; what looked like that was a stale real result from
-            an earlier run. On bulk import the group picker now has
-            "Create group" first and "All" as the default; a group you
-            pick always wins over auto-detection, and the country
-            auto-detection now understands vpnbook-style names like
-            de20/us16/fr2311 and also runs after a single-file import
-            (which never categorised before). During a real test the
-            connect button dims, the progress row gets a green halo,
-            and the status line counts down the seconds left for the
-            server under test (the wait from the settings); the Cancel
-            button in that row stops the test. The core is already at
-            ics-openvpn 0.7.69 — the submodule pins match the tag, so
-            there was nothing to update. Please test the new button
-            animation, the smaller panel, and a ping test followed by
-            a real test.
+            New in ${{ github.ref_name }} — eight fixes from testing v0.9.6.3:
+            the ping and real-test results are fixed columns now (ping
+            always on the LEFT, real always on the RIGHT, in Home and
+            in Configs, whatever the phone's locale direction is; an
+            empty column keeps its place instead of letting the other
+            badge slide into it). The bulk-import group picker moved
+            to the TOP of the import page, right under the hint, with
+            a bold label and a boxed spinner — it used to sit at the
+            very bottom of the long scrolling page, so it was never
+            seen. The real-test status line now counts down the TOTAL
+            time left for the whole run, not one server's seconds.
+            The test sentence lives in a distinct card now, in larger
+            Vazirmatn in the primary colour, in Home and in Configs.
+            The connect button visibly animates at rest too: it loops
+            slowly while disconnected (it used to freeze on its first
+            frame and look like a plain static icon), loops at full
+            speed while connecting, and plays once on connect. The
+            Home list no longer lags during a test: list refreshes
+            are merged to at most one re-bind every 400 ms, the
+            per-result disk save moved off the UI thread, and the
+            Configs full rebuild per result is a coalesced re-bind
+            instead. The Real test settings panel is smaller still
+            (6dp padding, 4dp sections, 10sp labels, 9sp hints,
+            28dp steppers). Please test the columns, the picker at
+            the top of Bulk import, the total countdown, the idle
+            button animation, and a real test on Home for lag.
 
             Install: download the APK below and install it on Android.
             Older versions: see CHANGELOG.md in this repo.
