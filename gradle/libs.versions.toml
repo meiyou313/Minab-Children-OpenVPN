@@ -18,6 +18,10 @@ bouncycastle = "1.70"
 mpandroidchart = "3.1.0"
 kotlin = "2.4.10"
 square-okhttp = "5.5.0"
+# Minab Beta v0.9.6.3 (fix #1) — Lottie for the animated connect
+# button (power-button orb). Apache 2.0, allowed by ics-openvpn's
+# explicit exception for Apache-2.0 libraries.
+lottie = "6.7.1"
 
 # Test
 androidx-test-core = "1.7.0"
@@ -50,6 +54,7 @@ org-bouncycastle-bcmail-jdk15on = { group = "org.bouncycastle", name = "bcmail-j
 org-bouncycastle-bcpg-jdk15on = { group = "org.bouncycastle", name = "bcpg-jdk15on", version.ref = "bouncycastle" }
 kotlin = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 square-okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "square-okhttp" }
+lottie = { group = "com.airbnb.android", name = "lottie", version.ref = "lottie" }
 
 # Test
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidx-test-core" }
