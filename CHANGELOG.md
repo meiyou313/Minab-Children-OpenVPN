@@ -2,6 +2,26 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.6.3 — seven items from testing v0.9.6.2:
+the connect button is now an animated Lottie power orb (it loops
+as a spinner while connecting and plays once on connect; the disc
+still shows the state colour). The Real test settings panel is
+smaller and more minimal, with smaller fonts and steppers. Both
+test columns are now cleared at the start of BOTH tests, so an old
+real-test result can never sit next to fresh ping values — the code
+has no path that writes a ping result into the real-test column;
+what looked like that was a stale real result from an earlier run.
+On bulk import the group picker now has "Create group" first and
+"All" as the default; a group you pick always wins over
+auto-detection, and the country auto-detection now understands
+vpnbook-style names like de20/us16/fr2311 and also runs after a
+single-file import (which never categorised before). During a real
+test the connect button dims, the progress row gets a green halo,
+and the status line counts down the seconds left for the server
+under test (the wait from the settings); the Cancel button in that
+row stops the test. The core is already at ics-openvpn 0.7.69 —
+the submodule pins match the tag, so there was nothing to update.
+
 New in v0.9.6.2 — six fixes from testing v0.9.6.1:
 the Real test settings are now an inline panel directly
 under the Real test button (Home AND Configs) instead of
