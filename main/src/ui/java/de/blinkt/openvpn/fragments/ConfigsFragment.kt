@@ -136,6 +136,22 @@ class ConfigsFragment : ListFragment() {
     private val realCountdownHandler = Handler(Looper.getMainLooper())
     private var realCountdownSeconds: Int = 0
     private var realCountdownName: String? = null
+    // Minab Beta v0.9.6.4 (fix #6) — coalesced list refresh,
+    // same as Home: a test used to rebuild the whole list
+    // (refreshList re-measures every row) on EVERY result, and
+    // the Configs page lagged with it. Refreshes during a test
+    // are now merged to at most one re-bind every 400 ms.
+    private val listRefreshHandler = Handler(Looper.getMainLooper())
+    private var listRefreshPending = false
+    private val listRefreshRunnable = Runnable {
+        listRefreshPending = false
+        if (isAdded) mArrayadapter?.notifyDataSetChanged()
+    }
+    private fun requestListRefresh() {
+        if (listRefreshPending) return
+        listRefreshPending = true
+        listRefreshHandler.postDelayed(listRefreshRunnable, 400)
+    }
     private val realCountdownRunnable: Runnable = Runnable {
         if (realTestActive && realCountdownSeconds > 0) {
             realCountdownSeconds--
@@ -318,6 +334,7 @@ class ConfigsFragment : ListFragment() {
         val name: TextView = view.findViewById(R.id.minab_config_name)
         val subtitle: TextView = view.findViewById(R.id.minab_config_subtitle)
         val flag: ImageView = view.findViewById(R.id.minab_config_flag)
+        val badges: View = view.findViewById(R.id.minab_config_badges)
         val pingBadge: TextView = view.findViewById(R.id.minab_config_ping_badge)
         val realBadge: TextView = view.findViewById(R.id.minab_config_real_badge)
         val star: ImageView = view.findViewById(R.id.minab_config_star)
@@ -426,7 +443,9 @@ class ConfigsFragment : ListFragment() {
         val sorted = items.sortedWith(pingComparator(groupOrder))
         adapter.clear()
         adapter.addAll(sorted)
-        adapter.notifyDataSetChanged()
+        // Minab Beta v0.9.6.4 (fix #6) — coalesced: a re-sort
+        // happens on every result while a test runs.
+        requestListRefresh()
     }
 
     private fun refreshListInner() {
@@ -525,12 +544,20 @@ class ConfigsFragment : ListFragment() {
                     holder.flag.visibility = View.VISIBLE
                     // Minab Beta v0.9.1 — ping / real badges in neat,
                     // small, regular columns like Home (fix #6).
-                    setConfigBadge(
+                    // Minab Beta v0.9.6.4 (fix #1) — fixed columns,
+                    // same as Home: the pair shows whenever either
+                    // test has a result; an empty column stays
+                    // INVISIBLE and keeps its place, so ping is
+                    // always the left column and real always the
+                    // right one.
+                    val pingShown = setConfigBadge(
                         holder.pingBadge,
                         profile.mLastPingMs, profile.mLastPingResult)
-                    setConfigBadge(
+                    val realShown = setConfigBadge(
                         holder.realBadge,
                         profile.mLastRealMs, profile.mLastRealResult)
+                    holder.badges.visibility =
+                        if (pingShown || realShown) View.VISIBLE else View.GONE
                     // Minab Beta v0.9.1 — the favorite star (fix #6):
                     // filled for a favorite, outline otherwise.
                     val star = holder.star
@@ -571,8 +598,11 @@ class ConfigsFragment : ListFragment() {
         (green < 100 ms, amber 100–299 ms, grey otherwise), hidden
         when the profile has no result for it. Mirrors Home's row
         badges; a 0 ms value is not a measurement (see the
-        VpnProfile migration guard). */
-    private fun setConfigBadge(badge: TextView, ms: Long, result: String) {
+        VpnProfile migration guard). Returns true when the badge
+        shows a result. Minab Beta v0.9.6.4 (fix #1) — an empty
+        badge is INVISIBLE, not GONE, so the column keeps its
+        place and the other badge never slides into it. */
+    private fun setConfigBadge(badge: TextView, ms: Long, result: String): Boolean {
         if (ms > 0) {
             badge.visibility = View.VISIBLE
             badge.text = result.ifEmpty { "$ms ms" }
@@ -583,12 +613,15 @@ class ConfigsFragment : ListFragment() {
                     else -> R.drawable.minab_ping_badge_fail
                 }
             )
+            return true
         } else if (result.isNotEmpty() && ms != 0L) {
             badge.visibility = View.VISIBLE
             badge.text = result
             badge.setBackgroundResource(R.drawable.minab_ping_badge_fail)
+            return true
         } else {
-            badge.visibility = View.GONE
+            badge.visibility = View.INVISIBLE
+            return false
         }
     }
 
@@ -1312,8 +1345,18 @@ class ConfigsFragment : ListFragment() {
                         if (result.status == PingTester.Status.OK) result.ms else -1
                     result.profile.mLastPingTime = result.timestampMs
                     result.profile.mLastPingResult = result.displayText()
-                    ProfileManager.saveProfile(requireContext(), result.profile)
-                    refreshList()
+                    // Minab Beta v0.9.6.4 (fix #6) — disk save off
+                    // the UI thread; a single row only needs a
+                    // re-bind, not the full refreshList rebuild.
+                    val profileToSave = result.profile
+                    val saveContext = requireContext()
+                    Thread {
+                        try {
+                            ProfileManager.saveProfile(saveContext, profileToSave)
+                        } catch (_: Exception) {
+                        }
+                    }.start()
+                    requestListRefresh()
                 }
             }
 
@@ -1384,14 +1427,24 @@ class ConfigsFragment : ListFragment() {
                         if (result.status == PingTester.Status.OK) result.ms else -1
                     result.profile.mLastPingTime = result.timestampMs
                     result.profile.mLastPingResult = result.displayText()
-                    ProfileManager.saveProfile(requireContext(), result.profile)
+                    // Minab Beta v0.9.6.4 (fix #6) — disk save off
+                    // the UI thread, refresh coalesced (same as
+                    // Home's recordPingResult).
+                    val profileToSave = result.profile
+                    val saveContext = requireContext()
+                    Thread {
+                        try {
+                            ProfileManager.saveProfile(saveContext, profileToSave)
+                        } catch (_: Exception) {
+                        }
+                    }.start()
                     pingDoneCount++
                     updateTestPingStatus()
                     // Minab Beta v0.9.6.2 (fix #5) — re-sort live
                     // as results arrive when the list is
                     // ping-sorted (same as Home).
                     if (sortMode == SORT_PING) resortConfigsAdapter()
-                    else mArrayadapter?.notifyDataSetChanged()
+                    else requestListRefresh()
                 }
             }
 
@@ -1488,12 +1541,24 @@ class ConfigsFragment : ListFragment() {
     private var realCountdownWorking: Int = 0
     private fun updateRealCountdownLine() {
         if (!realTestActive) return
-        testStatusView?.text = if (realCountdownSeconds > 0) {
+        // Minab Beta v0.9.6.4 (fix #3) — total time left for the
+        // whole run, same as Home: the current server's remaining
+        // seconds plus one wait per server still to test.
+        val waitSeconds = try {
+            MinabRealTestSettings.getWaitSeconds(requireContext())
+        } catch (_: Exception) {
+            12
+        }
+        val serversAfterCurrent =
+            (realCountdownTotal - realCountdownDone - 1).coerceAtLeast(0)
+        val totalSecondsLeft =
+            realCountdownSeconds + serversAfterCurrent * waitSeconds
+        testStatusView?.text = if (totalSecondsLeft > 0) {
             getString(
                 R.string.minab_real_running_countdown,
                 realCountdownDone, realCountdownTotal,
                 realCountdownName ?: "", realCountdownWorking,
-                realCountdownSeconds
+                totalSecondsLeft
             )
         } else {
             getString(
@@ -1606,7 +1671,13 @@ class ConfigsFragment : ListFragment() {
 
                 override fun onProfileResult(profile: VpnProfile) {
                     if (!isAdded || runId != realTestRunId) return
-                    refreshList()
+                    // Minab Beta v0.9.6.4 (fix #6) — the full
+                    // refreshList rebuild (chips + re-measuring
+                    // every row) on EVERY result was the worst of
+                    // the lag: a coalesced re-bind is enough
+                    // while the run is going; onFinished still
+                    // does the full refresh once.
+                    requestListRefresh()
                 }
 
                 override fun onFinished(cancelled: Boolean, working: Int) {

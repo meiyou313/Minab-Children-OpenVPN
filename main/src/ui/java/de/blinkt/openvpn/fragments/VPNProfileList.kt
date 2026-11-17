@@ -150,6 +150,25 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             realCountdownHandler.postDelayed(realCountdownRunnable, 1000)
         }
     }
+    // Minab Beta v0.9.6.4 (fix #6) — coalesced list refresh. A
+    // ping/real test used to call notifyDataSetChanged() on EVERY
+    // result (plus a disk save on the UI thread, plus a full
+    // re-sort when sorted): with dozens of servers the main
+    // thread re-bound every visible row dozens of times a second
+    // and the Home list lagged hard. Refreshes during a test are
+    // now merged to at most one re-bind every 400 ms — still
+    // live, but the list stays smooth.
+    private val listRefreshHandler = Handler(Looper.getMainLooper())
+    private var listRefreshPending = false
+    private val listRefreshRunnable = Runnable {
+        listRefreshPending = false
+        if (isAdded) mArrayadapter?.notifyDataSetChanged()
+    }
+    private fun requestListRefresh() {
+        if (listRefreshPending) return
+        listRefreshPending = true
+        listRefreshHandler.postDelayed(listRefreshRunnable, 400)
+    }
     private val realTestPauseHandler = Handler(Looper.getMainLooper())
     private val realTestPauseStop = Runnable {
         if (realTestActive) {
@@ -249,7 +268,11 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                     lastLevel = level
                     mLastStatusMessage = VpnStatus.getLastCleanLogMessage(activity)
                     mLastIntent = intent
-                    mArrayadapter?.notifyDataSetChanged()
+                    // Minab Beta v0.9.6.4 (fix #6) — coalesced:
+                    // during a real test every server connect /
+                    // disconnect fires a state change, and a full
+                    // re-bind on each one was part of the Home lag.
+                    requestListRefresh()
                     updateOrbState()
                     // Minab Beta v0.9 — keep the home-screen widget in sync
                     // with the connection state.
@@ -873,7 +896,10 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         )
         adapter.clear()
         adapter.addAll(ordered)
-        adapter.notifyDataSetChanged()
+        // Minab Beta v0.9.6.4 (fix #6) — coalesced: a re-sort
+        // happens on every result while a test runs, and the
+        // immediate re-bind was part of the Home lag.
+        requestListRefresh()
     }
 
     /** Minab v0.5 — size the (non-scrolling) ListView to the total
@@ -1375,9 +1401,14 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             else R.drawable.minab_orb_disc)
         // Minab Beta v0.9.6.3 (fix #1) — drive the Lottie orb only
         // on a state CHANGE: connecting loops the clip as a spinner,
-        // connected plays it once and holds the last frame,
-        // disconnected settles on the first frame. The disc
+        // connected plays it once and holds the last frame. The disc
         // background above still carries the state colour.
+        // Minab Beta v0.9.6.4 (fix #5) — disconnected no longer
+        // freezes the clip on its first frame: it used to look like
+        // a plain static icon, so the animation read as "not
+        // there". Disconnected now loops the clip slowly (half
+        // speed), so the button visibly breathes at rest; connecting
+        // loops it at full speed, connected plays it once.
         button.alpha = 1f
         val orbState = if (active) {
             if (lastLevel == ConnectionStatus.LEVEL_CONNECTED) "connected" else "connecting"
@@ -1385,17 +1416,20 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         if (orbState != lastOrbState) {
             when (orbState) {
                 "connecting" -> {
+                    button.speed = 1f
                     button.repeatCount = LottieDrawable.INFINITE
                     button.playAnimation()
                 }
                 "connected" -> {
+                    button.speed = 1f
                     button.repeatCount = 0
                     button.progress = 0f
                     button.playAnimation()
                 }
                 else -> {
-                    button.cancelAnimation()
-                    button.progress = 0f
+                    button.speed = 0.5f
+                    button.repeatCount = LottieDrawable.INFINITE
+                    button.playAnimation()
                 }
             }
             lastOrbState = orbState
@@ -1781,14 +1815,29 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             if (result.status == PingTester.Status.OK) result.ms else -1
         result.profile.mLastPingTime = result.timestampMs
         result.profile.mLastPingResult = result.displayText()
-        ProfileManager.saveProfile(requireContext(), result.profile)
+        // Minab Beta v0.9.6.4 (fix #6) — the disk save used to run
+        // on the UI thread for EVERY result (a file write per
+        // server, dozens per test): save off the thread instead.
+        // The fields are written above, before the thread starts;
+        // the context is captured here, so a detached fragment
+        // cannot make the save throw.
+        val profileToSave = result.profile
+        val saveContext = requireContext()
+        Thread {
+            try {
+                ProfileManager.saveProfile(saveContext, profileToSave)
+            } catch (_: Exception) {
+            }
+        }.start()
         pingDoneCount++
         updatePingStatus()
         // Minab v0.7: re-sort live as results arrive (when the
         // list is ping-sorted), so the fastest server floats to
         // the top during the test, not only at the end.
+        // Minab Beta v0.9.6.4 (fix #6) — coalesced refresh:
+        // resortAdapter's notify is merged now (see there).
         if (sortMode == SORT_PING) resortAdapter()
-        else mArrayadapter?.notifyDataSetChanged()
+        else requestListRefresh()
     }
 
     private fun updatePingStatus() {
@@ -1902,8 +1951,10 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                     if (!isAdded || runId != realTestRunId) return
                     // Minab v0.7: re-sort live as results arrive
                     // (when the list is real-sorted).
+                    // Minab Beta v0.9.6.4 (fix #6) — coalesced
+                    // refresh (see requestListRefresh).
                     if (sortMode == SORT_REAL) resortAdapter()
-                    else mArrayadapter?.notifyDataSetChanged()
+                    else requestListRefresh()
                 }
 
                 override fun onFinished(cancelled: Boolean, working: Int) {
@@ -1989,14 +2040,28 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         pingCancelButton?.visibility = View.VISIBLE
         pingProgressBar?.progress =
             if (realTotalCount > 0) realDoneCount * 100 / realTotalCount else 0
-        // Minab Beta v0.9.6.3 (fix #6) — while the countdown runs,
-        // the status line shows the seconds left for this server.
-        pingStatusView?.text = if (realCountdownSeconds > 0) {
+        // Minab Beta v0.9.6.4 (fix #3) — the line used to count
+        // down the seconds left for THIS server only (12 s, or
+        // the wait from the settings). It now shows the TOTAL
+        // time left for the whole run: the current server's
+        // remaining seconds plus one wait per server still to
+        // test. The ticker re-renders this every second, so the
+        // total ticks down live.
+        val waitSeconds = try {
+            MinabRealTestSettings.getWaitSeconds(requireContext())
+        } catch (_: Exception) {
+            12
+        }
+        val serversAfterCurrent =
+            (realTotalCount - realDoneCount - 1).coerceAtLeast(0)
+        val totalSecondsLeft =
+            realCountdownSeconds + serversAfterCurrent * waitSeconds
+        pingStatusView?.text = if (totalSecondsLeft > 0) {
             getString(
                 R.string.minab_real_running_countdown,
                 realDoneCount, realTotalCount,
                 realTestCurrentName ?: "", realWorkingCount,
-                realCountdownSeconds
+                totalSecondsLeft
             )
         } else {
             getString(
@@ -2404,6 +2469,7 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         val left: View = view.findViewById(R.id.vpn_list_item_left)
         val settings: View = view.findViewById(R.id.quickedit_settings)
         val flag: ImageView = view.findViewById(R.id.minab_flag)
+        val badges: View = view.findViewById(R.id.minab_badges)
         val pingBadge: TextView = view.findViewById(R.id.minab_ping_badge)
         val realBadge: TextView = view.findViewById(R.id.minab_real_badge)
         val star: ImageView = view.findViewById(R.id.minab_favorite_star)
@@ -2506,8 +2572,11 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // Minab v0.7: "> 0" (not ">= 0") — a 0 ms value is not
             // a measurement (see VpnProfile migration guard), and
             // the else-branch ignores a stale "0 ms" result text.
-            if (profile.mLastPingMs > 0) {
-                badge.visibility = View.VISIBLE
+            // Minab Beta v0.9.6.4 (fix #1) — the badge no longer
+            // sets its own visibility: an empty column stays
+            // INVISIBLE (not GONE) so the columns never shift,
+            // and the pair's visibility is set once below.
+            val pingShown = if (profile.mLastPingMs > 0) {
                 badge.text = profile.mLastPingResult.ifEmpty { profile.mLastPingMs.toString() + " ms" }
                 badge.setBackgroundResource(
                     when {
@@ -2516,12 +2585,13 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                         else -> R.drawable.minab_ping_badge_fail
                     }
                 )
+                true
             } else if (profile.mLastPingResult.isNotEmpty() && profile.mLastPingMs != 0L) {
-                badge.visibility = View.VISIBLE
                 badge.text = profile.mLastPingResult
                 badge.setBackgroundResource(R.drawable.minab_ping_badge_fail)
+                true
             } else {
-                badge.visibility = View.GONE
+                false
             }
 
             // Minab Beta v0.6: real-test badge next to the ping badge.
@@ -2532,8 +2602,10 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // Minab v0.7: "> 0" (not ">= 0") — a 0 ms value is not
             // a measurement (see VpnProfile migration guard), and
             // the else-branch ignores a stale "Real: 0 ms" text.
-            if (profile.mLastRealMs > 0) {
-                realBadge.visibility = View.VISIBLE
+            // Minab Beta v0.9.6.4 (fix #1) — same as the ping
+            // badge: visibility is set once below, from the two
+            // booleans, so the columns stay fixed.
+            val realShown = if (profile.mLastRealMs > 0) {
                 realBadge.text = profile.mLastRealResult.ifEmpty { getString(R.string.minab_real_ms, profile.mLastRealMs) }
                 realBadge.setBackgroundResource(
                     when {
@@ -2542,13 +2614,26 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                         else -> R.drawable.minab_ping_badge_fail
                     }
                 )
+                true
             } else if (profile.mLastRealResult.isNotEmpty() && profile.mLastRealMs != 0L) {
-                realBadge.visibility = View.VISIBLE
                 realBadge.text = profile.mLastRealResult
                 realBadge.setBackgroundResource(R.drawable.minab_ping_badge_fail)
+                true
             } else {
-                realBadge.visibility = View.GONE
+                false
             }
+            // Minab Beta v0.9.6.4 (fix #1) — fixed columns: the
+            // pair shows whenever either test has a result; an
+            // empty column stays INVISIBLE and keeps its place,
+            // so ping is always the left column and real always
+            // the right one. Both empty: the pair is GONE, so the
+            // name keeps its room.
+            holder.badges.visibility =
+                if (pingShown || realShown) View.VISIBLE else View.GONE
+            badge.visibility =
+                if (pingShown) View.VISIBLE else View.INVISIBLE
+            realBadge.visibility =
+                if (realShown) View.VISIBLE else View.INVISIBLE
 
             // Minab Beta v0.9 — the favorite star: filled for a
             // favorite, outline otherwise. Tapping it toggles the
