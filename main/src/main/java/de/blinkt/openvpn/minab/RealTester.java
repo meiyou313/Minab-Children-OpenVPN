@@ -181,6 +181,23 @@ public class RealTester implements VpnStatus.StateListener {
         if (myGeneration == generation) requestDisconnect();
     }
 
+    /** Minab Beta v0.9.6.3 (fix #3) — stop whatever real test is
+        running ANYWHERE in the app (Home or Configs), if any. The
+        fragments each own their own RealTester, so one's
+        cancelRealTest() cannot stop the other's run: a real test
+        started on Configs kept writing real-test results while the
+        user watched a ping test on Home, which read as "the ping
+        test wrote into the real-test column". Starting any test now
+        calls this first, so no run survives on the other tab. Safe
+        to call when nothing runs. */
+    public static void cancelCurrent() {
+        RealTester cur;
+        synchronized (LOCK) {
+            cur = current;
+        }
+        if (cur != null) cur.cancel();
+    }
+
     /** True when this run must stop: cancelled, superseded by a
         newer run, or its worker thread was interrupted. */
     private boolean stopped() {

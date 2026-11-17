@@ -52,9 +52,13 @@ public final class AutoCategory {
     private static final long CACHE_TTL_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
     private static final int HTTP_TIMEOUT_MS = 3000;
 
-    /** Non-letter/digit boundaries around a 2-letter token, e.g. "-us-", "_de.", ".nl-". */
+    /** Non-letter/digit boundaries around a 2-letter token, e.g. "-us-", "_de.", ".nl-".
+        Minab Beta v0.9.6.3 (fix #5): the token may be followed by a DIGIT too ("de20", "us16",
+        "fr2311" — vpnbook-style names), so the trailing boundary is "not a letter" instead of
+        "not a letter or digit". A following LETTER still blocks the match, so "free" never
+        matches "fr" and "book" never matches "bo". */
     private static final Pattern CODE_TOKEN =
-            Pattern.compile("(?:^|[^a-z0-9])([a-z]{2})(?:[^a-z0-9]|$)");
+            Pattern.compile("(?:^|[^a-z0-9])([a-z]{2})(?:[^a-z]|$)");
     /** A 2-letter TLD at the end of a hostname, e.g. example.de */
     private static final Pattern TLD =
             Pattern.compile("\\.([a-z]{2})$");
