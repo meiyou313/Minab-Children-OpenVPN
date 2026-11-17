@@ -532,6 +532,11 @@
     <string name="minab_filter_category">Filter by category</string>
     <string name="minab_manage_categories">Manage categories</string>
     <string name="minab_new_category">New category</string>
+    <!-- Minab Beta v0.9.6.3 (fix #5) — the import group picker:
+         "Create group" sits first in the list, "All" is the
+         default (auto-detect the country from the config). -->
+    <string name="minab_import_create_group">Create group…</string>
+    <string name="minab_import_category_all">All</string>
     <string name="minab_rename_category">Rename category</string>
     <string name="minab_delete_category">Delete category</string>
     <string name="minab_assign_category">Assign category</string>
@@ -547,6 +552,10 @@
     <!-- Minab Beta v0.6: Real test — actually connect each server and fetch web.telegram.org through the tunnel -->
     <string name="minab_real_test">Real test</string>
     <string name="minab_real_running">Real test %1$d/%2$d — %3$s (%4$d working)</string>
+    <!-- Minab Beta v0.9.6.3 (fix #6) — the same line with the
+         per-server countdown: seconds left for the server under
+         test (the wait set in the real-test settings). -->
+    <string name="minab_real_running_countdown">Real test %1$d/%2$d — %3$s (%4$d working) · %5$d s left</string>
     <!-- Minab Beta v0.9.1: the real-test badge is small — no "Real:" prefix (fix #13b) -->
     <string name="minab_real_ms">%1$d ms</string>
     <string name="minab_real_blocked">Blocked</string>
