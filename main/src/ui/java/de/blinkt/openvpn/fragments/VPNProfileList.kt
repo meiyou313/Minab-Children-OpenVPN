@@ -48,6 +48,8 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.annotation.RequiresApi
 import androidx.fragment.app.ListFragment
+import com.airbnb.lottie.LottieAnimationView
+import com.airbnb.lottie.LottieDrawable
 import de.blinkt.openvpn.LaunchVPN
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
@@ -64,6 +66,7 @@ import de.blinkt.openvpn.core.Preferences
 import de.blinkt.openvpn.core.ProfileManager
 import de.blinkt.openvpn.core.VpnStatus
 import de.blinkt.openvpn.core.VpnStatus.StateListener
+import de.blinkt.openvpn.minab.AutoCategory
 import de.blinkt.openvpn.minab.CategoryStore
 import de.blinkt.openvpn.minab.FlagHelper
 import de.blinkt.openvpn.minab.MinabCategoryReorder
@@ -131,6 +134,22 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
     private var realWorkingCount: Int = 0
     @Volatile
     private var realTestCurrentName: String? = null
+    /** Minab Beta v0.9.6.3 (fix #6) — per-server countdown while a
+        real test runs: seconds left for the server under test (the
+        wait from MinabRealTestSettings). Restarted whenever
+        onRealProgress names a new server; stopped on finish/cancel.
+        The ticker only re-renders the status line (updateRealStatus)
+        — it never touches the runner. */
+    private val realCountdownHandler = Handler(Looper.getMainLooper())
+    private var realCountdownSeconds: Int = 0
+    private var realCountdownName: String? = null
+    private val realCountdownRunnable = Runnable {
+        if (realTestActive && realCountdownSeconds > 0) {
+            realCountdownSeconds--
+            updateRealStatus()
+            realCountdownHandler.postDelayed(realCountdownRunnable, 1000)
+        }
+    }
     private val realTestPauseHandler = Handler(Looper.getMainLooper())
     private val realTestPauseStop = Runnable {
         if (realTestActive) {
@@ -152,7 +171,15 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
     private var realTestSettingsPanel: MinabRealTestSettingsPanel? = null
     private var categoryChipsContainer: LinearLayout? = null
     // --- Minab v0.3: Namaki-style PowerOrb (home connect button) ---
-    private var orbButton: android.widget.ImageButton? = null
+    // Minab Beta v0.9.6.3 (fix #1) — the connect button is a
+    // LottieAnimationView now (same id, same size, same click): it
+    // loops as a spinner while connecting and plays once on connect.
+    // lastOrbState remembers which state the animation is showing,
+    // so updateOrbState only drives it on a state CHANGE (it runs
+    // on every status update; restarting the animation each time
+    // would stutter it).
+    private var orbButton: LottieAnimationView? = null
+    private var lastOrbState: String = ""
     // --- Minab v0.9.1: the connected panel (fix #13) — button on
     // the LEFT, Status / Name / IP / Ping rows on the RIGHT. ---
     private var connStatusView: TextView? = null
@@ -560,7 +587,7 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // orb. Tapping it connects the selected / last-used profile,
         // or disconnects while a VPN is active (same flow as
         // tapping a profile row).
-        orbButton = v.findViewById<View?>(R.id.minab_power_orb) as android.widget.ImageButton?
+        orbButton = v.findViewById<View?>(R.id.minab_power_orb) as LottieAnimationView?
         orbButton?.setOnClickListener { toggleOrbConnection() }
         // Minab v0.7: the connected server's ping — tap it to
         // re-test that server's ping now (fix #13: the Ping row
@@ -1316,6 +1343,18 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // onFinished / cancelRealTest calls to updateOrbState below.
         if (realTestActive) {
             button.setBackgroundResource(R.drawable.minab_orb_disc)
+            // Minab Beta v0.9.6.3 (fixes #1, #6) — the Lottie orb
+            // freezes on its first frame and dims while a real test
+            // runs, so it reads as "busy, do not tap" (a tap already
+            // toasts "already running"). Restored by the normal
+            // branches below (alpha back to 1, animation re-driven
+            // on the state change).
+            if (lastOrbState != "testing") {
+                button.cancelAnimation()
+                button.progress = 0f
+                lastOrbState = "testing"
+            }
+            button.alpha = 0.45f
             statusView.text = getString(R.string.minab_status_testing)
             statusView.setTextColor(resources.getColor(
                 R.color.minab_busy, requireContext().theme))
@@ -1334,6 +1373,33 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         button.setBackgroundResource(
             if (active) R.drawable.minab_orb_disc_connected
             else R.drawable.minab_orb_disc)
+        // Minab Beta v0.9.6.3 (fix #1) — drive the Lottie orb only
+        // on a state CHANGE: connecting loops the clip as a spinner,
+        // connected plays it once and holds the last frame,
+        // disconnected settles on the first frame. The disc
+        // background above still carries the state colour.
+        button.alpha = 1f
+        val orbState = if (active) {
+            if (lastLevel == ConnectionStatus.LEVEL_CONNECTED) "connected" else "connecting"
+        } else "disconnected"
+        if (orbState != lastOrbState) {
+            when (orbState) {
+                "connecting" -> {
+                    button.repeatCount = LottieDrawable.INFINITE
+                    button.playAnimation()
+                }
+                "connected" -> {
+                    button.repeatCount = 0
+                    button.progress = 0f
+                    button.playAnimation()
+                }
+                else -> {
+                    button.cancelAnimation()
+                    button.progress = 0f
+                }
+            }
+            lastOrbState = orbState
+        }
         val nameView = connNameView
         val pingView = connPingView
         val uuid = VpnStatus.getLastConnectedVPNProfile()
@@ -1580,7 +1646,14 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // results FIRST, so the new results replace them and old
         // and new never mix: every badge goes back to blank until
         // its server's new result arrives.
+        // Minab Beta v0.9.6.3 (fix #3) — clear the real-test column
+        // too, and stop any real test running on the other tab (see
+        // RealTester.cancelCurrent): a run starts from blank columns,
+        // so an old real-test result can never sit next to fresh ping
+        // values and read as if the ping test had written it there.
+        RealTester.cancelCurrent()
         clearPingResults(profiles)
+        clearRealResults(profiles)
         populateVpnList()
         // Minab v0.7: do NOT reset the sort here — the list keeps
         // its previous order during the test; the finish sets the
@@ -1623,6 +1696,52 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                 // Saving must not stop the ping test.
             }
         }
+    }
+
+    /** Minab Beta v0.9.6.3 (fixes #3, #4) — wipe the stored
+        real-test result of every profile in the run (ms, time and
+        text), so the badges go blank until the new results arrive.
+        Called together with clearPingResults at the start of BOTH
+        tests: a run starts from blank columns, so an old real-test
+        result (e.g. "Blocked" from an earlier run) can never sit
+        next to fresh ping values and read as if the ping test had
+        written it there. (The code has no path that writes a ping
+        result into the real-test fields — the "leak" was stale real
+        results from an earlier run.) A save that fails must not
+        stop the test. */
+    private fun clearRealResults(profiles: List<VpnProfile>) {
+        for (profile in profiles) {
+            profile.mLastRealMs = -1
+            profile.mLastRealTime = 0
+            profile.mLastRealResult = ""
+            try {
+                ProfileManager.saveProfile(requireContext(), profile)
+            } catch (e: Exception) {
+                // Saving must not stop the test.
+            }
+        }
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #6) — green halo around the test
+        progress row while a real test runs, so the running test
+        stands out (the ping test keeps the plain row). */
+    private fun setRealTestHalo(on: Boolean) {
+        val row = pingProgressRow ?: return
+        if (on) {
+            row.setBackgroundResource(R.drawable.minab_halo_green)
+            row.setPadding(dp(8), dp(6), dp(8), dp(6))
+        } else {
+            row.background = null
+            row.setPadding(0, 0, 0, 0)
+        }
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #6) — stop the per-server countdown
+        ticker (finish, cancel, or a new run starting). */
+    private fun stopRealCountdown() {
+        realCountdownHandler.removeCallbacks(realCountdownRunnable)
+        realCountdownSeconds = 0
+        realCountdownName = null
     }
 
     /** Run the fast parallel ping over these profiles, recording each
@@ -1674,6 +1793,9 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
 
     private fun updatePingStatus() {
         val row = pingProgressRow ?: return
+        // Minab Beta v0.9.6.3 (fix #6) — the ping test keeps the
+        // plain row; the green halo is for the real test only.
+        setRealTestHalo(false)
         if (pingTester == null) {
             row.visibility = View.GONE
             return
@@ -1721,6 +1843,15 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         realTotalCount = 0
         realWorkingCount = 0
         realTestCurrentName = null
+        // Minab Beta v0.9.6.3 (fix #4) — the run starts from blank
+        // columns: clear the old results from BOTH the ping and the
+        // real-test column first, so the new results replace them
+        // instead of mixing with them. Also stop any real test
+        // running on the other tab (fix #3).
+        RealTester.cancelCurrent()
+        clearPingResults(profiles)
+        clearRealResults(profiles)
+        populateVpnList()
         // Minab v0.7: do NOT reset the sort here — the finish sets
         // the new mode (last completed test wins).
         realTestRunId++
@@ -1750,6 +1881,20 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                     realTotalCount = total
                     realWorkingCount = working
                     realTestCurrentName = currentName
+                    // Minab Beta v0.9.6.3 (fix #6) — a new server
+                    // under test restarts the per-server countdown
+                    // (the wait from the real-test settings); when
+                    // the run ends the name is null and the ticker
+                    // stops.
+                    if (currentName == null) {
+                        stopRealCountdown()
+                    } else if (currentName != realCountdownName) {
+                        realCountdownName = currentName
+                        realCountdownSeconds =
+                            MinabRealTestSettings.getWaitSeconds(requireContext())
+                        realCountdownHandler.removeCallbacks(realCountdownRunnable)
+                        realCountdownHandler.postDelayed(realCountdownRunnable, 1000)
+                    }
                     updateRealStatus()
                 }
 
@@ -1765,6 +1910,8 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
                     if (!isAdded || runId != realTestRunId) return
                     realTester = null
                     realTestActive = false
+                    stopRealCountdown()
+                    setRealTestHalo(false)
                     if (cancelled) {
                         pingProgressRow?.visibility = View.GONE
                         updateOrbState()
@@ -1803,6 +1950,9 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         }
         realTester = tester
         realTestActive = true
+        // Minab Beta v0.9.6.3 (fix #6) — the green halo goes on the
+        // progress row for the whole run (the ping phase included).
+        setRealTestHalo(true)
     }
 
     /** Stop our real test: the runner drops the VPN under test (if
@@ -1815,6 +1965,8 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         realTester?.cancel()
         realTester = null
         realTestActive = false
+        stopRealCountdown()
+        setRealTestHalo(false)
         pingProgressRow?.visibility = View.GONE
         // Minab Beta v0.9.6.1 (fix #10) — leave the steady
         // "testing" panel state at once; the runner's disconnect
@@ -1829,17 +1981,30 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         val row = pingProgressRow ?: return
         if (!realTestActive) {
             row.visibility = View.GONE
+            setRealTestHalo(false)
             return
         }
         row.visibility = View.VISIBLE
+        setRealTestHalo(true)
         pingCancelButton?.visibility = View.VISIBLE
         pingProgressBar?.progress =
             if (realTotalCount > 0) realDoneCount * 100 / realTotalCount else 0
-        pingStatusView?.text = getString(
-            R.string.minab_real_running,
-            realDoneCount, realTotalCount,
-            realTestCurrentName ?: "", realWorkingCount
-        )
+        // Minab Beta v0.9.6.3 (fix #6) — while the countdown runs,
+        // the status line shows the seconds left for this server.
+        pingStatusView?.text = if (realCountdownSeconds > 0) {
+            getString(
+                R.string.minab_real_running_countdown,
+                realDoneCount, realTotalCount,
+                realTestCurrentName ?: "", realWorkingCount,
+                realCountdownSeconds
+            )
+        } else {
+            getString(
+                R.string.minab_real_running,
+                realDoneCount, realTotalCount,
+                realTestCurrentName ?: "", realWorkingCount
+            )
+        }
     }
 
     override fun onCreateContextMenu(
@@ -2086,7 +2251,39 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             startConfigImport(uri)
         } else if (requestCode == IMPORT_PROFILE) {
             val profileUUID = data!!.getStringExtra(VpnProfile.EXTRA_PROFILEUUID)
-            mArrayadapter!!.add(ProfileManager.get(getActivity(), profileUUID))
+            val profile = ProfileManager.get(getActivity(), profileUUID)
+            mArrayadapter!!.add(profile)
+            // Minab Beta v0.9.6.3 (fix #5) — a single imported config
+            // never got auto-categorised (only the bulk import did),
+            // so new servers stayed in "Uncategorized" even when
+            // their name held a country code. Categorise it now, off
+            // the UI thread (the online lookup does DNS + HTTP):
+            // offline guess first, online lookup when that fails.
+            // A single import has no chosen group, so the guess
+            // always wins here; it never overwrites a group the user
+            // picked (see BulkImportActivity).
+            if (profile != null) {
+                val appContext = requireContext().applicationContext
+                Thread {
+                    try {
+                        val guessed = AutoCategory.guessCategory(
+                            appContext, profile.mName, null,
+                            profile.primaryRemoteHost
+                        )
+                        if (guessed != null) {
+                            activity?.runOnUiThread {
+                                if (!isAdded) return@runOnUiThread
+                                profile.setCategory(guessed)
+                                CategoryStore.addCategory(requireContext(), guessed)
+                                ProfileManager.saveProfile(requireContext(), profile)
+                                populateVpnList()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Best-effort: the config is imported either way.
+                    }
+                }.start()
+            }
         } else if (requestCode == FILE_PICKER_RESULT_KITKAT) {
             if (data != null) {
                 val uri = data.getData()

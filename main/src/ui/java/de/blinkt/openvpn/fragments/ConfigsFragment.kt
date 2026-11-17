@@ -127,6 +127,22 @@ class ConfigsFragment : ListFragment() {
     /** Bumped on every start/cancel so listener callbacks from a
         superseded run are ignored. */
     private var realTestRunId = 0
+    /** Minab Beta v0.9.6.3 (fix #6) — per-server countdown while a
+        real test runs: seconds left for the server under test (the
+        wait from MinabRealTestSettings). Restarted whenever
+        onRealProgress names a new server; stopped on finish/cancel.
+        The ticker only re-renders the status line — it never
+        touches the runner. */
+    private val realCountdownHandler = Handler(Looper.getMainLooper())
+    private var realCountdownSeconds: Int = 0
+    private var realCountdownName: String? = null
+    private val realCountdownRunnable = Runnable {
+        if (realTestActive && realCountdownSeconds > 0) {
+            realCountdownSeconds--
+            updateRealCountdownLine()
+            realCountdownHandler.postDelayed(realCountdownRunnable, 1000)
+        }
+    }
     private val testPauseHandler = Handler(Looper.getMainLooper())
     private val testPauseStop = Runnable {
         if (realTestActive) {
@@ -1343,7 +1359,14 @@ class ConfigsFragment : ListFragment() {
         // Minab Beta v0.9.6.2 (fix #2) — clear ALL old ping
         // results FIRST (same as Home): every badge goes back to
         // blank until its server's new result arrives.
+        // Minab Beta v0.9.6.3 (fix #3) — clear the real-test column
+        // too, and stop any real test running on the other tab (see
+        // RealTester.cancelCurrent): a run starts from blank columns,
+        // so an old real-test result can never sit next to fresh ping
+        // values and read as if the ping test had written it there.
+        RealTester.cancelCurrent()
         clearPingResults(profiles)
+        clearRealResults(profiles)
         refreshList()
         if (VpnStatus.isVPNActive()) {
             Toast.makeText(requireContext(), R.string.minab_ping_while_vpn, Toast.LENGTH_LONG).show()
@@ -1415,8 +1438,77 @@ class ConfigsFragment : ListFragment() {
         }
     }
 
+    /** Minab Beta v0.9.6.3 (fixes #3, #4) — wipe the stored
+        real-test result of every profile in the run (ms, time and
+        text). Same rule as clearPingResults, same reason: a run
+        starts from blank columns, so an old real-test result can
+        never sit next to fresh ping values and read as if the ping
+        test had written it there. A save that fails must not stop
+        the test. */
+    private fun clearRealResults(profiles: List<VpnProfile>) {
+        for (profile in profiles) {
+            profile.mLastRealMs = -1
+            profile.mLastRealTime = 0
+            profile.mLastRealResult = ""
+            try {
+                ProfileManager.saveProfile(requireContext(), profile)
+            } catch (e: Exception) {
+                // Saving must not stop the test.
+            }
+        }
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #6) — green halo around the test
+        progress row while a real test runs, so the running test
+        stands out (the ping test keeps the plain row). */
+    private fun setRealTestHalo(on: Boolean) {
+        val row = testProgressRow ?: return
+        if (on) {
+            row.setBackgroundResource(R.drawable.minab_halo_green)
+            row.setPadding(dp(8), dp(6), dp(8), dp(6))
+        } else {
+            row.background = null
+            row.setPadding(0, 0, 0, 0)
+        }
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #6) — stop the per-server countdown
+        ticker (finish, cancel, or a new run starting). */
+    private fun stopRealCountdown() {
+        realCountdownHandler.removeCallbacks(realCountdownRunnable)
+        realCountdownSeconds = 0
+        realCountdownName = null
+    }
+
+    /** Minab Beta v0.9.6.3 (fix #6) — re-render the real-test status
+        line with the current countdown (called by the ticker; the
+        last onRealProgress values are kept in the fields below). */
+    private var realCountdownDone: Int = 0
+    private var realCountdownTotal: Int = 0
+    private var realCountdownWorking: Int = 0
+    private fun updateRealCountdownLine() {
+        if (!realTestActive) return
+        testStatusView?.text = if (realCountdownSeconds > 0) {
+            getString(
+                R.string.minab_real_running_countdown,
+                realCountdownDone, realCountdownTotal,
+                realCountdownName ?: "", realCountdownWorking,
+                realCountdownSeconds
+            )
+        } else {
+            getString(
+                R.string.minab_real_running,
+                realCountdownDone, realCountdownTotal,
+                realCountdownName ?: "", realCountdownWorking
+            )
+        }
+    }
+
     private fun updateTestPingStatus() {
         val row = testProgressRow ?: return
+        // Minab Beta v0.9.6.3 (fix #6) — the ping test keeps the
+        // plain row; the green halo is for the real test only.
+        setRealTestHalo(false)
         if (pingTester == null) {
             row.visibility = View.GONE
             return
@@ -1456,6 +1548,15 @@ class ConfigsFragment : ListFragment() {
         realTotalCount = 0
         realTestRunId++
         val runId = realTestRunId
+        // Minab Beta v0.9.6.3 (fix #4) — the run starts from blank
+        // columns: clear the old results from BOTH the ping and the
+        // real-test column first, so the new results replace them
+        // instead of mixing with them. Also stop any real test
+        // running on the other tab (fix #3).
+        RealTester.cancelCurrent()
+        clearPingResults(profiles)
+        clearRealResults(profiles)
+        refreshList()
         val tester = RealTester(
             requireContext().applicationContext,
             MinabRealTestSettings.getWaitTimeoutMs(requireContext()),
@@ -1478,14 +1579,29 @@ class ConfigsFragment : ListFragment() {
                 ) {
                     if (!isAdded || runId != realTestRunId) return
                     realTotalCount = total
+                    realCountdownDone = done
+                    realCountdownTotal = total
+                    realCountdownWorking = working
+                    // Minab Beta v0.9.6.3 (fix #6) — a new server
+                    // under test restarts the per-server countdown
+                    // (the wait from the real-test settings); when
+                    // the run ends the name is null and the ticker
+                    // stops.
+                    if (currentName == null) {
+                        stopRealCountdown()
+                    } else if (currentName != realCountdownName) {
+                        realCountdownName = currentName
+                        realCountdownSeconds =
+                            MinabRealTestSettings.getWaitSeconds(requireContext())
+                        realCountdownHandler.removeCallbacks(realCountdownRunnable)
+                        realCountdownHandler.postDelayed(realCountdownRunnable, 1000)
+                    }
                     testProgressRow?.visibility = View.VISIBLE
+                    setRealTestHalo(true)
                     testCancelButton?.visibility = View.VISIBLE
                     testProgressBar?.progress =
                         if (total > 0) done * 100 / total else 0
-                    testStatusView?.text = getString(
-                        R.string.minab_real_running,
-                        done, total, currentName ?: "", working
-                    )
+                    updateRealCountdownLine()
                 }
 
                 override fun onProfileResult(profile: VpnProfile) {
@@ -1497,6 +1613,8 @@ class ConfigsFragment : ListFragment() {
                     if (!isAdded || runId != realTestRunId) return
                     realTester = null
                     realTestActive = false
+                    stopRealCountdown()
+                    setRealTestHalo(false)
                     testProgressRow?.visibility = View.GONE
                     if (cancelled) return
                     // Minab Beta v0.9.6.1 (fix #11) — the settings
@@ -1522,6 +1640,9 @@ class ConfigsFragment : ListFragment() {
         }
         realTester = tester
         realTestActive = true
+        // Minab Beta v0.9.6.3 (fix #6) — the green halo goes on the
+        // progress row for the whole run (the ping phase included).
+        setRealTestHalo(true)
     }
 
     /** Stop our real test: the runner drops the VPN under test (if
@@ -1534,6 +1655,8 @@ class ConfigsFragment : ListFragment() {
         realTester?.cancel()
         realTester = null
         realTestActive = false
+        stopRealCountdown()
+        setRealTestHalo(false)
         testProgressRow?.visibility = View.GONE
     }
 
