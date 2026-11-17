@@ -2,6 +2,33 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.6.4 — eight fixes from testing v0.9.6.3:
+the ping and real-test results are fixed columns now (ping
+always on the LEFT, real always on the RIGHT, in Home and in
+Configs, whatever the phone's locale direction is; an empty
+column keeps its place instead of letting the other badge
+slide into it). The bulk-import group picker moved to the TOP
+of the import page, right under the hint, with a bold label
+and a boxed spinner — it used to sit at the very bottom of
+the long scrolling page, so it was never seen. The real-test
+status line now counts down the TOTAL time left for the whole
+run (current server's remaining seconds plus one wait per
+server still to test), not one server's 12 s. The test
+sentence lives in a distinct card now, in larger Vazirmatn
+in the primary colour, in Home and in Configs. The connect
+button visibly animates at rest too: it loops slowly while
+disconnected (it used to freeze on its first frame and look
+like a plain static icon), loops at full speed while
+connecting, and plays once on connect. The Home list no
+longer lags during a test: list refreshes are merged to at
+most one re-bind every 400 ms, the per-result disk save
+moved off the UI thread, and the Configs full rebuild per
+result is a coalesced re-bind instead. The Real test
+settings panel is smaller still (6dp padding, 4dp sections,
+10sp labels, 9sp hints, 28dp steppers). Release notes are
+generated from the tag now, so a release page can never
+again show another version's notes.
+
 New in v0.9.6.3 — seven items from testing v0.9.6.2:
 the connect button is now an animated Lottie power orb (it loops
 as a spinner while connecting and plays once on connect; the disc
