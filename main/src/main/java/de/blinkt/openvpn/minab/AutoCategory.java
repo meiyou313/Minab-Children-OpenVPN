@@ -98,6 +98,29 @@ public final class AutoCategory {
         return null;
     }
 
+    /**
+     * Minab Beta v0.9.6.5 (fix #2) — the country code for one
+     * already-resolved IP, for the row flag: same 30-day cache and
+     * ip-api.com lookup as guessCategory, but without re-doing DNS
+     * (the ping test already resolved the host). Background thread
+     * only. Returns the lower-case 2-letter code, or null.
+     */
+    public static String countryCodeForIp(Context context, String ip) {
+        if (context == null || TextUtils.isEmpty(ip)) return null;
+        try {
+            String cached = cachedCountryCode(context, ip);
+            if (cached != null) return cached;
+            String fetched = lookupCountryCode(ip);
+            if (fetched != null) {
+                cacheCountryCode(context, ip, fetched);
+                return fetched;
+            }
+        } catch (Exception ignored) {
+            // Any failure -> no country; the row keeps the globe.
+        }
+        return null;
+    }
+
     /** Offline-only part, usable from unit tests without a Context. */
     public static String guessOffline(String profileName, String fileName, String remoteHost) {
         String code = codeFromText(profileName);

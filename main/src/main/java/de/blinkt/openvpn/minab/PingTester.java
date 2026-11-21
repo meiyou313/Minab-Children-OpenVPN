@@ -120,12 +120,23 @@ public final class PingTester {
         /** Round-trip ms when status == OK, otherwise -1. */
         public final long ms;
         public final long timestampMs;
+        /** Minab Beta v0.9.6.5 (fix #2) — the IP the remote host
+            resolved to, or null when DNS failed. The ping test
+            already did the DNS lookup, so the flag fix can ask
+            ip-api.com what country this IP is in without
+            resolving it a second time. */
+        public final String resolvedIp;
 
         public Result(VpnProfile profile, Status status, long ms) {
+            this(profile, status, ms, null);
+        }
+
+        public Result(VpnProfile profile, Status status, long ms, String resolvedIp) {
             this.profile = profile;
             this.status = status;
             this.ms = ms;
             this.timestampMs = System.currentTimeMillis();
+            this.resolvedIp = resolvedIp;
         }
 
         public String displayText() {
@@ -206,8 +217,14 @@ public final class PingTester {
             // (it will fail too) and the TCP step reports Failed.
         }
         Long icmp = icmpPing(host, expected);
-        if (icmp != null) return new Result(profile, Status.OK, icmp);
-        return tcpPing(profile, host, port, expected);
+        String ip = expected == null ? null : expected.getHostAddress();
+        if (icmp != null) return new Result(profile, Status.OK, icmp, ip);
+        return withResolvedIp(tcpPing(profile, host, port, expected), ip);
+    }
+
+    /** Attach the resolved IP to a result built by the TCP path. */
+    private static Result withResolvedIp(Result r, String ip) {
+        return new Result(r.profile, r.status, r.ms, ip);
     }
 
     /** The "64 bytes from <ip>" line of the ping output, if any. */
