@@ -49,11 +49,15 @@ import de.blinkt.openvpn.LaunchVPN
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
 import de.blinkt.openvpn.activities.VPNPreferences
+import de.blinkt.openvpn.core.ConnectionStatus
 import de.blinkt.openvpn.core.OpenVPNService
 import de.blinkt.openvpn.core.ProfileManager
 import de.blinkt.openvpn.core.VpnStatus
+import de.blinkt.openvpn.minab.AutoCategory
 import de.blinkt.openvpn.minab.CategoryStore
 import de.blinkt.openvpn.minab.FlagHelper
+import de.blinkt.openvpn.minab.MinabConnectState
+import de.blinkt.openvpn.minab.MinabServerCountry
 import de.blinkt.openvpn.minab.MinabBackup
 import de.blinkt.openvpn.minab.MinabCategoryReorder
 import de.blinkt.openvpn.minab.MinabFavorites
@@ -66,8 +70,12 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
-class ConfigsFragment : ListFragment() {
+class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
     private var selectedCategory: String? = null
+    /** Minab Beta v0.9.6.5 (fix #4) — the last connection level,
+        so the row of the server being connected to can show the
+        green halo + spinner (same as Home). */
+    private var lastLevel: ConnectionStatus? = null
     private var mArrayadapter: ArrayAdapter<VpnProfile>? = null
     private var chipsContainer: LinearLayout? = null
     private lateinit var backupLauncher: ActivityResultLauncher<String>
@@ -295,14 +303,41 @@ class ConfigsFragment : ListFragment() {
 
     override fun onResume() {
         super.onResume()
+        // Minab Beta v0.9.6.5 (fix #4) — listen for connection
+        // state changes (same as Home), so the connecting row can
+        // show its halo + spinner.
+        VpnStatus.addStateListener(this)
         // Minab v0.6: we are back (e.g. after our own LaunchVPN
         // round-trip) — do not stop a running real test for it.
         testPauseHandler.removeCallbacks(testPauseStop)
         refreshList()
     }
 
+    /** Minab Beta v0.9.6.5 (fix #4) — VpnStatus.StateListener:
+        only a LEVEL change re-binds the list; state updates also
+        fire for every log line, and a re-bind on each one would
+        be the Home lag all over again. */
+    override fun updateState(
+        state: String?,
+        logmessage: String?,
+        localizedResId: Int,
+        level: ConnectionStatus?,
+        intent: Intent?
+    ) {
+        if (level == lastLevel) return
+        lastLevel = level
+        activity?.runOnUiThread {
+            if (isAdded) requestListRefresh()
+        }
+    }
+
+    override fun setConnectedVPN(uuid: String?) {
+        // The rows read VpnStatus directly; nothing to store here.
+    }
+
     override fun onPause() {
         super.onPause()
+        VpnStatus.removeStateListener(this)
         // Minab Beta v0.9.2 — a debounced search must not fire
         // after the fragment is gone (tab switch pauses us).
         searchDebounceHandler.removeCallbacks(searchDebounceRunnable)
@@ -334,6 +369,7 @@ class ConfigsFragment : ListFragment() {
         val name: TextView = view.findViewById(R.id.minab_config_name)
         val subtitle: TextView = view.findViewById(R.id.minab_config_subtitle)
         val flag: ImageView = view.findViewById(R.id.minab_config_flag)
+        val connecting: ProgressBar = view.findViewById(R.id.minab_config_connecting_spinner)
         val badges: View = view.findViewById(R.id.minab_config_badges)
         val pingBadge: TextView = view.findViewById(R.id.minab_config_ping_badge)
         val realBadge: TextView = view.findViewById(R.id.minab_config_real_badge)
@@ -540,8 +576,24 @@ class ConfigsFragment : ListFragment() {
                     // Minab Beta v0.9.1 — every server gets a flag
                     // (fix #6): flagResForProfile falls back to the
                     // globe, so the column is never empty.
-                    holder.flag.setImageResource(FlagHelper.flagResForProfile(profile))
+                    // Minab Beta v0.9.6.5 (fix #2) — the Context
+                    // overload: it also reads the IP-detected
+                    // country stored after a ping (MinabServerCountry).
+                    holder.flag.setImageResource(FlagHelper.flagResForProfile(profile, context))
                     holder.flag.visibility = View.VISIBLE
+                    // Minab Beta v0.9.6.5 (fix #4) — the connecting
+                    // row: green halo + small spinner while THIS
+                    // server is connecting (same as Home). Both
+                    // branches set the background and the spinner
+                    // (rows are recycled); the connected row keeps
+                    // the plain background here, like before.
+                    if (MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)) {
+                        view.setBackgroundResource(R.drawable.minab_halo_green)
+                        holder.connecting.visibility = View.VISIBLE
+                    } else {
+                        view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        holder.connecting.visibility = View.GONE
+                    }
                     // Minab Beta v0.9.1 — ping / real badges in neat,
                     // small, regular columns like Home (fix #6).
                     // Minab Beta v0.9.6.4 (fix #1) — fixed columns,
@@ -1445,6 +1497,9 @@ class ConfigsFragment : ListFragment() {
                     // ping-sorted (same as Home).
                     if (sortMode == SORT_PING) resortConfigsAdapter()
                     else requestListRefresh()
+                    // Minab Beta v0.9.6.5 (fix #2) — the flag from
+                    // the IP (same as Home's recordPingResult).
+                    maybeDetectCountryFromIp(result)
                 }
             }
 
@@ -1472,6 +1527,31 @@ class ConfigsFragment : ListFragment() {
                 }
             }
         })
+    }
+
+    /** Minab Beta v0.9.6.5 (fix #2) — the flag from the IP: when a
+        ping result arrives and the row still shows the globe (no
+        country in the name, host or group), ask what country the
+        IP the ping resolved to is in — once per profile, cached 30
+        days by AutoCategory — and store it, so the flag appears
+        on the next re-bind. Runs off the UI thread; never blocks
+        the test. Same as Home's recordPingResult. */
+    private fun maybeDetectCountryFromIp(result: PingTester.Result) {
+        val ip = result.resolvedIp ?: return
+        val profile = result.profile
+        val ctx = context ?: return
+        if (MinabServerCountry.get(ctx, profile.getUUIDString()) != null) return
+        if (FlagHelper.flagResForProfile(profile) != R.drawable.minab_flag_globe) return
+        Thread {
+            try {
+                val code = AutoCategory.countryCodeForIp(ctx, ip) ?: return@Thread
+                MinabServerCountry.put(ctx, profile.getUUIDString(), code)
+                activity?.runOnUiThread {
+                    if (isAdded) requestListRefresh()
+                }
+            } catch (_: Exception) {
+            }
+        }.start()
     }
 
     /** Minab Beta v0.9.6.2 (fix #2) — wipe the stored ping result

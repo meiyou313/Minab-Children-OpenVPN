@@ -73,8 +73,10 @@ import de.blinkt.openvpn.minab.MinabCategoryReorder
 import de.blinkt.openvpn.minab.MinabFailover
 import de.blinkt.openvpn.minab.MinabFavorites
 import de.blinkt.openvpn.minab.MinabIpCheck
+import de.blinkt.openvpn.minab.MinabConnectState
 import de.blinkt.openvpn.minab.MinabRealTestSettings
 import de.blinkt.openvpn.minab.MinabRealTestSettingsPanel
+import de.blinkt.openvpn.minab.MinabServerCountry
 import de.blinkt.openvpn.minab.MinabUpdateChecker
 import de.blinkt.openvpn.minab.MinabUpdateNotifier
 import de.blinkt.openvpn.minab.MinabVpnControl
@@ -1838,6 +1840,34 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         // resortAdapter's notify is merged now (see there).
         if (sortMode == SORT_PING) resortAdapter()
         else requestListRefresh()
+        // Minab Beta v0.9.6.5 (fix #2) — the flag from the IP (see
+        // maybeDetectCountryFromIp below).
+        maybeDetectCountryFromIp(result)
+    }
+
+    /** Minab Beta v0.9.6.5 (fix #2) — the flag from the IP: when a
+        ping result arrives and the row still shows the globe (no
+        country in the name, host or group), ask what country the
+        IP the ping resolved to is in — once per profile, cached 30
+        days by AutoCategory — and store it, so the flag appears
+        on the next re-bind. Runs off the UI thread; never blocks
+        the test. */
+    private fun maybeDetectCountryFromIp(result: PingTester.Result) {
+        val ip = result.resolvedIp ?: return
+        val profile = result.profile
+        val ctx = context ?: return
+        if (MinabServerCountry.get(ctx, profile.getUUIDString()) != null) return
+        if (FlagHelper.flagResForProfile(profile) != R.drawable.minab_flag_globe) return
+        Thread {
+            try {
+                val code = AutoCategory.countryCodeForIp(ctx, ip) ?: return@Thread
+                MinabServerCountry.put(ctx, profile.getUUIDString(), code)
+                activity?.runOnUiThread {
+                    if (isAdded) requestListRefresh()
+                }
+            } catch (_: Exception) {
+            }
+        }.start()
     }
 
     private fun updatePingStatus() {
@@ -2469,6 +2499,7 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
         val left: View = view.findViewById(R.id.vpn_list_item_left)
         val settings: View = view.findViewById(R.id.quickedit_settings)
         val flag: ImageView = view.findViewById(R.id.minab_flag)
+        val connecting: ProgressBar = view.findViewById(R.id.minab_connecting_spinner)
         val badges: View = view.findViewById(R.id.minab_badges)
         val pingBadge: TextView = view.findViewById(R.id.minab_ping_badge)
         val realBadge: TextView = view.findViewById(R.id.minab_real_badge)
@@ -2508,13 +2539,27 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // must set the colours (rows are recycled). Updates
             // live: updateState() calls notifyDataSetChanged() on
             // every connection-state change.
+            // Minab Beta v0.9.6.5 (fix #4) — the connecting row:
+            // a green halo around the row (the same drawable as
+            // the real-test progress row) plus the small green
+            // spinner in front of the name, the moment the server
+            // is tapped — until then the row had no green at all.
+            // All three states set the background AND the spinner
+            // (rows are recycled).
             val connected = VpnStatus.isVPNActive() &&
                 profile.getUUIDString() == VpnStatus.getLastConnectedVPNProfile()
-            if (connected) {
-                v.setBackgroundColor(
-                    resources.getColor(R.color.minab_connected_bg, requireContext().theme))
+            val connecting = MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)
+            if (connecting) {
+                v.setBackgroundResource(R.drawable.minab_halo_green)
+                holder.connecting.visibility = View.VISIBLE
             } else {
-                v.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                if (connected) {
+                    v.setBackgroundColor(
+                        resources.getColor(R.color.minab_connected_bg, requireContext().theme))
+                } else {
+                    v.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                }
+                holder.connecting.visibility = View.GONE
             }
             val titleText = holder.title
             titleText.setTextColor(
@@ -2566,7 +2611,10 @@ class VPNProfileList : ListFragment(), View.OnClickListener, StateListener {
             // server gets a flag — even an Uncategorized one — and
             // the flag column is never empty.
             val flagView = holder.flag
-            flagView.setImageResource(FlagHelper.flagResForProfile(profile))
+            // Minab Beta v0.9.6.5 (fix #2) — the Context overload:
+            // it also reads the IP-detected country stored after a
+            // ping (MinabServerCountry).
+            flagView.setImageResource(FlagHelper.flagResForProfile(profile, requireContext()))
             flagView.visibility = View.VISIBLE
             val badge = holder.pingBadge
             // Minab v0.7: "> 0" (not ">= 0") — a 0 ms value is not

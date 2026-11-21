@@ -100,6 +100,10 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     // date / range.
     private ImageButton mDataJump;
     private TextView mDataSelected;
+    // Minab Beta v0.9.6.5 (fix #5) — the one-line footer row
+    // (Total + tapped period + jump icon); hidden with the Total
+    // when there is no data yet.
+    private View mDataFooter;
     private Button mDataDaily;
     private Button mDataWeekly;
     private Button mDataMonthly;
@@ -141,6 +145,7 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         mDataBars = dataHeader.findViewById(R.id.minab_data_bars);
         mDataBarsScroll = dataHeader.findViewById(R.id.minab_data_bars_scroll);
         mDataTotal = dataHeader.findViewById(R.id.minab_data_total);
+        mDataFooter = dataHeader.findViewById(R.id.minab_data_footer);
         mDataEmpty = dataHeader.findViewById(R.id.minab_data_empty);
         // Minab Beta v0.9.6.1 (fix #5) — jump to the bar for the
         // period we are in; (fix #7) the tapped bar's date / range.
@@ -341,6 +346,12 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         }
         mDataEmpty.setVisibility(total == 0 ? View.VISIBLE : View.GONE);
         mDataTotal.setVisibility(total == 0 ? View.GONE : View.VISIBLE);
+        // Minab Beta v0.9.6.5 (fix #5) — the whole one-line footer
+        // hides when there is no data (otherwise the jump icon
+        // would sit alone in the row).
+        if (mDataFooter != null) {
+            mDataFooter.setVisibility(total == 0 ? View.GONE : View.VISIBLE);
+        }
         if (total > 0) {
             mDataTotal.setText(getString(
                     R.string.minab_data_total, DataUsageStore.formatBytes(total)));
