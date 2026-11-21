@@ -31,7 +31,6 @@ package de.blinkt.openvpn.minab
 import android.content.Context
 import android.content.res.ColorStateList
 import android.view.View
-import android.widget.Button
 import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.ImageButton
@@ -68,13 +67,16 @@ class MinabRealTestSettingsPanel(
 
     init {
         gear.setOnClickListener { toggle() }
-        panel.findViewById<Button>(R.id.minab_real_settings_wait_minus)
+        // Minab Beta v0.9.6.5 (fix #1) — the steppers are
+        // ImageButtons now (explicit plus/minus vectors): the old
+        // text Buttons rendered invisibly on the phone.
+        panel.findViewById<ImageButton>(R.id.minab_real_settings_wait_minus)
             ?.setOnClickListener { stepWait(-1) }
-        panel.findViewById<Button>(R.id.minab_real_settings_wait_plus)
+        panel.findViewById<ImageButton>(R.id.minab_real_settings_wait_plus)
             ?.setOnClickListener { stepWait(1) }
-        panel.findViewById<Button>(R.id.minab_real_settings_max_minus)
+        panel.findViewById<ImageButton>(R.id.minab_real_settings_max_minus)
             ?.setOnClickListener { stepMax(-1) }
-        panel.findViewById<Button>(R.id.minab_real_settings_max_plus)
+        panel.findViewById<ImageButton>(R.id.minab_real_settings_max_plus)
             ?.setOnClickListener { stepMax(1) }
         unpingedCheck.setOnCheckedChangeListener(unpingedListener)
         panel.findViewById<View>(R.id.minab_real_settings_reset)

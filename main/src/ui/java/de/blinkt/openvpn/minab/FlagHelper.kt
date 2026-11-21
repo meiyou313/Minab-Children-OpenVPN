@@ -143,25 +143,32 @@ object FlagHelper {
     /**
      * Minab Beta v0.9.1 — the flag for one profile, for the Home and
      * Configs rows (fix #6 / #13b). Every server gets a flag, never
-     * nothing:
-     *   1. the profile's category, when it is a known country
-     *      ("Germany", "DE");
-     *   2. a flag emoji inside the config name ("Finland 🇫🇮(TCP)")
-     *      or the server host;
-     *   3. a full country name or 2-letter code anywhere in the
-     *      name or server host ("us-free…", "de-01.example.com");
+     * nothing.
+     *
+     * Minab Beta v0.9.6.5 (fix #2) — the order changed, because the
+     * old order was wrong: the category (the GROUP the user put the
+     * server into, e.g. "Romania") used to win over the server's own
+     * name, so US and Japanese servers sitting in the Romania group
+     * all showed the Romanian flag — even after ping and real tests.
+     * The order now is:
+     *   1. a flag emoji or a country name / code in the config name
+     *      or server host ("us-free…", "jp-free-31", "de-01…") —
+     *      this is where the server's real country lives;
+     *   2. the country detected from the server's IP after a ping
+     *      (MinabServerCountry), for servers whose name carries no
+     *      country at all;
+     *   3. the profile's category, when it is a known country
+     *      ("Germany", "DE") — a group is where the user put the
+     *      server, not where the server is, so it is only a
+     *      fallback now;
      *   4. otherwise the generic globe — so the flag column is
      *      never empty and every row lines up.
      * Never returns 0.
      */
-    fun flagResForProfile(profile: VpnProfile): Int {
-        val category = profile.getCategory()
-        if (!category.isNullOrBlank()) {
-            val key = category.trim().lowercase(Locale.US)
-            if (key != "uncategorized") {
-                byName[key]?.let { return it }
-            }
-        }
+    fun flagResForProfile(profile: VpnProfile): Int =
+        flagResForProfile(profile, null)
+
+    fun flagResForProfile(profile: VpnProfile, context: android.content.Context?): Int {
         val name = profile.mName
         val host = try {
             profile.getPrimaryRemoteHost()
@@ -172,6 +179,18 @@ object FlagHelper {
         flagEmojiCode(host)?.let { byName[it]?.let { res -> return res } }
         scanCountryToken(name)?.let { return it }
         scanCountryToken(host)?.let { return it }
+        if (context != null) {
+            MinabServerCountry.get(context, profile.getUUIDString())?.let { code ->
+                byName[code.lowercase(Locale.US)]?.let { res -> return res }
+            }
+        }
+        val category = profile.getCategory()
+        if (!category.isNullOrBlank()) {
+            val key = category.trim().lowercase(Locale.US)
+            if (key != "uncategorized") {
+                byName[key]?.let { return it }
+            }
+        }
         return R.drawable.minab_flag_globe
     }
 
