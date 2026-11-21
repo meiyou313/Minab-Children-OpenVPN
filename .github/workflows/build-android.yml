@@ -144,32 +144,30 @@ jobs:
             by country), and bulk ping test of all profiles or one
             group.
 
-            New in ${{ github.ref_name }} — eight fixes from testing v0.9.6.3:
-            the ping and real-test results are fixed columns now (ping
-            always on the LEFT, real always on the RIGHT, in Home and
-            in Configs, whatever the phone's locale direction is; an
-            empty column keeps its place instead of letting the other
-            badge slide into it). The bulk-import group picker moved
-            to the TOP of the import page, right under the hint, with
-            a bold label and a boxed spinner — it used to sit at the
-            very bottom of the long scrolling page, so it was never
-            seen. The real-test status line now counts down the TOTAL
-            time left for the whole run, not one server's seconds.
-            The test sentence lives in a distinct card now, in larger
-            Vazirmatn in the primary colour, in Home and in Configs.
-            The connect button visibly animates at rest too: it loops
-            slowly while disconnected (it used to freeze on its first
-            frame and look like a plain static icon), loops at full
-            speed while connecting, and plays once on connect. The
-            Home list no longer lags during a test: list refreshes
-            are merged to at most one re-bind every 400 ms, the
-            per-result disk save moved off the UI thread, and the
-            Configs full rebuild per result is a coalesced re-bind
-            instead. The Real test settings panel is smaller still
-            (6dp padding, 4dp sections, 10sp labels, 9sp hints,
-            28dp steppers). Please test the columns, the picker at
-            the top of Bulk import, the total countdown, the idle
-            button animation, and a real test on Home for lag.
+            New in ${{ github.ref_name }} — five fixes from testing v0.9.6.4:
+            the Real test settings panel is one row per setting now —
+            the time and server count sit beside their titles, and the
+            + and − steppers are real bordered buttons with visible
+            icons (the old text buttons rendered invisibly, so the
+            numbers could not be changed at all). The country flag of
+            each server comes from the server itself now: its name or
+            host first (us-free… → the US flag), then the country of
+            the IP a ping resolved, and only then its group — US and
+            Japanese servers sitting in the Romania group no longer
+            show the Romanian flag. The Bulk import page is compact
+            and fits without scrolling (one short hint, tighter
+            spacing), the group menu uses the app font with roomy
+            rows, and after picking config files a username/password
+            dialog appears when no credentials are filled in yet
+            (the fields on the page stay). While a server is
+            connecting, its row gets a green halo and a small green
+            spinner in front of the name — until now the row had no
+            green at all before it connected. In the Graph tab, the
+            total, the tapped period and the jump-to-now icon share
+            one line (smaller font). Please test the panel steppers,
+            the flags of the US/Japan servers in the Romania group,
+            the Bulk import page, the connecting halo, and the Graph
+            footer.
 
             Install: download the APK below and install it on Android.
             Older versions: see CHANGELOG.md in this repo.
