@@ -293,8 +293,11 @@ class BulkImportActivity : BaseActivity() {
         after a group is created. */
     private fun refreshCategorySpinner(selectCategory: String?) {
         val items = categorySpinnerItems()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, items)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        // Minab Beta v0.9.6.5 (fix #3) — custom Vazirmatn items
+        // for the closed picker and the dropdown (the stock
+        // simple_spinner layouts looked old and ugly).
+        val adapter = ArrayAdapter(this, R.layout.minab_spinner_item, items)
+        adapter.setDropDownViewResource(R.layout.minab_spinner_dropdown_item)
         categorySpinner.adapter = adapter
         selectedCategory = selectCategory
         val pos = when {
@@ -332,6 +335,53 @@ class BulkImportActivity : BaseActivity() {
             Toast.makeText(this, R.string.minab_no_files_picked, Toast.LENGTH_SHORT).show()
             return
         }
+        // Minab Beta v0.9.6.5 (fix #3) — after picking files, when
+        // no credentials are filled in anywhere yet, ask for the
+        // username/password in a dialog right here; the fields on
+        // the page stay as they are.
+        if (hasUsableCredentials()) {
+            startFilesImport(uris)
+        } else {
+            showCredentialsDialog(
+                onImport = { user, pass ->
+                    usernameField.setText(user)
+                    passwordField.setText(pass)
+                    startFilesImport(uris)
+                },
+                onSkip = { startFilesImport(uris) }
+            )
+        }
+    }
+
+    /** True when the batch can be imported with a login: the page
+        fields are filled, or shared credentials were saved before. */
+    private fun hasUsableCredentials(): Boolean {
+        if (usernameField.text.isNotBlank() && passwordField.text.isNotBlank()) return true
+        return SharedCredentials.hasCredentials(this)
+    }
+
+    /** The username/password dialog after picking files (fix #3):
+        same card look as the page. "Import" fills the page fields
+        and starts the import; "Skip" (or back) imports without a
+        login — profiles that need one will ask when connecting. */
+    private fun showCredentialsDialog(
+        onImport: (String, String) -> Unit,
+        onSkip: () -> Unit
+    ) {
+        val view = layoutInflater.inflate(R.layout.minab_credentials_dialog, null)
+        val userField = view.findViewById<EditText>(R.id.minab_credentials_dialog_username)
+        val passField = view.findViewById<EditText>(R.id.minab_credentials_dialog_password)
+        AlertDialog.Builder(this)
+            .setView(view)
+            .setPositiveButton(R.string.minab_bulk_credentials_import) { _, _ ->
+                onImport(userField.text.toString(), passField.text.toString())
+            }
+            .setNegativeButton(R.string.minab_bulk_credentials_skip) { _, _ -> onSkip() }
+            .setOnCancelListener { onSkip() }
+            .show()
+    }
+
+    private fun startFilesImport(uris: List<Uri>) {
         selectedCount = uris.size
         runImport { result, opts ->
             var done = 0
