@@ -515,7 +515,11 @@
     <!-- Minab Children additions -->
     <string name="minab_bulk_import">Bulk import (.ovpn / .zip)</string>
     <string name="minab_bulk_import_title">Bulk import configs</string>
-    <string name="minab_bulk_import_hint">Import many VPN configs at once. Pick .ovpn files — or one .zip with .ovpn files inside — and they are all imported together. Enter one username and password below and it is used for every imported config that needs a login.</string>
+    <string name="minab_bulk_import_hint">Pick .ovpn files — or one .zip with .ovpn files inside — and they are all imported together.</string>
+    <string name="minab_bulk_credentials_title">Username &amp; password</string>
+    <string name="minab_bulk_credentials_hint">Enter the username and password for these configs. You can also fill them in on this page.</string>
+    <string name="minab_bulk_credentials_import">Import</string>
+    <string name="minab_bulk_credentials_skip">Skip</string>
     <string name="minab_pick_files">Pick files</string>
     <string name="minab_pick_zip">Pick a .zip file</string>
     <string name="minab_username">Username (for all)</string>
@@ -588,6 +592,10 @@
     <string name="minab_real_settings_unpinged">Also test servers that did not answer ping</string>
     <string name="minab_real_settings_unpinged_hint">Recommended: off</string>
     <string name="minab_real_settings_reset">Reset to recommended</string>
+    <string name="minab_real_settings_wait_minus_desc">Decrease wait per server</string>
+    <string name="minab_real_settings_wait_plus_desc">Increase wait per server</string>
+    <string name="minab_real_settings_max_minus_desc">Decrease healthy servers to find</string>
+    <string name="minab_real_settings_max_plus_desc">Increase healthy servers to find</string>
     <string name="minab_real_none_to_test">No servers matched the real-test settings.</string>
     <!-- Minab Beta v0.2: short labels for the visible main-screen buttons -->
     <string name="minab_bulk_import_short">Bulk import</string>
@@ -610,7 +618,7 @@
     <string name="minab_import_progress">Imported %1$d of %2$d…</string>
     <string name="minab_import_categorising">Detecting countries… %1$d of %2$d</string>
     <string name="minab_last_import">Last import: %1$s</string>
-    <string name="minab_shared_credentials_hint">These are the VPN username and password your configs use to log in. They are saved and applied to the configs you choose — and to configs you import later.</string>
+    <string name="minab_shared_credentials_hint">One username and password for every config that needs a login — saved, and applied to configs you import later.</string>
     <string name="minab_apply_credentials">Apply to all profiles</string>
     <string name="minab_credentials_empty">Enter a username and password first.</string>
     <string name="minab_credentials_applied">Applied to %1$d profile(s). New imports will use these credentials too.</string>
