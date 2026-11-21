@@ -2,6 +2,9 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.6.5 — five fixes from testing v0.9.6.4:
+the Real test settings panel is one row per setting now — the time and server count sit beside their titles, and the + and − steppers are real bordered buttons with visible icons (the old text buttons rendered invisibly, so the numbers could not be changed at all). The country flag of each server comes from the server itself now: its name or host first (us-free… → the US flag), then the country of the IP a ping resolved, and only then its group — US and Japanese servers sitting in the Romania group no longer show the Romanian flag. The Bulk import page is compact and fits without scrolling (one short hint, tighter spacing), the group menu uses the app font with roomy rows, and after picking config files a username/password dialog appears when no credentials are filled in yet (the fields on the page stay). While a server is connecting, its row gets a green halo and a small green spinner in front of the name — until now the row had no green at all before it connected. In the Graph tab, the total, the tapped period and the jump-to-now icon share one line (smaller font).
+
 New in v0.9.6.4 — eight fixes from testing v0.9.6.3:
 the ping and real-test results are fixed columns now (ping
 always on the LEFT, real always on the RIGHT, in Home and in
