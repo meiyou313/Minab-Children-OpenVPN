@@ -32,6 +32,19 @@
         android:layout_marginEnd="8dp"
         android:contentDescription="@string/minab_flag_description" />
 
+    <!-- Minab Beta v0.9.6.5 (fix #4) — small green connecting
+         spinner, shown only while THIS server is connecting (see
+         ConfigsFragment.bindConfigRow). 20dp, GONE otherwise. -->
+    <ProgressBar
+        android:id="@+id/minab_config_connecting_spinner"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="4dp"
+        android:indeterminate="true"
+        android:indeterminateTint="@color/minab_connected"
+        android:visibility="gone" />
+
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"

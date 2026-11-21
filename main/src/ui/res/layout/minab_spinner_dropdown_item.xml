@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Minab Beta v0.9.6.5 (fix #3) — one row of the group picker
+  ~ dropdown on the Bulk import page. The stock
+  ~ simple_spinner_dropdown_item looked old and ugly (tiny default
+  ~ text, no font, no rhythm); this one is Vazirmatn 13sp with
+  ~ roomy padding and the selectable background, and the popup
+  ~ itself uses the card background (see the Spinner in
+  ~ bulk_import.xml).
+  -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/text1"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:fontFamily="@font/vazirmatn"
+    android:paddingStart="16dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="12dp"
+    android:textColor="@color/minab_text_primary"
+    android:textSize="13sp" />

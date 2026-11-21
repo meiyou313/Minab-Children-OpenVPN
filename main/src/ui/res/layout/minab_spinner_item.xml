@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Minab Beta v0.9.6.5 (fix #3) — the closed group picker on the
+  ~ Bulk import page: Vazirmatn, 13sp, primary text, so the picker
+  ~ matches the rest of the page instead of the stock Android
+  ~ spinner text.
+  -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/text1"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fontFamily="@font/vazirmatn"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:textColor="@color/minab_text_primary"
+    android:textSize="13sp" />

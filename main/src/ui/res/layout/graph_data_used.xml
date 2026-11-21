@@ -127,8 +127,15 @@
         <!-- Minab Beta v0.9.6.1 (fix #5) — "jump to the current
              bar" icon at the right end of the Total row (the spot
              the user marked with a red pen): it scrolls the strip
-             straight to the bar for the period we are in. -->
+             straight to the bar for the period we are in.
+             Minab Beta v0.9.6.5 (fix #5) — Total, the tapped
+             period and the jump icon all in ONE row now (11sp),
+             instead of Total + icon on one line and the period
+             ("November 2026 · 1.94 GB") on a line of its own
+             below. The row hides with the Total when there is no
+             data yet (see GraphFragment). -->
         <LinearLayout
+            android:id="@+id/minab_data_footer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
@@ -140,34 +147,38 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
                 android:gravity="center"
+                android:maxLines="1"
                 android:textColor="@color/minab_text_secondary"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
+
+            <!-- Minab Beta v0.9.6.1 (fix #7) — the date / range of
+                 the bar the user tapped ("Sat 14 Nov 2026 ·
+                 1.54 GB"). Hidden until the first tap. -->
+            <TextView
+                android:id="@+id/minab_data_selected"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
+                android:maxLines="1"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="11sp"
+                android:visibility="gone" />
 
             <ImageButton
                 android:id="@+id/minab_data_jump_current"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/minab_data_jump_current_desc"
                 android:src="@drawable/minab_ic_jump_current" />
         </LinearLayout>
-
-        <!-- Minab Beta v0.9.6.1 (fix #7) — the date / range of the
-             bar the user tapped ("Sat 14 Nov 2026 · 1.54 GB").
-             Hidden until the first tap. -->
-        <TextView
-            android:id="@+id/minab_data_selected"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:fontFamily="@font/vazirmatn"
-            android:gravity="center"
-            android:textColor="@color/minab_text_primary"
-            android:textSize="12sp"
-            android:visibility="gone" />
     </LinearLayout>
 
     <TextView

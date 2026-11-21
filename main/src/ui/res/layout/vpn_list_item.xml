@@ -38,6 +38,20 @@
         android:contentDescription="@string/minab_flag_description"
         android:visibility="gone" />
 
+    <!-- Minab Beta v0.9.6.5 (fix #4) — small green connecting
+         spinner, shown only while THIS server is connecting (see
+         VPNProfileList.bindRow). 20dp, GONE otherwise, so it never
+         shifts the name or crowds the badges, star or pencil. -->
+    <ProgressBar
+        android:id="@+id/minab_connecting_spinner"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="4dp"
+        android:indeterminate="true"
+        android:indeterminateTint="@color/minab_connected"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/vpn_list_item_left"
         android:layout_height="match_parent"
