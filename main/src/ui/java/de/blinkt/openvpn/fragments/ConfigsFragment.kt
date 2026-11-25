@@ -173,15 +173,22 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         savedInstanceState: Bundle?
     ): View {
         val root = inflater.inflate(R.layout.configs_fragment, container, false)
-        val rv = root.findViewById<RecyclerView>(R.id.minab_configs_recycler)
-        recyclerView = rv
-
-        val header = inflater.inflate(R.layout.configs_fragment_header, rv, false)
-        headerView = header
-        val empty = inflater.inflate(R.layout.configs_fragment_empty, rv, false)
-        emptyView = empty
-
         try {
+            val rv = root.findViewById<RecyclerView>(R.id.minab_configs_recycler)
+            recyclerView = rv
+            // CRITICAL: LayoutManager MUST be assigned BEFORE inflating any
+            // child layout with rv as parent (RecyclerView.generateLayoutParams
+            // throws IllegalStateException when mLayout is null).
+            rv.layoutManager = LinearLayoutManager(requireContext())
+            rv.setHasFixedSize(true)
+            rv.itemAnimator = null
+            rv.setItemViewCacheSize(12)
+
+            val header = inflater.inflate(R.layout.configs_fragment_header, rv, false)
+            headerView = header
+            val empty = inflater.inflate(R.layout.configs_fragment_empty, rv, false)
+            emptyView = empty
+
             chipsContainer = header.findViewById(R.id.minab_configs_chips)
             header.findViewById<Button>(R.id.minab_configs_credentials_group)?.setOnClickListener {
                 showCredentialsDialog(selectedCategory)
@@ -253,10 +260,6 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 }
             })
 
-            rv.layoutManager = LinearLayoutManager(requireContext())
-            rv.setHasFixedSize(true)
-            rv.itemAnimator = null
-            rv.setItemViewCacheSize(12)
             configsAdapter = ConfigsRecyclerAdapter(header, empty)
             rv.adapter = configsAdapter
 
@@ -1442,8 +1445,14 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
             return when (viewType) {
-                VIEW_TYPE_HEADER -> StaticViewHolder(header).apply { setIsRecyclable(false) }
-                VIEW_TYPE_EMPTY -> StaticViewHolder(empty).apply { setIsRecyclable(false) }
+                VIEW_TYPE_HEADER -> {
+                    (header.parent as? ViewGroup)?.removeView(header)
+                    StaticViewHolder(header).apply { setIsRecyclable(false) }
+                }
+                VIEW_TYPE_EMPTY -> {
+                    (empty.parent as? ViewGroup)?.removeView(empty)
+                    StaticViewHolder(empty).apply { setIsRecyclable(false) }
+                }
                 else -> {
                     val v = LayoutInflater.from(parent.context)
                         .inflate(R.layout.minab_config_row, parent, false)

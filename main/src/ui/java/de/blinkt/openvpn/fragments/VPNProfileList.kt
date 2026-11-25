@@ -461,15 +461,22 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener {
         savedInstanceState: Bundle?
     ): View {
         val root = inflater.inflate(R.layout.vpn_profile_list, container, false)
-        val rv = root.findViewById<RecyclerView>(R.id.minab_home_recycler)
-        recyclerView = rv
-
-        val header = inflater.inflate(R.layout.vpn_profile_list_header, rv, false)
-        headerView = header
-        val empty = inflater.inflate(R.layout.vpn_profile_list_empty, rv, false)
-        emptyView = empty
-
         try {
+            val rv = root.findViewById<RecyclerView>(R.id.minab_home_recycler)
+            recyclerView = rv
+            // CRITICAL: LayoutManager MUST be assigned BEFORE inflating any
+            // child layout with rv as parent, because RecyclerView.generateLayoutParams
+            // throws IllegalStateException("RecyclerView has no LayoutManager") when null.
+            rv.layoutManager = LinearLayoutManager(requireContext())
+            rv.setHasFixedSize(true)
+            rv.itemAnimator = null
+            rv.setItemViewCacheSize(12)
+
+            val header = inflater.inflate(R.layout.vpn_profile_list_header, rv, false)
+            headerView = header
+            val empty = inflater.inflate(R.layout.vpn_profile_list_empty, rv, false)
+            emptyView = empty
+
             val newvpntext = empty.findViewById<TextView>(R.id.add_new_vpn_hint)
             val importvpntext = empty.findViewById<TextView>(R.id.import_vpn_hint)
             newvpntext?.text = Html.fromHtml(getString(R.string.add_new_vpn_hint), MiniImageGetter(), null)
@@ -541,10 +548,6 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener {
             updateBanner = header.findViewById(R.id.minab_update_banner)
             mPermissionView = header.findViewById(R.id.notification_permission)
 
-            rv.layoutManager = LinearLayoutManager(requireContext())
-            rv.setHasFixedSize(true)
-            rv.itemAnimator = null
-            rv.setItemViewCacheSize(12)
             homeAdapter = HomeRecyclerAdapter(header, empty)
             rv.adapter = homeAdapter
 
@@ -2066,8 +2069,14 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
             return when (viewType) {
-                VIEW_TYPE_HEADER -> StaticViewHolder(header).apply { setIsRecyclable(false) }
-                VIEW_TYPE_EMPTY -> StaticViewHolder(empty).apply { setIsRecyclable(false) }
+                VIEW_TYPE_HEADER -> {
+                    (header.parent as? ViewGroup)?.removeView(header)
+                    StaticViewHolder(header).apply { setIsRecyclable(false) }
+                }
+                VIEW_TYPE_EMPTY -> {
+                    (empty.parent as? ViewGroup)?.removeView(empty)
+                    StaticViewHolder(empty).apply { setIsRecyclable(false) }
+                }
                 else -> {
                     val v = LayoutInflater.from(parent.context)
                         .inflate(R.layout.vpn_list_item, parent, false)

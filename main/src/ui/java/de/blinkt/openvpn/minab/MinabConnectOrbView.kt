@@ -113,6 +113,7 @@ class MinabConnectOrbView @JvmOverloads constructor(
     private var currentState: State = State.DISCONNECTED
     private var animationsAllowed: Boolean = true
     private var attached: Boolean = false
+    private var initialized: Boolean = false
 
     // Interpolated colours (updated smoothly across state changes).
     private var curCoreStart: Int = disconnectedPalette.coreStart
@@ -209,6 +210,7 @@ class MinabConnectOrbView @JvmOverloads constructor(
     init {
         isClickable = true
         isFocusable = true
+        initialized = true
         updateContentDescription()
     }
 
@@ -601,6 +603,7 @@ class MinabConnectOrbView @JvmOverloads constructor(
     }
 
     private fun syncPhaseAnimator() {
+        if (!initialized) return
         val shouldRun = attached &&
             animationsAllowed &&
             visibility == VISIBLE &&

@@ -2,6 +2,9 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.6.7 — hotfix for v0.9.6.6 launch crash:
+fixed an immediate startup crash (IllegalStateException: RecyclerView has no LayoutManager) caused by inflating the Home and Configs RecyclerView header/empty layouts before assigning LinearLayoutManager; also added safe view re-attachment guards for retained header/empty ViewHolders and an initialization guard in MinabConnectOrbView.
+
 New in v0.9.6.6 — animated Connect button, smooth tab switching, dedicated test progress panel, and connect-area lock during tests:
 the Connect button on Home is now a custom hardware-accelerated animated orb (MinabConnectOrbView) with smooth colour morphing and distinct lively animations for Disconnected (indigo-violet breathing halo), Connecting (amber-orange with dual radar waves, comet arc, and counter-rotating orbit), Connected (emerald-mint with shockwave burst + spring pop), Disconnecting (coral-crimson inward pulse), and Testing (muted slate). Switching between the bottom tabs (especially Home, Configs and Graph) is now smooth and lag-free: Home and Configs replaced NestedScrollView + ListView + expandListView with virtualised RecyclerViews, ViewPager2 keeps tabs cached and pre-warmed, crash breadcrumbs / widget updates / data-usage loads / test-reset saves moved off the UI thread, and country flag lookups and favorites are cached in memory. Starting Ping test or Real test now opens a dedicated Test Progress card on Home and Configs with live percentage, rounded progress bar, Tested / Remaining / Responded-or-Working counters, current server + ETA, and a clear Cancel test button. While any test is running (Ping test or Real test), the Connect section smoothly dims and locks against accidental taps until the test finishes or is cancelled.
 
