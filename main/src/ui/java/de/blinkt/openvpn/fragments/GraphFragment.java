@@ -44,6 +44,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import de.blinkt.openvpn.R;
 import de.blinkt.openvpn.core.OpenVPNManagement;
@@ -107,6 +109,9 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     private Button mDataDaily;
     private Button mDataWeekly;
     private Button mDataMonthly;
+    private String mLastDataSignature = null;
+    private static final ExecutorService DATA_EXECUTOR = Executors.newSingleThreadExecutor();
+    private volatile int mDataLoadGen = 0;
 
     private static final int TIME_PERIOD_SECDONS = 0;
     private static final int TIME_PERIOD_MINUTES = 1;
@@ -213,80 +218,98 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     }
 
     /** Minab v0.7: (re)build the "Data used" bar chart from the
-        real measured usage. Each bar is a plain View whose height
-        is proportional to the largest bar, labelled with its exact
-        value (MB/GB); empty days get a 2dp baseline. No library. */
+        real measured usage. Loads MODE_MULTI_PROCESS SharedPreferences off
+        the UI thread and caches a signature so switching to the Graph tab
+        never stalls on disk I/O or rebuilds 200 identical views. */
     private void renderDataUsed() {
         if (!isAdded() || mDataBars == null) return;
+        final Context ctx = getActivity();
+        if (ctx == null) return;
+        final Context appCtx = ctx.getApplicationContext();
+        final int mode = mDataMode;
+        final int gen = ++mDataLoadGen;
+        updateDataChips();
+        DATA_EXECUTOR.execute(() -> {
+            final List<DataUsageStore.Bucket> buckets;
+            try {
+                switch (mode) {
+                    case DATA_WEEKLY:
+                        buckets = DataUsageStore.getWeekly(appCtx);
+                        break;
+                    case DATA_MONTHLY:
+                        buckets = DataUsageStore.getMonthly(appCtx);
+                        break;
+                    default:
+                        buckets = DataUsageStore.getDaily(appCtx);
+                        break;
+                }
+            } catch (Exception e) {
+                return;
+            }
+            mHandler.post(() -> {
+                if (!isAdded() || mDataBars == null || gen != mDataLoadGen) return;
+                applyDataUsedBuckets(mode, buckets);
+            });
+        });
+    }
+
+    private void applyDataUsedBuckets(int mode, List<DataUsageStore.Bucket> buckets) {
+        if (!isAdded() || mDataBars == null) return;
         Context ctx = getActivity();
-        List<DataUsageStore.Bucket> buckets;
-        switch (mDataMode) {
-            case DATA_WEEKLY:
-                buckets = DataUsageStore.getWeekly(ctx);
-                break;
-            case DATA_MONTHLY:
-                buckets = DataUsageStore.getMonthly(ctx);
-                break;
-            default:
-                buckets = DataUsageStore.getDaily(ctx);
-                break;
-        }
-        long max = 0;
-        long total = 0;
-        for (DataUsageStore.Bucket b : buckets) {
-            max = Math.max(max, b.bytes);
-            total += b.bytes;
-        }
-        mDataBars.removeAllViews();
+        if (ctx == null) return;
+        boolean daily = (mode == DATA_DAILY);
         float density = getResources().getDisplayMetrics().density;
-        int maxBarPx = (int) (88 * density);
-        int minBarPx = (int) (2 * density);
-        int barWidthPx = (int) (20 * density);
-        // Minab Beta v0.9.6.1 (fixes #2/#3/#8) — Weekly and Monthly
-        // are 12 bars with exactly 6 visible: fixed columns, one
-        // sixth of the scroll viewport each, inside a WRAP_CONTENT
-        // strip scrolled to the recent end — the same shape as the
-        // Daily strip. The old code gave Weekly/Monthly weight-1
-        // columns in a MATCH_PARENT strip; inside a
-        // HorizontalScrollView the width is UNSPECIFIED, so the
-        // weights collapsed to content width: the whole strip was
-        // only ~1/3 of the screen wide and the value label
-        // ("1.54 GB") was squeezed to "1....". Fixed widths fix
-        // both. The viewport width is only known after layout;
-        // before that, wait for the layout pass instead of guessing.
-        boolean daily = (mDataMode == DATA_DAILY);
         int colWidthPx;
         if (daily) {
             colWidthPx = (int) (40 * density);
         } else {
             int viewportW = mDataBarsScroll != null ? mDataBarsScroll.getWidth() : 0;
             if (viewportW <= 0) {
-                if (mDataBarsScroll != null) mDataBarsScroll.post(this::renderDataUsed);
+                if (mDataBarsScroll != null) {
+                    mDataBarsScroll.post(() -> applyDataUsedBuckets(mode, buckets));
+                }
                 return;
             }
             colWidthPx = viewportW / 6;
         }
+        long max = 0;
+        long total = 0;
+        StringBuilder sig = new StringBuilder();
+        sig.append(mode).append('|').append(colWidthPx).append('|').append(buckets.size());
+        for (DataUsageStore.Bucket b : buckets) {
+            max = Math.max(max, b.bytes);
+            total += b.bytes;
+            sig.append('|').append(b.label).append(':').append(b.bytes).append(':').append(b.current ? 1 : 0);
+        }
+        String signature = sig.toString();
+        if (signature.equals(mLastDataSignature) && mDataBars.getChildCount() == buckets.size()) {
+            if (mScrollDataToEnd && mDataBarsScroll != null) {
+                mScrollDataToEnd = false;
+                mDataBarsScroll.post(() -> mDataBarsScroll.fullScroll(View.FOCUS_RIGHT));
+            }
+            return;
+        }
+        mLastDataSignature = signature;
+        mDataBars.removeAllViews();
+        int maxBarPx = (int) (88 * density);
+        int minBarPx = (int) (2 * density);
+        int barWidthPx = (int) (20 * density);
         // Minab Beta v0.9.6 — these params MUST be
         // FrameLayout.LayoutParams (a MarginLayoutParams): mDataBars
         // is the direct child of the HorizontalScrollView in
-        // graph_data_used.xml, and HorizontalScrollView
-        // .measureChildWithMargins casts the child's params to
-        // MarginLayoutParams. The v0.9.1 code used plain
-        // ViewGroup.LayoutParams here, which threw
-        // ClassCastException on the main thread every time the
-        // Graph page was laid out during a tab switch — the phone's
-        // own crash report (0.9.5, twice identical) proved it.
+        // graph_data_used.xml.
         mDataBars.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 (int) (130 * density)));
+        int dividerColor = getResources().getColor(R.color.minab_divider);
+        int currentLabelColor = getResources().getColor(R.color.minab_connected);
+        int secondaryLabelColor = getResources().getColor(R.color.minab_text_secondary);
         for (DataUsageStore.Bucket b : buckets) {
             LinearLayout col = new LinearLayout(ctx);
             col.setOrientation(LinearLayout.VERTICAL);
             col.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
             col.setLayoutParams(new LinearLayout.LayoutParams(
                     colWidthPx, LinearLayout.LayoutParams.MATCH_PARENT));
-            // Minab Beta v0.9.6.1 (fix #7) — tapping a bar shows
-            // its date / range under the card (showSelectedBar).
             final DataUsageStore.Bucket bucket = b;
             col.setClickable(true);
             col.setOnClickListener(v2 -> showSelectedBar(bucket));
@@ -307,15 +330,11 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             int height = b.bytes <= 0 ? minBarPx
                     : (int) (minBarPx + (b.bytes / (double) max) * maxBarPx);
             if (b.current) {
-                // Minab Beta v0.9.6.1 (fix #4) — the bar for the
-                // period we are in is green, so it stands out from
-                // the indigo bars (even at 0 bytes, the green
-                // baseline marks the current period).
                 bar.setBackgroundResource(R.drawable.minab_data_bar_current);
             } else if (b.bytes > 0) {
                 bar.setBackgroundResource(R.drawable.minab_data_bar);
             } else {
-                bar.setBackgroundColor(getResources().getColor(R.color.minab_divider));
+                bar.setBackgroundColor(dividerColor);
             }
             LinearLayout.LayoutParams barParams =
                     new LinearLayout.LayoutParams(barWidthPx, height);
@@ -329,15 +348,7 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             label.setGravity(Gravity.CENTER);
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
-            // Minab Beta v0.9.6.1 (fix #4/#6) — the current period's
-            // label is green too, so today / this week / this month
-            // is readable at a glance even when its bar is empty;
-            // and with the fixed 1/6-viewport columns the "d MMM"
-            // weekly labels ("9 Nov") finally fit whole instead of
-            // truncating to "9 ...".
-            label.setTextColor(getResources().getColor(b.current
-                    ? R.color.minab_connected
-                    : R.color.minab_text_secondary));
+            label.setTextColor(b.current ? currentLabelColor : secondaryLabelColor);
             col.addView(label, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -346,9 +357,6 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         }
         mDataEmpty.setVisibility(total == 0 ? View.VISIBLE : View.GONE);
         mDataTotal.setVisibility(total == 0 ? View.GONE : View.VISIBLE);
-        // Minab Beta v0.9.6.5 (fix #5) — the whole one-line footer
-        // hides when there is no data (otherwise the jump icon
-        // would sit alone in the row).
         if (mDataFooter != null) {
             mDataFooter.setVisibility(total == 0 ? View.GONE : View.VISIBLE);
         }
@@ -357,10 +365,6 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
                     R.string.minab_data_total, DataUsageStore.formatBytes(total)));
         }
         updateDataChips();
-        // Minab Beta v0.9.1 — after a mode change (or first open)
-        // jump to the recent end of the strip (today + the 3 empty
-        // future bars). Live updates never scroll, so the user can
-        // look back through history undisturbed.
         if (mScrollDataToEnd && mDataBarsScroll != null) {
             mScrollDataToEnd = false;
             mDataBarsScroll.post(() ->
@@ -409,7 +413,7 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     private Runnable triggerRefresh = new Runnable() {
         @Override
         public void run() {
-            mChartAdapter.notifyDataSetChanged();
+            if (mChartAdapter != null) mChartAdapter.notifyDataSetChanged();
             mHandler.postDelayed(triggerRefresh, OpenVPNManagement.mBytecountInterval * 1500);
         }
     };
@@ -429,6 +433,13 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
 
         mHandler.removeCallbacks(triggerRefresh);
         VpnStatus.removeByteCountListener(this);
+    }
+
+    @Override
+    public void onDestroyView() {
+        mLastDataSignature = null;
+        mHandler.removeCallbacks(triggerRefresh);
+        super.onDestroyView();
     }
 
     @Override
@@ -545,7 +556,7 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             YAxis yAxis = holder.chart.getAxisLeft();
             yAxis.setLabelCount(5, false);
 
-            final Resources res = getActivity().getResources();
+            final Resources res = mContext.getResources();
             yAxis.setValueFormatter(new ValueFormatter() {
                 @Override
                 public String getFormattedValue(float value) {

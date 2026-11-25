@@ -28,6 +28,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.core.VpnStatus
+import java.util.concurrent.Executors
 
 class MinabWidgetProvider : AppWidgetProvider() {
 
@@ -64,15 +65,23 @@ class MinabWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_TOGGLE = "de.blinkt.openvpn.minab.WIDGET_TOGGLE"
+        private val widgetExecutor = Executors.newSingleThreadExecutor()
 
-        /** Refresh every Minab widget instance. Safe to call from anywhere. */
+        /** Refresh every Minab widget instance off the UI thread so
+            AppWidgetManager IPC never stalls tab transitions. */
         fun updateAllWidgets(context: Context) {
+            val appCtx = context.applicationContext
             try {
-                val manager = AppWidgetManager.getInstance(context.applicationContext)
-                val component = ComponentName(context.applicationContext, MinabWidgetProvider::class.java)
-                val ids = manager.getAppWidgetIds(component)
-                if (ids.isNotEmpty()) {
-                    updateWidgets(context.applicationContext, manager, ids)
+                widgetExecutor.execute {
+                    try {
+                        val manager = AppWidgetManager.getInstance(appCtx)
+                        val component = ComponentName(appCtx, MinabWidgetProvider::class.java)
+                        val ids = manager.getAppWidgetIds(component)
+                        if (ids.isNotEmpty()) {
+                            updateWidgets(appCtx, manager, ids)
+                        }
+                    } catch (ignored: Exception) {
+                    }
                 }
             } catch (ignored: Exception) {
             }

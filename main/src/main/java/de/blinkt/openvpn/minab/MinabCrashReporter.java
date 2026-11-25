@@ -54,6 +54,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import de.blinkt.openvpn.BuildConfig;
 
@@ -67,6 +69,13 @@ public final class MinabCrashReporter {
 
     private static volatile boolean installed = false;
     private static Thread.UncaughtExceptionHandler previousHandler = null;
+
+    /** In-memory ring buffer + single-thread background writer so tab-switch
+        breadcrumbs never perform synchronous disk reads/writes on the UI thread.
+        Crash reports and clean shutdowns flush synchronously. */
+    private static final Object CRUMB_LOCK = new Object();
+    private static List<String> cachedBreadcrumbs = null;
+    private static final ExecutorService CRUMB_WRITER = Executors.newSingleThreadExecutor();
 
     private MinabCrashReporter() {
     }
@@ -93,6 +102,7 @@ public final class MinabCrashReporter {
     }
 
     private static void writeCrashReport(Context ctx, Thread thread, Throwable throwable) {
+        flushBreadcrumbsSync(ctx);
         StringBuilder sb = new StringBuilder();
         sb.append("Minab crash report\n");
         sb.append("time: ").append(nowString()).append('\n');
@@ -109,16 +119,44 @@ public final class MinabCrashReporter {
         writePrivateFile(ctx, CRASH_FILE, sb.toString());
     }
 
-    /** One timestamped line, e.g. "TAB selected 2 Graph". Synchronous on purpose: a breadcrumb
-        written at the moment of the event must be on disk even if the app is killed a millisecond
-        later. The file is tiny (<= 50 short lines), so the write is far below a millisecond. */
-    public static synchronized void breadcrumb(Context ctx, String event) {
+    /** Record one timestamped event (e.g. "TAB selected 2 Graph") without blocking
+        the UI thread with disk I/O during tab animations. Updates the in-memory
+        ring buffer immediately and flushes asynchronously on a single-thread
+        writer. Clean shutdown / backgrounding events flush immediately as well. */
+    public static void breadcrumb(Context ctx, String event) {
         if (ctx == null || event == null) return;
+        final Context appCtx = ctx.getApplicationContext();
+        final String line = nowString() + " " + event;
+        final String snapshot;
+        synchronized (CRUMB_LOCK) {
+            if (cachedBreadcrumbs == null) {
+                cachedBreadcrumbs = new ArrayList<>();
+            }
+            cachedBreadcrumbs.add(line);
+            while (cachedBreadcrumbs.size() > MAX_BREADCRUMBS) {
+                cachedBreadcrumbs.remove(0);
+            }
+            snapshot = TextUtils.join("\n", cachedBreadcrumbs) + "\n";
+        }
         try {
-            List<String> lines = readLines(ctx, BREADCRUMB_FILE);
-            lines.add(nowString() + " " + event);
-            while (lines.size() > MAX_BREADCRUMBS) lines.remove(0);
-            writePrivateFile(ctx, BREADCRUMB_FILE, TextUtils.join("\n", lines) + "\n");
+            CRUMB_WRITER.execute(() -> {
+                try {
+                    writePrivateFile(appCtx, BREADCRUMB_FILE, snapshot);
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void flushBreadcrumbsSync(Context ctx) {
+        final String snapshot;
+        synchronized (CRUMB_LOCK) {
+            if (cachedBreadcrumbs == null || cachedBreadcrumbs.isEmpty()) return;
+            snapshot = TextUtils.join("\n", cachedBreadcrumbs) + "\n";
+        }
+        try {
+            writePrivateFile(ctx.getApplicationContext(), BREADCRUMB_FILE, snapshot);
         } catch (Exception ignored) {
         }
     }
@@ -184,6 +222,9 @@ public final class MinabCrashReporter {
     }
 
     private static void clearReports(Context ctx) {
+        synchronized (CRUMB_LOCK) {
+            if (cachedBreadcrumbs != null) cachedBreadcrumbs.clear();
+        }
         try {
             ctx.deleteFile(CRASH_FILE);
             ctx.deleteFile(BREADCRUMB_FILE);

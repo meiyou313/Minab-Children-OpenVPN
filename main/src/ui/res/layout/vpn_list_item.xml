@@ -13,185 +13,162 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 
-     Minab Beta v0.5 — minimal rows: 48dp, 14sp name, 11sp subtitle,
-     a small country flag before the name (set in
-     VPNProfileList.VPNArrayAdapter.getView), smaller ping pill.
+     Home RecyclerView row inside the grouped server card.
 -->
 
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/minab_row_card_wrapper"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@android:color/transparent"
-    android:focusable="false"
-    android:gravity="center_vertical"
-    android:minHeight="48dp">
-
-    <!-- Minab Beta v0.5 — country flag (24x18dp) before the name.
-         Hidden when the country has no bundled flag. -->
-    <ImageView
-        android:id="@+id/minab_flag"
-        android:layout_width="24dp"
-        android:layout_height="18dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="6dp"
-        android:contentDescription="@string/minab_flag_description"
-        android:visibility="gone" />
-
-    <!-- Minab Beta v0.9.6.5 (fix #4) — small green connecting
-         spinner, shown only while THIS server is connecting (see
-         VPNProfileList.bindRow). 20dp, GONE otherwise, so it never
-         shifts the name or crowds the badges, star or pencil. -->
-    <ProgressBar
-        android:id="@+id/minab_connecting_spinner"
-        style="?android:attr/progressBarStyleSmall"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:layout_marginEnd="4dp"
-        android:indeterminate="true"
-        android:indeterminateTint="@color/minab_connected"
-        android:visibility="gone" />
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:background="@drawable/minab_row_card_middle">
 
     <LinearLayout
-        android:id="@+id/vpn_list_item_left"
-        android:layout_height="match_parent"
-        android:layout_width="wrap_content"
-        android:background="?android:attr/selectableItemBackground"
-        android:focusable="true"
-        android:layout_weight="1"
-        android:gravity="center_vertical">
+        android:id="@+id/minab_row_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="1dp"
+        android:layout_marginTop="1dp"
+        android:layout_marginEnd="1dp"
+        android:layout_marginBottom="1dp"
+        android:background="@android:color/transparent"
+        android:focusable="false"
+        android:gravity="center_vertical"
+        android:minHeight="48dp">
+
+        <ImageView
+            android:id="@+id/minab_flag"
+            android:layout_width="24dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="6dp"
+            android:contentDescription="@string/minab_flag_description"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/minab_connecting_spinner"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="4dp"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/minab_connected"
+            android:visibility="gone" />
 
         <LinearLayout
-            android:id="@android:id/widget_frame"
-            android:layout_width="wrap_content"
+            android:id="@+id/vpn_list_item_left"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="vertical">
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackground"
+            android:focusable="true"
+            android:gravity="center_vertical">
 
-            <!-- Minab Beta v0.9.6.1 (fix #9) — the name still did
-                 not fit: at 11sp on two lines the second line and
-                 the group subtitle were cut at the row's bottom
-                 edge ("us-free-51.protonvpn.tcp"). The texts are
-                 smaller now (name 10sp, subtitle 9sp) and the name
-                 is one line with "…" if it still does not fit, so
-                 name + group always fit inside the row. The badges
-                 are 9sp too ("1967 ms" was cut to "1967..."), and
-                 the pencil/flag spacing is tighter to give the name
-                 more room. Home only — Configs has its own row
-                 layout and never had this problem. -->
-            <TextView
-                android:id="@+id/vpn_item_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="@font/vazirmatn"
-                android:maxLines="1"
-                android:textColor="@color/minab_text_primary"
-                android:textSize="10sp"
-                tools:text="Vpn Name" />
+            <LinearLayout
+                android:id="@android:id/widget_frame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/vpn_item_subtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="marquee"
-                android:fadingEdge="horizontal"
-                android:fontFamily="@font/vazirmatn"
-                android:singleLine="true"
-                android:textColor="@color/minab_text_secondary"
-                android:textSize="9sp"
-                tools:text="Not connected!" />
+                <TextView
+                    android:id="@+id/vpn_item_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn"
+                    android:maxLines="1"
+                    android:textColor="@color/minab_text_primary"
+                    android:textSize="10sp"
+                    tools:text="Vpn Name" />
+
+                <TextView
+                    android:id="@+id/vpn_item_subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="@color/minab_text_secondary"
+                    android:textSize="9sp"
+                    tools:text="Not connected!" />
+            </LinearLayout>
+
         </LinearLayout>
 
-    </LinearLayout>
-
-    <!-- Minab Children (v0.2): visible ping badge. In v0.1 the ping
-         result was only small secondary text under the name; now each
-         tested profile shows a coloured pill ("24 ms", "Timeout",
-         "Failed") here. Set in VPNProfileList.VPNArrayAdapter.getView. -->
-    <!-- Minab Beta v0.9.1 — smaller badges (fix #13b): 54dp
-         instead of 86dp, so the "Failed"/"Blocked" badges stop
-         crowding out the server name. The real badge shows just
-         the ms value now (the "Real: " prefix is gone from
-         minab_real_ms), so both badges fit in 54dp. -->
-    <!-- Minab Beta v0.9.6.4 (fix #1) — the two result columns are
-         one fixed LTR pair now: ping ALWAYS on the left, real
-         ALWAYS on the right, whatever the phone's locale direction
-         is. Before, the pair mirrored with RTL, so the ping badge
-         sat on the right of the pair (towards the middle of the
-         row) and read as if the ping result had been written in
-         the wrong column. The pair itself is GONE when neither
-         test has run; an empty column stays INVISIBLE (not GONE)
-         so the other badge never slides into its place. -->
-    <LinearLayout
-        android:id="@+id/minab_badges"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layoutDirection="ltr"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/minab_ping_badge"
-            style="@style/Minab.PingBadge"
-            android:layout_width="54dp"
+        <LinearLayout
+            android:id="@+id/minab_badges"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/minab_ping_badge_fast"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:textSize="9sp"
-            android:visibility="invisible"
-            tools:text="24 ms"
-            tools:visibility="visible" />
+            android:gravity="center_vertical"
+            android:layoutDirection="ltr"
+            android:orientation="horizontal"
+            android:visibility="gone">
 
-        <TextView
-            android:id="@+id/minab_real_badge"
-            style="@style/Minab.PingBadge"
-            android:layout_width="54dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/minab_ping_badge_fast"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:textSize="9sp"
-            android:visibility="invisible"
-            tools:text="850 ms"
-            tools:visibility="visible" />
+            <TextView
+                android:id="@+id/minab_ping_badge"
+                style="@style/Minab.PingBadge"
+                android:layout_width="54dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/minab_ping_badge_fast"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:textSize="9sp"
+                android:visibility="invisible"
+                tools:text="24 ms"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/minab_real_badge"
+                style="@style/Minab.PingBadge"
+                android:layout_width="54dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/minab_ping_badge_fast"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:textSize="9sp"
+                android:visibility="invisible"
+                tools:text="850 ms"
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/minab_favorite_star"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:layout_marginEnd="4dp"
+            android:contentDescription="@string/minab_favorite_desc"
+            android:src="@drawable/minab_star_off" />
+
+        <View
+            android:layout_width="1dip"
+            android:layout_height="match_parent"
+            android:layout_marginTop="8dip"
+            android:layout_marginBottom="8dip"
+            android:background="@android:drawable/divider_horizontal_dark"
+            android:focusable="false" />
+
+        <ImageView
+            android:id="@+id/quickedit_settings"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:background="?android:attr/selectableItemBackground"
+            android:contentDescription="@string/configure_the_vpn"
+            android:focusable="true"
+            android:paddingStart="4dip"
+            android:paddingLeft="4dip"
+            android:paddingEnd="4dip"
+            android:paddingRight="4dip"
+            android:src="@drawable/ic_edit" />
+
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/minab_favorite_star"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:layout_gravity="center"
-        android:layout_marginEnd="4dp"
-        android:contentDescription="@string/minab_favorite_desc"
-        android:src="@drawable/minab_star_off" />
-
-    <View
-        android:layout_width="1dip"
-        android:layout_height="match_parent"
-        android:layout_marginBottom="8dip"
-        android:layout_marginTop="8dip"
-        android:background="@android:drawable/divider_horizontal_dark"
-        android:focusable="false" />
-
-    <ImageView
-        android:id="@+id/quickedit_settings"
-        android:layout_width="wrap_content"
-        android:layout_height="fill_parent"
-        android:layout_gravity="center"
-        android:background="?android:attr/selectableItemBackground"
-        android:contentDescription="@string/configure_the_vpn"
-        android:focusable="true"
-        android:paddingEnd="4dip"
-        android:paddingLeft="4dip"
-        android:paddingRight="4dip"
-        android:paddingStart="4dip"
-        android:src="@drawable/ic_edit" />
-
-</LinearLayout>
+</FrameLayout>

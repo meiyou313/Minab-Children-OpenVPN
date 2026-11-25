@@ -211,8 +211,16 @@ public final class DataUsageStore {
     }
 
     private static String dayKey(Calendar cal) {
-        return KEY_PREFIX +
-                new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.getTime());
+        int y = cal.get(Calendar.YEAR);
+        int m = cal.get(Calendar.MONTH) + 1;
+        int d = cal.get(Calendar.DAY_OF_MONTH);
+        StringBuilder sb = new StringBuilder(14);
+        sb.append(KEY_PREFIX).append(y).append('-');
+        if (m < 10) sb.append('0');
+        sb.append(m).append('-');
+        if (d < 10) sb.append('0');
+        sb.append(d);
+        return sb.toString();
     }
 
     /** All stored day totals, with keys older than KEEP_DAYS pruned. */

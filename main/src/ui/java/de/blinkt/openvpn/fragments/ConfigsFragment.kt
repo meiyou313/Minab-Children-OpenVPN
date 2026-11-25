@@ -3,17 +3,9 @@
  * Copyright (c) 2026 Minab contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * ConfigsFragment (v0.4): the CONFIGS tab — a dedicated place to
- * manage configs. Group filter tabs on top, buttons for credentials
- * (this group / all) and backup, then the config list. Tap a config
- * for rename, credentials, category, ping or delete.
- *
- * v0.5: minimal rows (checkbox, country flag, small name) like
- * Home; ticking boxes selects configs for Delete selected and
- * Share as zip; the Share button shares the selection, or the
- * current group, or all configs as one zip file (Android share
- * intent via the app FileProvider); the credentials buttons sit
- * under a plain "VPN username & password" explanation.
+ * ConfigsFragment: the CONFIGS tab — virtualised RecyclerView hosting the
+ * Configs header (view type 0) and recycled config rows (view type 1), with
+ * the shared dedicated Test Progress panel and MinabTestCoordinator support.
  */
 
 package de.blinkt.openvpn.fragments
@@ -21,6 +13,7 @@ package de.blinkt.openvpn.fragments
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -28,23 +21,26 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.fragment.app.ListFragment
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import de.blinkt.openvpn.LaunchVPN
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
@@ -56,110 +52,87 @@ import de.blinkt.openvpn.core.VpnStatus
 import de.blinkt.openvpn.minab.AutoCategory
 import de.blinkt.openvpn.minab.CategoryStore
 import de.blinkt.openvpn.minab.FlagHelper
-import de.blinkt.openvpn.minab.MinabConnectState
-import de.blinkt.openvpn.minab.MinabServerCountry
 import de.blinkt.openvpn.minab.MinabBackup
 import de.blinkt.openvpn.minab.MinabCategoryReorder
+import de.blinkt.openvpn.minab.MinabConnectState
 import de.blinkt.openvpn.minab.MinabFavorites
 import de.blinkt.openvpn.minab.MinabRealTestSettings
 import de.blinkt.openvpn.minab.MinabRealTestSettingsPanel
+import de.blinkt.openvpn.minab.MinabServerCountry
+import de.blinkt.openvpn.minab.MinabTestCoordinator
+import de.blinkt.openvpn.minab.MinabTestProgressPanel
 import de.blinkt.openvpn.minab.PingTester
 import de.blinkt.openvpn.minab.RealTester
 import de.blinkt.openvpn.minab.SharedCredentials
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
+import java.util.concurrent.Executors
+import kotlin.math.min
 
-class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
+class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     private var selectedCategory: String? = null
-    /** Minab Beta v0.9.6.5 (fix #4) — the last connection level,
-        so the row of the server being connected to can show the
-        green halo + spinner (same as Home). */
     private var lastLevel: ConnectionStatus? = null
-    private var mArrayadapter: ArrayAdapter<VpnProfile>? = null
+
+    private var recyclerView: RecyclerView? = null
+    private var headerView: View? = null
+    private var emptyView: View? = null
+    private var configsAdapter: ConfigsRecyclerAdapter? = null
+    private var displayedProfiles: MutableList<VpnProfile> = mutableListOf()
+    private var cachedFavorites: Set<String> = emptySet()
+
     private var chipsContainer: LinearLayout? = null
     private lateinit var backupLauncher: ActivityResultLauncher<String>
-    // --- Minab Beta v0.9.1: search (fix #9) + chip cache (fix #4).
-    // The search box filters by name or country, debounced 250 ms
-    // like Home's; the chip bar is only rebuilt when its signature
-    // (selected tab + group order) changed. ---
+
     private var searchQuery: String = ""
     private val searchDebounceHandler = Handler(Looper.getMainLooper())
     private val searchDebounceRunnable = Runnable { refreshList() }
     private var chipsSignature: String? = null
-    /** Minab Beta v0.9.3 — the visible list's content signature
-        (see listSignature): when a refresh produces the same
-        signature as the list already on screen, the adapter rebuild
-        and the row re-measure are skipped — a tab switch lands here
-        and must be nearly free (same as Home). */
     private var lastListSignature: String? = null
-    /** Minab Beta v0.9.3 — the cached expandListView result (same
-        idea as Home): the signature + ListView width it was
-        measured for, and the total height. */
-    private var lastExpandSignature: String? = null
-    private var lastExpandWidth: Int = 0
-    private var lastExpandHeight: Int = 0
-    /** UUIDs of the configs ticked for Delete / Share. */
+
     private val selectedUuids = mutableSetOf<String>()
     private var selectionRow: View? = null
     private var shareButton: Button? = null
-    // --- Minab v0.6: the two server tests (Ping test / Real test) ---
-    // The Real test runner itself is minab.RealTester (shared with
-    // Home); this fragment only owns the UI state and the connect
-    // action (startVPN). Ping tests are independent (they do not
-    // touch the tunnel); real tests are exclusive app-wide.
+    private var shareSelectedButton: Button? = null
+
+    // --- Server tests (Ping test & Real test) ---
     private var pingTester: PingTester? = null
     private var pingDoneCount: Int = 0
     private var pingTotalCount: Int = 0
-    private var testProgressRow: View? = null
-    private var testProgressBar: ProgressBar? = null
-    private var testStatusView: TextView? = null
-    private var testCancelButton: Button? = null
-    /** True while our real test runs. */
+    private var pingOkCount: Int = 0
+    private var pingLatestName: String? = null
+
+    private var testProgressPanel: MinabTestProgressPanel? = null
     private var realTestActive: Boolean = false
     private var realTester: RealTester? = null
-    /** Total servers the current run will test (from
-        onRealProgress); 0 when the settings left nothing to test. */
     private var realTotalCount: Int = 0
-    /** Minab Beta v0.9.6.2 (fix #6) — the inline Real test
-        settings panel under the Real test button (shared helper
-        with Home); null until onCreateView wires it. */
+    private var realTargetWorking: Int = 5
+    private var realPingPhaseActive: Boolean = false
+    private var realPingOkCount: Int = 0
     private var realTestSettingsPanel: MinabRealTestSettingsPanel? = null
-    /** Minab Beta v0.9.6.2 (fix #5) — the Configs sort mode:
-        NONE (name order, as before) or PING (after a ping test:
-        lowest ping first within each group, untested/failed
-        last). Persisted in "MinabPrefs" so it survives the
-        fragment being recreated. Displayed order only — the
-        stored profile/group order is never rewritten. */
     private var sortMode: Int = SORT_NONE
-    /** Bumped on every start/cancel so listener callbacks from a
-        superseded run are ignored. */
     private var realTestRunId = 0
-    /** Minab Beta v0.9.6.3 (fix #6) — per-server countdown while a
-        real test runs: seconds left for the server under test (the
-        wait from MinabRealTestSettings). Restarted whenever
-        onRealProgress names a new server; stopped on finish/cancel.
-        The ticker only re-renders the status line — it never
-        touches the runner. */
+
     private val realCountdownHandler = Handler(Looper.getMainLooper())
     private var realCountdownSeconds: Int = 0
     private var realCountdownName: String? = null
-    // Minab Beta v0.9.6.4 (fix #6) — coalesced list refresh,
-    // same as Home: a test used to rebuild the whole list
-    // (refreshList re-measures every row) on EVERY result, and
-    // the Configs page lagged with it. Refreshes during a test
-    // are now merged to at most one re-bind every 400 ms.
+    private var realCountdownDone: Int = 0
+    private var realCountdownTotal: Int = 0
+    private var realCountdownWorking: Int = 0
+
     private val listRefreshHandler = Handler(Looper.getMainLooper())
     private var listRefreshPending = false
     private val listRefreshRunnable = Runnable {
         listRefreshPending = false
-        if (isAdded) mArrayadapter?.notifyDataSetChanged()
+        if (isAdded) configsAdapter?.submitList(displayedProfiles)
     }
+
     private fun requestListRefresh() {
         if (listRefreshPending) return
         listRefreshPending = true
-        listRefreshHandler.postDelayed(listRefreshRunnable, 400)
+        listRefreshHandler.postDelayed(listRefreshRunnable, 350)
     }
+
     private val realCountdownRunnable: Runnable = Runnable {
         if (realTestActive && realCountdownSeconds > 0) {
             realCountdownSeconds--
@@ -167,27 +140,24 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
             realCountdownHandler.postDelayed(realCountdownRunnable, 1000)
         }
     }
+
     private val testPauseHandler = Handler(Looper.getMainLooper())
     private val testPauseStop = Runnable {
         if (realTestActive) {
             cancelRealTest()
             try {
                 Toast.makeText(requireContext(), R.string.minab_real_cancelled, Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                // Fragment gone meanwhile: nothing to tell.
+            } catch (_: Exception) {
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Minab Beta v0.9.6.2 (fix #5) — restore the persisted
-        // sort mode BEFORE the first refresh, so the list comes
-        // back ping-sorted the way the last test left it.
         try {
             sortMode = requireContext().getSharedPreferences("MinabPrefs", Context.MODE_PRIVATE)
                 .getInt(PREF_SORT_MODE, SORT_NONE)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             sortMode = SORT_NONE
         }
         backupLauncher = registerForActivityResult(
@@ -198,125 +168,116 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val v = inflater.inflate(R.layout.configs_fragment, container, false)
-        // Minab Beta v0.9.5 — AUDIT: this is the only tab
-        // fragment whose onCreateView had no guard (Home's is
-        // partly guarded, Graph / Settings / About were guarded
-        // in 0.9.4). A throw while wiring the tab would close the
-        // app on the first switch to Configs; now the tab shows
-        // an empty view instead.
+        val root = inflater.inflate(R.layout.configs_fragment, container, false)
+        val rv = root.findViewById<RecyclerView>(R.id.minab_configs_recycler)
+        recyclerView = rv
+
+        val header = inflater.inflate(R.layout.configs_fragment_header, rv, false)
+        headerView = header
+        val empty = inflater.inflate(R.layout.configs_fragment_empty, rv, false)
+        emptyView = empty
+
         try {
-        chipsContainer = v.findViewById(R.id.minab_configs_chips)
-        v.findViewById<Button>(R.id.minab_configs_credentials_group)?.setOnClickListener {
-            showCredentialsDialog(selectedCategory)
-        }
-        v.findViewById<Button>(R.id.minab_configs_credentials_all)?.setOnClickListener {
-            showCredentialsDialog(null)
-        }
-        v.findViewById<Button>(R.id.minab_configs_backup)?.setOnClickListener {
-            val profiles = ProfileManager.getInstance(requireContext()).getProfiles()
-            if (profiles.isEmpty()) {
-                Toast.makeText(requireContext(), R.string.minab_backup_none, Toast.LENGTH_SHORT).show()
-            } else {
-                backupLauncher.launch("minab-backup.ovpn.zip")
+            chipsContainer = header.findViewById(R.id.minab_configs_chips)
+            header.findViewById<Button>(R.id.minab_configs_credentials_group)?.setOnClickListener {
+                showCredentialsDialog(selectedCategory)
             }
-        }
-        shareButton = v.findViewById(R.id.minab_configs_share)
-        shareButton?.setOnClickListener { shareCurrentScope() }
-        selectionRow = v.findViewById(R.id.minab_configs_selection_row)
-        v.findViewById<Button>(R.id.minab_configs_delete_selected)?.setOnClickListener {
-            showDeleteSelectedDialog()
-        }
-        // Minab v0.8: Copy / Move the ticked configs to a group.
-        v.findViewById<Button>(R.id.minab_configs_copy_selected)?.setOnClickListener {
-            showCopyMoveDialog(true)
-        }
-        v.findViewById<Button>(R.id.minab_configs_move_selected)?.setOnClickListener {
-            showCopyMoveDialog(false)
-        }
-        v.findViewById<Button>(R.id.minab_configs_share_selected)?.setOnClickListener {
-            shareProfiles(selectedProfiles())
-        }
-        // Minab v0.6: the two server tests. Ping test is the fast
-        // parallel check; Real test actually connects each server
-        // and opens Telegram Web through it (see startRealTest).
-        v.findViewById<Button>(R.id.minab_configs_test_ping)?.setOnClickListener {
-            startPingTest(visibleProfiles())
-        }
-        v.findViewById<Button>(R.id.minab_configs_test_real)?.setOnClickListener {
-            startRealTest(visibleProfiles())
-        }
-        // Minab Beta v0.9.6.2 (fix #6) — Real test settings gear:
-        // opens the inline panel directly under the Real test
-        // button (green gear while open, blue while closed), the
-        // same shared helper as Home.
-        val realTestSettingsButton =
-            v.findViewById<ImageButton>(R.id.minab_configs_btn_real_test_settings)
-        val realTestSettingsPanelView =
-            v.findViewById<View>(R.id.minab_real_settings_panel)
-        if (realTestSettingsButton != null && realTestSettingsPanelView != null) {
-            realTestSettingsPanel = MinabRealTestSettingsPanel(
-                requireContext(), realTestSettingsButton, realTestSettingsPanelView
-            )
-        }
-        testProgressRow = v.findViewById(R.id.minab_configs_test_progress_row)
-        testProgressBar = v.findViewById(R.id.minab_configs_test_progress)
-        testStatusView = v.findViewById(R.id.minab_configs_test_status)
-        testCancelButton = v.findViewById(R.id.minab_configs_test_cancel_btn)
-        testCancelButton?.setOnClickListener {
-            // The same Cancel button stops whichever test runs.
-            if (realTestActive) {
-                cancelRealTest()
-                Toast.makeText(requireContext(), R.string.minab_real_cancelled, Toast.LENGTH_SHORT).show()
-            } else {
-                cancelPingTest()
-                Toast.makeText(requireContext(), R.string.minab_ping_cancelled, Toast.LENGTH_SHORT).show()
+            header.findViewById<Button>(R.id.minab_configs_credentials_all)?.setOnClickListener {
+                showCredentialsDialog(null)
             }
-        }
-        // Minab Beta v0.9.4 — safe call: a missing ListView must
-        // not kill the launch.
-        v.findViewById<ListView>(android.R.id.list)?.setOnItemLongClickListener { _, _, position, _ ->
-            val profile = mArrayadapter?.getItem(position) ?: return@setOnItemLongClickListener false
-            toggleSelection(profile)
-            true
-        }
-        // Minab Beta v0.9.1 — search the configs by name or country
-        // (fix #9), like the search box on Home. Debounced, so
-        // typing does not rebuild the list on every keystroke.
-        v.findViewById<EditText>(R.id.minab_configs_search)?.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                searchQuery = s?.toString()?.trim() ?: ""
-                searchDebounceHandler.removeCallbacks(searchDebounceRunnable)
-                searchDebounceHandler.postDelayed(searchDebounceRunnable, 250)
+            header.findViewById<Button>(R.id.minab_configs_backup)?.setOnClickListener {
+                val profiles = ProfileManager.getInstance(requireContext()).getProfiles()
+                if (profiles.isEmpty()) {
+                    Toast.makeText(requireContext(), R.string.minab_backup_none, Toast.LENGTH_SHORT).show()
+                } else {
+                    backupLauncher.launch("minab-backup.ovpn.zip")
+                }
             }
-        })
+            shareButton = header.findViewById(R.id.minab_configs_share)
+            shareButton?.setOnClickListener { shareCurrentScope() }
+            selectionRow = header.findViewById(R.id.minab_configs_selection_row)
+            shareSelectedButton = header.findViewById(R.id.minab_configs_share_selected)
+            header.findViewById<Button>(R.id.minab_configs_delete_selected)?.setOnClickListener {
+                showDeleteSelectedDialog()
+            }
+            header.findViewById<Button>(R.id.minab_configs_copy_selected)?.setOnClickListener {
+                showCopyMoveDialog(true)
+            }
+            header.findViewById<Button>(R.id.minab_configs_move_selected)?.setOnClickListener {
+                showCopyMoveDialog(false)
+            }
+            shareSelectedButton?.setOnClickListener {
+                shareProfiles(selectedProfiles())
+            }
+            header.findViewById<Button>(R.id.minab_configs_test_ping)?.setOnClickListener {
+                startPingTest(visibleProfiles())
+            }
+            header.findViewById<Button>(R.id.minab_configs_test_real)?.setOnClickListener {
+                startRealTest(visibleProfiles())
+            }
+
+            val realTestSettingsButton =
+                header.findViewById<ImageButton>(R.id.minab_configs_btn_real_test_settings)
+            val realTestSettingsPanelView =
+                header.findViewById<View>(R.id.minab_real_settings_panel)
+            if (realTestSettingsButton != null && realTestSettingsPanelView != null) {
+                realTestSettingsPanel = MinabRealTestSettingsPanel(
+                    requireContext(), realTestSettingsButton, realTestSettingsPanelView
+                )
+            }
+
+            val testPanelRoot = header.findViewById<View>(R.id.minab_test_panel)
+            if (testPanelRoot != null) {
+                testProgressPanel = MinabTestProgressPanel(requireContext(), testPanelRoot) {
+                    if (realTestActive) {
+                        cancelRealTest()
+                        Toast.makeText(requireContext(), R.string.minab_real_cancelled, Toast.LENGTH_SHORT).show()
+                    } else if (pingTester != null) {
+                        cancelPingTest()
+                        Toast.makeText(requireContext(), R.string.minab_ping_cancelled, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            header.findViewById<EditText>(R.id.minab_configs_search)?.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    searchQuery = s?.toString()?.trim() ?: ""
+                    searchDebounceHandler.removeCallbacks(searchDebounceRunnable)
+                    searchDebounceHandler.postDelayed(searchDebounceRunnable, 250)
+                }
+            })
+
+            rv.layoutManager = LinearLayoutManager(requireContext())
+            rv.setHasFixedSize(true)
+            rv.itemAnimator = null
+            rv.setItemViewCacheSize(12)
+            configsAdapter = ConfigsRecyclerAdapter(header, empty)
+            rv.adapter = configsAdapter
+
+            // Populate immediately while created offscreen so the first frame
+            // during a Home -> Configs tab slide already shows populated rows.
+            lastListSignature = null
+            chipsSignature = null
+            refreshList()
         } catch (e: Exception) {
             android.util.Log.e("ConfigsFragment", "Minab: onCreateView failed", e)
         }
-        return v
+        return root
     }
 
     override fun onResume() {
         super.onResume()
-        // Minab Beta v0.9.6.5 (fix #4) — listen for connection
-        // state changes (same as Home), so the connecting row can
-        // show its halo + spinner.
         VpnStatus.addStateListener(this)
-        // Minab v0.6: we are back (e.g. after our own LaunchVPN
-        // round-trip) — do not stop a running real test for it.
         testPauseHandler.removeCallbacks(testPauseStop)
         refreshList()
     }
 
-    /** Minab Beta v0.9.6.5 (fix #4) — VpnStatus.StateListener:
-        only a LEVEL change re-binds the list; state updates also
-        fire for every log line, and a re-bind on each one would
-        be the Home lag all over again. */
     override fun updateState(
         state: String?,
         logmessage: String?,
@@ -332,25 +293,35 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
     }
 
     override fun setConnectedVPN(uuid: String?) {
-        // The rows read VpnStatus directly; nothing to store here.
     }
 
     override fun onPause() {
         super.onPause()
         VpnStatus.removeStateListener(this)
-        // Minab Beta v0.9.2 — a debounced search must not fire
-        // after the fragment is gone (tab switch pauses us).
         searchDebounceHandler.removeCallbacks(searchDebounceRunnable)
-        // Minab v0.6: leaving Configs mid-run stops the real test —
-        // but launching LaunchVPN pauses us briefly too, so wait
-        // 8 s: a quick round-trip (our own connect/disconnect)
-        // resumes in time and the run survives it.
         if (realTestActive) testPauseHandler.postDelayed(testPauseStop, 8000)
     }
 
+    override fun onDestroyView() {
+        listRefreshHandler.removeCallbacks(listRefreshRunnable)
+        listRefreshPending = false
+        recyclerView?.adapter = null
+        recyclerView = null
+        headerView = null
+        emptyView = null
+        configsAdapter = null
+        chipsContainer = null
+        selectionRow = null
+        shareButton = null
+        shareSelectedButton = null
+        testProgressPanel = null
+        realTestSettingsPanel = null
+        lastListSignature = null
+        chipsSignature = null
+        super.onDestroyView()
+    }
+
     override fun onDestroy() {
-        // Stop the tests when the fragment is really gone. Results
-        // already saved on profiles are kept.
         testPauseHandler.removeCallbacks(testPauseStop)
         searchDebounceHandler.removeCallbacks(searchDebounceRunnable)
         cancelPingTest()
@@ -361,47 +332,19 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
-    /** Minab Beta v0.9.3 — row ViewHolder for minab_config_row
-        (same as Home's RowHolder): caches the row's views on the
-        view's tag so getView stops calling findViewById ~8 times
-        per row on every layout/measure. */
-    private class ConfigRowHolder(val view: View) {
-        val name: TextView = view.findViewById(R.id.minab_config_name)
-        val subtitle: TextView = view.findViewById(R.id.minab_config_subtitle)
-        val flag: ImageView = view.findViewById(R.id.minab_config_flag)
-        val connecting: ProgressBar = view.findViewById(R.id.minab_config_connecting_spinner)
-        val badges: View = view.findViewById(R.id.minab_config_badges)
-        val pingBadge: TextView = view.findViewById(R.id.minab_config_ping_badge)
-        val realBadge: TextView = view.findViewById(R.id.minab_config_real_badge)
-        val star: ImageView = view.findViewById(R.id.minab_config_star)
-        val edit: ImageView = view.findViewById(R.id.minab_config_edit)
-        val checkBox: CheckBox = view.findViewById(R.id.minab_config_checkbox)
-    }
-
     private fun refreshList() {
-        if (!isAdded) return
+        if (!isAdded || configsAdapter == null) return
         try {
             refreshListInner()
-        } catch (e: Exception) {
-            // Minab Beta v0.9.3 — one bad profile (or a corrupt
-            // state) must never kill the app on a tab switch: keep
-            // the list that is already on screen instead of crashing.
+        } catch (_: Exception) {
         }
     }
 
-    /** Signature of the visible list: filter/search + order + everything
-        a row shows (name, group, ping/real results, favorite, profile
-        version, selection). Two refreshes with the same signature
-        show the same rows. */
-    private fun listSignature(sorted: Collection<VpnProfile>): String {
-        val favorites = try {
-            MinabFavorites.getAll(requireContext())
-        } catch (e: Exception) {
-            emptySet<String>()
-        }
-        val sb = StringBuilder()
+    private fun listSignature(sorted: Collection<VpnProfile>, favorites: Set<String>): String {
+        val sb = StringBuilder(sorted.size * 48)
         sb.append(selectedCategory ?: "all").append('|')
             .append(searchQuery).append('|')
+            .append(sortMode).append('|')
             .append(selectedUuids.sorted().joinToString(",")).append('|')
             .append(sorted.size)
         for (p in sorted) {
@@ -418,46 +361,24 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         return sb.toString()
     }
 
-    /** True when the ListView is already showing our adapter (so a
-        refresh that changes nothing can skip re-attaching it — the
-        attach itself re-lays out every row). */
-    private fun isAdapterShowing(): Boolean {
-        val adapter = mArrayadapter ?: return false
-        val list = try {
-            listView
-        } catch (e: IllegalStateException) {
-            return false
-        }
-        return list.adapter === adapter
-    }
-
-    /** Set the Configs sort mode and persist it (see the sortMode
-        field). The last completed ping test wins. */
     private fun setSortMode(mode: Int) {
         sortMode = mode
         try {
             requireContext().getSharedPreferences("MinabPrefs", Context.MODE_PRIVATE)
                 .edit().putInt(PREF_SORT_MODE, mode).apply()
-        } catch (e: Exception) {
-            // Prefs unavailable: the in-memory mode still applies
-            // for this session.
+        } catch (_: Exception) {
         }
     }
 
-    /** The saved group order (chip order, Uncategorized last) for
-        ping sorting: the list stays grouped, only the order inside
-        each group changes. */
     private fun pingGroupOrder(context: Context): List<String> {
         return try {
             val ordered = CategoryStore.getOrderedCategories(context)
             ordered.filter { it != CategoryStore.DEFAULT_CATEGORY } + CategoryStore.DEFAULT_CATEGORY
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
 
-    /** Comparator for ping sort: within each group (saved chip
-        order), lowest ping first, untested/failed last, then name. */
     private fun pingComparator(groupOrder: List<String>): Comparator<VpnProfile> {
         val groupIndex = groupOrder.withIndex().associate { it.value to it.index }
         return compareBy<VpnProfile> { groupIndex[it.getCategory()] ?: Int.MAX_VALUE }
@@ -465,22 +386,15 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
             .thenBy { it.mName ?: "" }
     }
 
-    /** Re-sort the rows already in the adapter, live, while a ping
-        test runs — without rebuilding chips or re-measuring the
-        list. No-op unless the current sort mode is PING. */
     private fun resortConfigsAdapter() {
-        val adapter = mArrayadapter ?: return
-        val items = (0 until adapter.count).mapNotNull { adapter.getItem(it) }
+        if (displayedProfiles.isEmpty()) return
         val groupOrder = try {
             pingGroupOrder(requireContext())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return
         }
-        val sorted = items.sortedWith(pingComparator(groupOrder))
-        adapter.clear()
-        adapter.addAll(sorted)
-        // Minab Beta v0.9.6.4 (fix #6) — coalesced: a re-sort
-        // happens on every result while a test runs.
+        displayedProfiles = displayedProfiles.sortedWith(pingComparator(groupOrder)).toMutableList()
+        lastListSignature = null
         requestListRefresh()
     }
 
@@ -488,10 +402,7 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         val context = requireContext()
         val pm = ProfileManager.getInstance(context)
         val all = pm.getProfiles().toList()
-        // Drop selections for configs that no longer exist.
         selectedUuids.retainAll(all.map { it.getUUIDString() }.toSet())
-        // Minab Beta v0.9.1 — the favorites pseudo-tab (fix #7):
-        // a starred config shows in its country group AND here.
         val favorites = MinabFavorites.getAll(context)
         val filtered = when {
             selectedCategory == null -> all
@@ -499,161 +410,32 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
                 all.filter { favorites.contains(it.getUUIDString()) }
             else -> all.filter { it.getCategory() == selectedCategory }
         }
-        // Minab Beta v0.9.1 — search by name or country (fix #9),
-        // case-insensitive; an empty search shows everything.
         val query = searchQuery.lowercase()
         val searched = if (query.isEmpty()) filtered else filtered.filter { profile ->
             val name = profile.mName?.lowercase() ?: ""
             val category = profile.getCategory()?.lowercase() ?: ""
             name.contains(query) || category.contains(query)
         }
-        // Minab Beta v0.9.6.2 (fix #5) — sort the DISPLAYED
-        // order. NONE: by name, as before. PING: within each
-        // group (saved chip order, so the group structure is
-        // preserved), lowest ping first, untested/failed last,
-        // then name. sortedWith, not TreeSet: a TreeSet drops a
-        // config when the comparator calls it equal to another
-        // (same name), so two same-named configs could silently
-        // lose one row.
         val sorted: List<VpnProfile> = if (sortMode == SORT_PING) {
             searched.sortedWith(pingComparator(pingGroupOrder(context)))
         } else {
             searched.sortedWith(compareBy { it.mName ?: "" })
         }
-        // Minab Beta v0.9.3 — a tab switch lands here with the same
-        // rows already on screen: skip the adapter rebuild and the
-        // re-measure entirely. The chip bar and selection bar are
-        // still updated (both are signature-cached / cheap).
-        val signature = listSignature(sorted)
-        if (signature == lastListSignature && isAdapterShowing()) {
+
+        val signature = listSignature(sorted, favorites)
+        if (signature == lastListSignature) {
             rebuildChips()
             updateSelectionBar()
-            // Still post the expand: it is cached (a no-op when the
-            // width did not change) but re-measures when it did
-            // (e.g. multi-window resize).
-            view?.post { expandListView() }
             return
         }
         lastListSignature = signature
-        if (mArrayadapter == null) {
-            mArrayadapter = object : ArrayAdapter<VpnProfile>(
-                context, R.layout.minab_config_row, ArrayList(sorted)
-            ) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    // Minab Beta v0.9.4 — a row must never kill the
-                    // app: a failure here runs during ListView
-                    // layout on the main thread, so it is caught
-                    // and the row is left unbound (see Home).
-                    val view = try {
-                        convertView
-                            ?: LayoutInflater.from(context).inflate(R.layout.minab_config_row, parent, false)
-                    } catch (e: Exception) {
-                        android.util.Log.e("ConfigsFragment", "Minab: row inflate failed at $position", e)
-                        return convertView ?: View(parent.context)
-                    }
-                    try {
-                        bindConfigRow(view, position)
-                    } catch (e: Exception) {
-                        android.util.Log.e("ConfigsFragment", "Minab: row bind failed at $position", e)
-                    }
-                    return view
-                }
-                /** The old getView body, extracted so it can be guarded. */
-                private fun bindConfigRow(view: View, position: Int) {
-                    // Minab Beta v0.9.3 — row ViewHolder (same as
-                    // Home): getView called findViewById ~8 times
-                    // per row on every layout/measure.
-                    val holder = (view.tag as? ConfigRowHolder)
-                        ?: ConfigRowHolder(view).also { view.tag = it }
-                    val profile = getItem(position) ?: return
-                    holder.name.text = profile.mName
-                    // Minab Beta v0.9.1 — the subtitle is just the
-                    // group (fix #6): the ping / real results live
-                    // in the badges now, and the username is never
-                    // shown under a config.
-                    holder.subtitle.text =
-                        "[" + profile.getCategory() + "]"
-                    // Minab Beta v0.9.1 — every server gets a flag
-                    // (fix #6): flagResForProfile falls back to the
-                    // globe, so the column is never empty.
-                    // Minab Beta v0.9.6.5 (fix #2) — the Context
-                    // overload: it also reads the IP-detected
-                    // country stored after a ping (MinabServerCountry).
-                    holder.flag.setImageResource(FlagHelper.flagResForProfile(profile, context))
-                    holder.flag.visibility = View.VISIBLE
-                    // Minab Beta v0.9.6.5 (fix #4) — the connecting
-                    // row: green halo + small spinner while THIS
-                    // server is connecting (same as Home). Both
-                    // branches set the background and the spinner
-                    // (rows are recycled); the connected row keeps
-                    // the plain background here, like before.
-                    if (MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)) {
-                        view.setBackgroundResource(R.drawable.minab_halo_green)
-                        holder.connecting.visibility = View.VISIBLE
-                    } else {
-                        view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                        holder.connecting.visibility = View.GONE
-                    }
-                    // Minab Beta v0.9.1 — ping / real badges in neat,
-                    // small, regular columns like Home (fix #6).
-                    // Minab Beta v0.9.6.4 (fix #1) — fixed columns,
-                    // same as Home: the pair shows whenever either
-                    // test has a result; an empty column stays
-                    // INVISIBLE and keeps its place, so ping is
-                    // always the left column and real always the
-                    // right one.
-                    val pingShown = setConfigBadge(
-                        holder.pingBadge,
-                        profile.mLastPingMs, profile.mLastPingResult)
-                    val realShown = setConfigBadge(
-                        holder.realBadge,
-                        profile.mLastRealMs, profile.mLastRealResult)
-                    holder.badges.visibility =
-                        if (pingShown || realShown) View.VISIBLE else View.GONE
-                    // Minab Beta v0.9.1 — the favorite star (fix #6):
-                    // filled for a favorite, outline otherwise.
-                    val star = holder.star
-                    val isFavorite = MinabFavorites.isFavorite(context, profile.getUUIDString())
-                    star.setImageResource(
-                        if (isFavorite) R.drawable.minab_star_on else R.drawable.minab_star_off
-                    )
-                    star.setOnClickListener {
-                        MinabFavorites.toggle(context, profile.getUUIDString())
-                        refreshList()
-                    }
-                    // Minab Beta v0.9.1 — the pencil opens the server
-                    // editor directly (fix #6).
-                    holder.edit.setOnClickListener { editVPN(profile) }
-                    val checkBox = holder.checkBox
-                    checkBox.setOnCheckedChangeListener(null)
-                    checkBox.isChecked = selectedUuids.contains(profile.getUUIDString())
-                    checkBox.setOnCheckedChangeListener { _, _ -> toggleSelection(profile) }
-                }
-            }
-            listAdapter = mArrayadapter
-        } else {
-            mArrayadapter!!.clear()
-            mArrayadapter!!.addAll(sorted)
-            mArrayadapter!!.notifyDataSetChanged()
-        }
+        cachedFavorites = favorites
+        displayedProfiles = sorted.toMutableList()
+        configsAdapter?.submitList(displayedProfiles)
         rebuildChips()
         updateSelectionBar()
-        // Minab Beta v0.9 — the list now lives INSIDE this page
-        // (a NestedScrollView) instead of in its own little window,
-        // so the ListView must grow to its full content height.
-        // Posted on the fragment view (v0.5.1 hotfix pattern), so
-        // it never runs before the view exists.
-        view?.post { expandListView() }
     }
 
-    /** One test badge (ping or real): the value as a coloured pill
-        (green < 100 ms, amber 100–299 ms, grey otherwise), hidden
-        when the profile has no result for it. Mirrors Home's row
-        badges; a 0 ms value is not a measurement (see the
-        VpnProfile migration guard). Returns true when the badge
-        shows a result. Minab Beta v0.9.6.4 (fix #1) — an empty
-        badge is INVISIBLE, not GONE, so the column keeps its
-        place and the other badge never slides into it. */
     private fun setConfigBadge(badge: TextView, ms: Long, result: String): Boolean {
         if (ms > 0) {
             badge.visibility = View.VISIBLE
@@ -677,8 +459,6 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         }
     }
 
-    /** Open the server editor for this config (fix #6: the pencil
-        on the row). The list refreshes on resume after editing. */
     private fun editVPN(profile: VpnProfile) {
         val intent = Intent(requireContext(), VPNPreferences::class.java)
             .putExtra(
@@ -688,109 +468,7 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         startActivity(intent)
     }
 
-    /** Minab Beta v0.9 — grow the ListView to its full content
-        height, so the whole Configs page scrolls as one (like Home).
-        Same proven pattern as Home's expandListView: measure each
-        row off the view tree, add the dividers, set the total
-        height. Null-safe on the fragment view; one bad row falls
-        back to a standard height instead of crashing. */
-    private fun expandListView() {
-        if (!isAdded || view == null) return
-        val list = try { listView } catch (e: IllegalStateException) { return }
-        val adapter = mArrayadapter ?: return
-        if (adapter.count == 0) {
-            lastExpandSignature = null
-            lastExpandWidth = 0
-            lastExpandHeight = 0
-            list.layoutParams.height = 0
-            list.requestLayout()
-            return
-        }
-        // Minab Beta v0.9.3 — measure with the ListView's TRUE
-        // width (same fix as Home): a guessed width wrapped long
-        // names differently than the real layout, so two-line names
-        // came out shorter than laid out and their subtitle was cut
-        // off at the row's bottom edge. If the width is not known
-        // yet, wait for the layout pass instead of guessing.
-        val width = list.width
-        if (width <= 0) {
-            view?.post { expandListView() }
-            return
-        }
-        // Minab Beta v0.9.3 — cached: the same rows at the same
-        // width have the same height. Re-measuring every row on
-        // every refresh was the main per-switch cost.
-        val signature = adapterSignature()
-        if (signature != null && signature == lastExpandSignature && width == lastExpandWidth) {
-            if (list.layoutParams.height != lastExpandHeight) {
-                list.layoutParams.height = lastExpandHeight
-                list.requestLayout()
-            }
-            return
-        }
-        val widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
-        val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        var totalHeight = 0
-        for (i in 0 until adapter.count) {
-            try {
-                // Minab Beta v0.9.3 — a FRESH view per row: the
-                // recycled convertView carried the previous row's
-                // measured state (badges shown/hidden), which made
-                // two-line names measure shorter than they lay out.
-                // Measuring is now cached, so this runs rarely.
-                val item = adapter.getView(i, null, list)
-                item.measure(widthSpec, heightSpec)
-                totalHeight += item.measuredHeight
-            } catch (e: Exception) {
-                // One bad row must not crash the app; assume the
-                // standard two-line row height for it.
-                totalHeight += dp(64)
-            }
-        }
-        totalHeight += list.dividerHeight * (adapter.count - 1)
-        // A few px of slack for rounding (one row's text metrics).
-        totalHeight += dp(4)
-        lastExpandSignature = signature
-        lastExpandWidth = width
-        lastExpandHeight = totalHeight
-        val params = list.layoutParams
-        params.height = totalHeight
-        list.layoutParams = params
-    }
-
-    /** Signature of the rows the adapter is currently showing (same
-        shape as listSignature, read from the adapter so the expand
-        cache stays valid across refreshes). Null when the adapter
-        is not ready. */
-    private fun adapterSignature(): String? {
-        val adapter = mArrayadapter ?: return null
-        val favorites = try {
-            MinabFavorites.getAll(requireContext())
-        } catch (e: Exception) {
-            emptySet<String>()
-        }
-        val sb = StringBuilder()
-        sb.append(adapter.count)
-        for (i in 0 until adapter.count) {
-            val p = try {
-                adapter.getItem(i)
-            } catch (e: Exception) {
-                null
-            } ?: continue
-            sb.append('|').append(p.getUUIDString())
-                .append(',').append(p.mVersion)
-                .append(',').append(p.mLastPingMs)
-                .append(',').append(p.mLastPingResult)
-                .append(',').append(p.mLastRealMs)
-                .append(',').append(p.mLastRealResult)
-                .append(',').append(favorites.contains(p.getUUIDString()))
-                .append(',').append(p.mName ?: "")
-                .append(',').append(p.getCategory() ?: "")
-        }
-        return sb.toString()
-    }
-
-    // --- Minab v0.5: selection (delete / share) ---
+    // --- Selection (delete / copy / move / share) ---
 
     private fun selectedProfiles(): List<VpnProfile> {
         val all = ProfileManager.getInstance(requireContext()).getProfiles().toList()
@@ -800,28 +478,26 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
     private fun toggleSelection(profile: VpnProfile) {
         val uuid = profile.getUUIDString()
         if (!selectedUuids.remove(uuid)) selectedUuids.add(uuid)
-        mArrayadapter?.notifyDataSetChanged()
+        lastListSignature = null
+        configsAdapter?.notifyRowsUpdated()
         updateSelectionBar()
     }
 
     private fun clearSelection() {
         if (selectedUuids.isEmpty()) return
         selectedUuids.clear()
-        mArrayadapter?.notifyDataSetChanged()
+        lastListSignature = null
+        configsAdapter?.notifyRowsUpdated()
         updateSelectionBar()
     }
 
-    /** Show the Delete/Share row while something is ticked, and
-        keep the Share button's label truthful about its scope. */
     private fun updateSelectionBar() {
         if (!isAdded) return
         val count = selectedUuids.size
         selectionRow?.visibility = if (count > 0) View.VISIBLE else View.GONE
-        val shareSelected = view?.findViewById<Button>(R.id.minab_configs_share_selected)
-        // Minab Beta v0.9 — the short label ("Share (3)") fits on
-        // one line; the old label ("Share selected (3)") wrapped to
-        // two lines and the second line was clipped (v0.8 screenshot).
-        if (count > 0) shareSelected?.text = getString(R.string.minab_share_selected_short, count)
+        if (count > 0) {
+            shareSelectedButton?.text = getString(R.string.minab_share_selected_short, count)
+        }
         shareButton?.text = when {
             count > 0 -> getString(R.string.minab_share_selected_short, count)
             selectedCategory != null -> getString(R.string.minab_share_group)
@@ -854,11 +530,6 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
             .show()
     }
 
-    // --- Minab v0.8: copy / move the ticked configs to a group ---
-
-    /** Pick a target group, then copy or move the ticked configs
-        there. The picker is the same list as "Assign category"
-        (all groups + "New group"). */
     private fun showCopyMoveDialog(isCopy: Boolean) {
         val count = selectedUuids.size
         if (count == 0) return
@@ -877,11 +548,6 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
             .show()
     }
 
-    /** Copy duplicates each profile (new UUID, same name) into the
-        target group and keeps the original; Move just changes the
-        group of the selected profiles. New profiles are added the
-        same way bulk import does (addProfile + saveProfile +
-        saveProfileList). */
     private fun copyMoveSelected(target: String, isCopy: Boolean) {
         val context = requireContext()
         val pm = ProfileManager.getInstance(context)
@@ -914,19 +580,11 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         refreshList()
     }
 
-    // --- Minab v0.5: share configs as one zip ---
+    // --- Share configs as zip ---
 
-    /** Share button scope: the ticked configs, else the current
-        group, else every config. */
     private fun shareCurrentScope() {
         val context = requireContext()
-        val profiles = when {
-            selectedUuids.isNotEmpty() -> selectedProfiles()
-            // Minab Beta v0.9.1 — visibleProfiles() handles the
-            // favorites tab too (fix #7); filtering by category
-            // here would match nothing on that tab.
-            else -> visibleProfiles()
-        }
+        val profiles = if (selectedUuids.isNotEmpty()) selectedProfiles() else visibleProfiles()
         if (profiles.isEmpty()) {
             Toast.makeText(context, R.string.minab_backup_none, Toast.LENGTH_SHORT).show()
             return
@@ -934,25 +592,21 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         shareProfiles(profiles)
     }
 
-    /** Write the profiles as .ovpn files into one zip in the cache
-        dir, then hand it to the Android share sheet. The zip goes
-        through the app FileProvider (see FileProvider.java: .zip
-        files in the cache dir are served), so no storage permission
-        is needed. */
     private fun shareProfiles(profiles: List<VpnProfile>) {
         if (profiles.isEmpty()) return
         val context = requireContext()
         Toast.makeText(context, R.string.minab_share_creating, Toast.LENGTH_SHORT).show()
-        Thread {
+        val appCtx = context.applicationContext
+        BACKGROUND_EXECUTOR.execute {
             var count = 0
             var file: File? = null
             try {
-                file = File(context.cacheDir, "minab-share-" + System.currentTimeMillis() + ".zip")
+                file = File(appCtx.cacheDir, "minab-share-" + System.currentTimeMillis() + ".zip")
                 FileOutputStream(file).use { out ->
-                    count = writeProfilesZip(context, profiles, out)
+                    count = writeProfilesZip(appCtx, profiles, out)
                 }
                 if (count == 0) file = null
-            } catch (ignored: Exception) {
+            } catch (_: Exception) {
                 file = null
             }
             val outFile = file
@@ -980,26 +634,15 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
                     clearSelection()
                 }
             }
-        }.start()
+        }
     }
 
-    /** Plain .ovpn-only zip, exactly as before (the Share flow uses
-        it). Now delegated to MinabBackup so there is one writer. */
     private fun writeProfilesZip(
         context: Context,
         profiles: List<VpnProfile>,
         out: OutputStream
     ): Int = MinabBackup.writeProfilesZip(context, profiles, out)
 
-    /** The group tabs: favorites + All + one tab per group +
-        Manage + a "+" tab, and a pencil tab to reorder the groups.
-        Minab Beta v0.9.1 (fixes #7, #8): the favorites tab is
-        FIRST (gold star + "favorites"), "manage categories" is
-        second-to-last (right before "+") — Configs had no Manage
-        tab before — and the pencil opens the reorder dialog (the
-        custom order is saved in CategoryStore). The bar is only
-        rebuilt when its signature (selected tab + group order)
-        changed (fix #4). */
     private fun rebuildChips() {
         val container = chipsContainer ?: return
         val context = requireContext()
@@ -1008,136 +651,123 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         if (signature == chipsSignature && container.childCount > 0) return
         chipsSignature = signature
         container.removeAllViews()
-        // Favorites first (fix #7): gold star + "favorites".
         addFavoritesTab(container)
-        // "all" + country groups in the saved order +
-        // "Uncategorized" last (the catch-all, not a country).
         val tabs = mutableListOf<String?>(null)
         tabs.addAll(ordered.filter { it != CategoryStore.DEFAULT_CATEGORY })
         tabs.add(CategoryStore.DEFAULT_CATEGORY)
         for (category in tabs) {
-            // v0.5: the first tab reads just "all", like Home.
             val label = category ?: getString(R.string.minab_all_tab)
             val selected = category == selectedCategory
-            val chip = TextView(context)
-            chip.text = label
-            chip.textSize = 11f
-            chip.setTextColor(
-                resources.getColor(
-                    if (selected) R.color.minab_teal_dark else R.color.minab_chip_text,
-                    context.theme
+            val chip = TextView(context).apply {
+                text = label
+                textSize = 11f
+                setTextColor(
+                    ContextCompat.getColor(
+                        context,
+                        if (selected) R.color.minab_teal_dark else R.color.minab_chip_text
+                    )
                 )
-            )
-            chip.setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
-            chip.setBackgroundResource(
-                if (selected) R.drawable.minab_chip_bg_selected
-                else R.drawable.minab_chip_bg
-            )
-            chip.setPadding(dp(10), dp(5), dp(10), dp(5))
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            params.marginEnd = dp(6)
-            chip.layoutParams = params
-            chip.setOnClickListener {
-                selectedCategory = category
-                refreshList()
+                setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+                setBackgroundResource(
+                    if (selected) R.drawable.minab_chip_bg_selected else R.drawable.minab_chip_bg
+                )
+                setPadding(dp(10), dp(5), dp(10), dp(5))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = dp(6) }
+                setOnClickListener {
+                    selectedCategory = category
+                    refreshList()
+                }
             }
             container.addView(chip)
         }
-        // Manage second-to-last (fix #8), right before "+".
-        val manage = TextView(context)
-        manage.text = getString(R.string.minab_manage_categories)
-        manage.textSize = 11f
-        manage.setTextColor(resources.getColor(R.color.minab_teal, context.theme))
-        manage.setBackgroundResource(R.drawable.minab_chip_bg)
-        manage.setPadding(dp(10), dp(5), dp(10), dp(5))
-        val manageParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        manageParams.marginEnd = dp(6)
-        manage.layoutParams = manageParams
-        manage.setOnClickListener { showManageCategoriesDialog() }
+
+        val manage = TextView(context).apply {
+            text = getString(R.string.minab_manage_categories)
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(context, R.color.minab_teal))
+            setBackgroundResource(R.drawable.minab_chip_bg)
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
+            setOnClickListener { showManageCategoriesDialog() }
+        }
         container.addView(manage)
-        val add = TextView(context)
-        add.text = "+ " + getString(R.string.minab_new_group)
-        add.textSize = 11f
-        add.setTextColor(resources.getColor(R.color.minab_teal, context.theme))
-        add.setBackgroundResource(R.drawable.minab_chip_bg)
-        add.setPadding(dp(10), dp(5), dp(10), dp(5))
-        val addParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        addParams.marginEnd = dp(6)
-        add.layoutParams = addParams
-        add.setOnClickListener { showNewCategoryDialog { refreshList() } }
+
+        val add = TextView(context).apply {
+            text = "+ " + getString(R.string.minab_new_group)
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(context, R.color.minab_teal))
+            setBackgroundResource(R.drawable.minab_chip_bg)
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
+            setOnClickListener { showNewCategoryDialog { refreshList() } }
+        }
         container.addView(add)
-        // Reorder pencil (fix #8): opens the group-order dialog.
-        val reorder = ImageView(context)
-        reorder.setImageResource(R.drawable.ic_edit)
-        reorder.setColorFilter(resources.getColor(R.color.minab_teal, context.theme))
-        reorder.setBackgroundResource(R.drawable.minab_chip_bg)
-        reorder.setPadding(dp(8), dp(5), dp(8), dp(5))
-        reorder.contentDescription = getString(R.string.minab_reorder_groups)
-        val reorderParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        reorderParams.marginEnd = dp(6)
-        reorder.layoutParams = reorderParams
-        reorder.setOnClickListener {
-            MinabCategoryReorder.show(context) {
-                chipsSignature = null
-                rebuildChips()
-                refreshList()
+
+        val reorder = ImageView(context).apply {
+            setImageResource(R.drawable.ic_edit)
+            setColorFilter(ContextCompat.getColor(context, R.color.minab_teal))
+            setBackgroundResource(R.drawable.minab_chip_bg)
+            setPadding(dp(8), dp(5), dp(8), dp(5))
+            contentDescription = getString(R.string.minab_reorder_groups)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
+            setOnClickListener {
+                MinabCategoryReorder.show(context) {
+                    chipsSignature = null
+                    rebuildChips()
+                    refreshList()
+                }
             }
         }
         container.addView(reorder)
-        // Trailing peek spacer (see Home): the fade shows the bar scrolls.
+
         val peek = View(context)
         peek.layoutParams = LinearLayout.LayoutParams(dp(20), dp(1))
         container.addView(peek)
     }
 
-    /** The favorites tab (fix #7): FIRST, before "all". A gold star
-        (minab_star_on is amber) + "favorites". Tapping it shows the
-        starred servers — they stay in their country groups too. */
     private fun addFavoritesTab(container: LinearLayout) {
         val context = requireContext()
         val selected = selectedCategory == CategoryStore.FAVORITES_TAB
-        val tab = LinearLayout(context)
-        tab.orientation = LinearLayout.HORIZONTAL
-        tab.gravity = android.view.Gravity.CENTER_VERTICAL
-        tab.setBackgroundResource(
-            if (selected) R.drawable.minab_chip_bg_selected
-            else R.drawable.minab_chip_bg
-        )
-        tab.setPadding(dp(10), dp(5), dp(10), dp(5))
-        val tabParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        tabParams.marginEnd = dp(6)
-        tab.layoutParams = tabParams
-        val star = ImageView(context)
-        star.setImageResource(R.drawable.minab_star_on)
-        val starParams = LinearLayout.LayoutParams(dp(14), dp(14))
-        starParams.marginEnd = dp(4)
-        star.layoutParams = starParams
-        tab.addView(star)
-        val label = TextView(context)
-        label.text = getString(R.string.minab_favorites_tab)
-        label.textSize = 11f
-        label.setTextColor(
-            resources.getColor(
-                if (selected) R.color.minab_teal_dark else R.color.minab_chip_text,
-                context.theme
+        val tab = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(
+                if (selected) R.drawable.minab_chip_bg_selected else R.drawable.minab_chip_bg
             )
-        )
-        label.setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
+        }
+        val star = ImageView(context).apply {
+            setImageResource(R.drawable.minab_star_on)
+            layoutParams = LinearLayout.LayoutParams(dp(14), dp(14)).apply { marginEnd = dp(4) }
+        }
+        tab.addView(star)
+        val label = TextView(context).apply {
+            text = getString(R.string.minab_favorites_tab)
+            textSize = 11f
+            setTextColor(
+                ContextCompat.getColor(
+                    context,
+                    if (selected) R.color.minab_teal_dark else R.color.minab_chip_text
+                )
+            )
+            setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+        }
         tab.addView(label)
         tab.setOnClickListener {
             selectedCategory = CategoryStore.FAVORITES_TAB
@@ -1149,8 +779,6 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         container.addView(tab)
     }
 
-    /** Rename / delete a group (the Manage tab, fix #8). Mirrors
-        Home's dialog; the list refreshes after every change. */
     private fun showManageCategoriesDialog() {
         val categories = CategoryStore.getOrderedCategories(requireContext())
             .filter { it != CategoryStore.DEFAULT_CATEGORY }
@@ -1205,10 +833,8 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
             .show()
     }
 
-    override fun onListItemClick(l: ListView, v: View, position: Int, id: Long) {
-        val profile = mArrayadapter?.getItem(position) ?: return
+    private fun onConfigRowClick(profile: VpnProfile) {
         if (selectedUuids.isNotEmpty()) {
-            // Selection mode: tapping toggles instead of opening the dialog.
             toggleSelection(profile)
         } else {
             showConfigActionsDialog(profile)
@@ -1278,12 +904,8 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         }
     }
 
-    /** group == null means "all profiles". */
     private fun showCredentialsDialog(group: String?) {
-        // Minab Beta v0.9.1 — the favorites tab is not a real group
-        // (fix #7): "Set for this group" there means all configs.
-        val effectiveGroup =
-            if (group == CategoryStore.FAVORITES_TAB) null else group
+        val effectiveGroup = if (group == CategoryStore.FAVORITES_TAB) null else group
         val title = if (effectiveGroup == null) getString(R.string.minab_credentials_for_all)
         else getString(R.string.minab_credentials_for_group) + " — " + effectiveGroup
         AlertDialog.Builder(requireContext())
@@ -1397,17 +1019,14 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
                         if (result.status == PingTester.Status.OK) result.ms else -1
                     result.profile.mLastPingTime = result.timestampMs
                     result.profile.mLastPingResult = result.displayText()
-                    // Minab Beta v0.9.6.4 (fix #6) — disk save off
-                    // the UI thread; a single row only needs a
-                    // re-bind, not the full refreshList rebuild.
                     val profileToSave = result.profile
-                    val saveContext = requireContext()
-                    Thread {
+                    val saveContext = requireContext().applicationContext
+                    BACKGROUND_EXECUTOR.execute {
                         try {
                             ProfileManager.saveProfile(saveContext, profileToSave)
                         } catch (_: Exception) {
                         }
-                    }.start()
+                    }
                     requestListRefresh()
                 }
             }
@@ -1421,11 +1040,8 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         })
     }
 
-    // --- Minab v0.6: the two server tests ---
+    // --- Two server tests ---
 
-    /** Configs currently shown (same filter as the list): the whole
-        list, one group when a group tab is selected, or the starred
-        servers on the favorites tab (fix #7). */
     private fun visibleProfiles(): List<VpnProfile> {
         val all = ProfileManager.getInstance(requireContext()).getProfiles().toList()
         val wanted = selectedCategory
@@ -1439,11 +1055,27 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         }
     }
 
-    /** Fast parallel ping over the visible configs. Ping tests are
-        independent: they do not touch the tunnel, so they are not
-        blocked by a real test running on Home. Within this tab the
-        two tests share one progress row, so starting one cancels
-        the other (same as Home). */
+    private fun clearTestResultsAsync(profiles: List<VpnProfile>) {
+        for (profile in profiles) {
+            profile.mLastPingMs = -1
+            profile.mLastPingTime = 0
+            profile.mLastPingResult = ""
+            profile.mLastRealMs = -1
+            profile.mLastRealTime = 0
+            profile.mLastRealResult = ""
+        }
+        val appCtx = requireContext().applicationContext
+        val snapshot = profiles.toList()
+        BACKGROUND_EXECUTOR.execute {
+            for (profile in snapshot) {
+                try {
+                    ProfileManager.saveProfile(appCtx, profile)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
     private fun startPingTest(profiles: List<VpnProfile>) {
         if (profiles.isEmpty()) {
             Toast.makeText(requireContext(), R.string.minab_no_profiles_in_category, Toast.LENGTH_SHORT).show()
@@ -1451,17 +1083,9 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         }
         cancelRealTest()
         cancelPingTest()
-        // Minab Beta v0.9.6.2 (fix #2) — clear ALL old ping
-        // results FIRST (same as Home): every badge goes back to
-        // blank until its server's new result arrives.
-        // Minab Beta v0.9.6.3 (fix #3) — clear the real-test column
-        // too, and stop any real test running on the other tab (see
-        // RealTester.cancelCurrent): a run starts from blank columns,
-        // so an old real-test result can never sit next to fresh ping
-        // values and read as if the ping test had written it there.
         RealTester.cancelCurrent()
-        clearPingResults(profiles)
-        clearRealResults(profiles)
+        clearTestResultsAsync(profiles)
+        lastListSignature = null
         refreshList()
         if (VpnStatus.isVPNActive()) {
             Toast.makeText(requireContext(), R.string.minab_ping_while_vpn, Toast.LENGTH_LONG).show()
@@ -1470,215 +1094,123 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         pingTester = tester
         pingDoneCount = 0
         pingTotalCount = profiles.size
+        pingOkCount = 0
+        pingLatestName = null
+        MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.CONFIGS_PING, true)
         updateTestPingStatus()
         tester.testAll(profiles, object : PingTester.PingListener {
             override fun onResult(result: PingTester.Result) {
                 activity?.runOnUiThread {
-                    if (!isAdded) return@runOnUiThread
-                    result.profile.mLastPingMs =
-                        if (result.status == PingTester.Status.OK) result.ms else -1
+                    if (!isAdded || pingTester !== tester) return@runOnUiThread
+                    val ok = result.status == PingTester.Status.OK
+                    result.profile.mLastPingMs = if (ok) result.ms else -1
                     result.profile.mLastPingTime = result.timestampMs
                     result.profile.mLastPingResult = result.displayText()
-                    // Minab Beta v0.9.6.4 (fix #6) — disk save off
-                    // the UI thread, refresh coalesced (same as
-                    // Home's recordPingResult).
                     val profileToSave = result.profile
-                    val saveContext = requireContext()
-                    Thread {
+                    val saveContext = requireContext().applicationContext
+                    BACKGROUND_EXECUTOR.execute {
                         try {
                             ProfileManager.saveProfile(saveContext, profileToSave)
                         } catch (_: Exception) {
                         }
-                    }.start()
+                    }
                     pingDoneCount++
+                    if (ok) pingOkCount++
+                    pingLatestName = result.profile.mName
                     updateTestPingStatus()
-                    // Minab Beta v0.9.6.2 (fix #5) — re-sort live
-                    // as results arrive when the list is
-                    // ping-sorted (same as Home).
                     if (sortMode == SORT_PING) resortConfigsAdapter()
                     else requestListRefresh()
-                    // Minab Beta v0.9.6.5 (fix #2) — the flag from
-                    // the IP (same as Home's recordPingResult).
                     maybeDetectCountryFromIp(result)
                 }
             }
 
             override fun onFinished(cancelled: Boolean) {
                 activity?.runOnUiThread {
+                    if (pingTester === tester) {
+                        pingTester = null
+                    }
+                    MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.CONFIGS_PING, false)
                     if (!isAdded) return@runOnUiThread
-                    pingTester = null
                     if (cancelled) {
                         Toast.makeText(requireContext(), R.string.minab_ping_cancelled, Toast.LENGTH_SHORT).show()
-                        testProgressRow?.visibility = View.GONE
+                        testProgressPanel?.hide()
                     } else {
-                        // Minab Beta v0.9.6.2 (fix #5) — after a
-                        // ping test the list is sorted by ping
-                        // (lowest first within each group), like
-                        // Home. Keep the progress row as a "done"
-                        // line, same as Home.
                         setSortMode(SORT_PING)
+                        lastListSignature = null
                         refreshList()
                         Toast.makeText(requireContext(), R.string.minab_ping_done, Toast.LENGTH_SHORT).show()
-                        testProgressRow?.visibility = View.VISIBLE
-                        testProgressBar?.progress = 100
-                        testCancelButton?.visibility = View.GONE
-                        testStatusView?.text = getString(R.string.minab_sort_by_ping)
+                        testProgressPanel?.showFinished(
+                            isReal = false,
+                            summaryText = getString(R.string.minab_sort_by_ping),
+                            tested = pingDoneCount,
+                            total = pingTotalCount,
+                            found = pingOkCount
+                        )
                     }
                 }
             }
         })
     }
 
-    /** Minab Beta v0.9.6.5 (fix #2) — the flag from the IP: when a
-        ping result arrives and the row still shows the globe (no
-        country in the name, host or group), ask what country the
-        IP the ping resolved to is in — once per profile, cached 30
-        days by AutoCategory — and store it, so the flag appears
-        on the next re-bind. Runs off the UI thread; never blocks
-        the test. Same as Home's recordPingResult. */
     private fun maybeDetectCountryFromIp(result: PingTester.Result) {
         val ip = result.resolvedIp ?: return
         val profile = result.profile
-        val ctx = context ?: return
+        val ctx = context?.applicationContext ?: return
         if (MinabServerCountry.get(ctx, profile.getUUIDString()) != null) return
         if (FlagHelper.flagResForProfile(profile) != R.drawable.minab_flag_globe) return
-        Thread {
+        BACKGROUND_EXECUTOR.execute {
             try {
-                val code = AutoCategory.countryCodeForIp(ctx, ip) ?: return@Thread
+                val code = AutoCategory.countryCodeForIp(ctx, ip) ?: return@execute
                 MinabServerCountry.put(ctx, profile.getUUIDString(), code)
                 activity?.runOnUiThread {
                     if (isAdded) requestListRefresh()
                 }
             } catch (_: Exception) {
             }
-        }.start()
-    }
-
-    /** Minab Beta v0.9.6.2 (fix #2) — wipe the stored ping result
-        of every profile in the run (ms, time and text), so the
-        badges go blank until the new results arrive. A save that
-        fails must not stop the test. */
-    private fun clearPingResults(profiles: List<VpnProfile>) {
-        for (profile in profiles) {
-            profile.mLastPingMs = -1
-            profile.mLastPingTime = 0
-            profile.mLastPingResult = ""
-            try {
-                ProfileManager.saveProfile(requireContext(), profile)
-            } catch (e: Exception) {
-                // Saving must not stop the ping test.
-            }
         }
     }
 
-    /** Minab Beta v0.9.6.3 (fixes #3, #4) — wipe the stored
-        real-test result of every profile in the run (ms, time and
-        text). Same rule as clearPingResults, same reason: a run
-        starts from blank columns, so an old real-test result can
-        never sit next to fresh ping values and read as if the ping
-        test had written it there. A save that fails must not stop
-        the test. */
-    private fun clearRealResults(profiles: List<VpnProfile>) {
-        for (profile in profiles) {
-            profile.mLastRealMs = -1
-            profile.mLastRealTime = 0
-            profile.mLastRealResult = ""
-            try {
-                ProfileManager.saveProfile(requireContext(), profile)
-            } catch (e: Exception) {
-                // Saving must not stop the test.
-            }
-        }
-    }
-
-    /** Minab Beta v0.9.6.3 (fix #6) — green halo around the test
-        progress row while a real test runs, so the running test
-        stands out (the ping test keeps the plain row). */
-    private fun setRealTestHalo(on: Boolean) {
-        val row = testProgressRow ?: return
-        if (on) {
-            row.setBackgroundResource(R.drawable.minab_halo_green)
-            row.setPadding(dp(8), dp(6), dp(8), dp(6))
-        } else {
-            row.background = null
-            row.setPadding(0, 0, 0, 0)
-        }
-    }
-
-    /** Minab Beta v0.9.6.3 (fix #6) — stop the per-server countdown
-        ticker (finish, cancel, or a new run starting). */
     private fun stopRealCountdown() {
         realCountdownHandler.removeCallbacks(realCountdownRunnable)
         realCountdownSeconds = 0
         realCountdownName = null
     }
 
-    /** Minab Beta v0.9.6.3 (fix #6) — re-render the real-test status
-        line with the current countdown (called by the ticker; the
-        last onRealProgress values are kept in the fields below). */
-    private var realCountdownDone: Int = 0
-    private var realCountdownTotal: Int = 0
-    private var realCountdownWorking: Int = 0
     private fun updateRealCountdownLine() {
         if (!realTestActive) return
-        // Minab Beta v0.9.6.4 (fix #3) — total time left for the
-        // whole run, same as Home: the current server's remaining
-        // seconds plus one wait per server still to test.
         val waitSeconds = try {
             MinabRealTestSettings.getWaitSeconds(requireContext())
         } catch (_: Exception) {
             12
         }
-        val serversAfterCurrent =
-            (realCountdownTotal - realCountdownDone - 1).coerceAtLeast(0)
-        val totalSecondsLeft =
-            realCountdownSeconds + serversAfterCurrent * waitSeconds
-        testStatusView?.text = if (totalSecondsLeft > 0) {
-            getString(
-                R.string.minab_real_running_countdown,
-                realCountdownDone, realCountdownTotal,
-                realCountdownName ?: "", realCountdownWorking,
-                totalSecondsLeft
-            )
-        } else {
-            getString(
-                R.string.minab_real_running,
-                realCountdownDone, realCountdownTotal,
-                realCountdownName ?: "", realCountdownWorking
-            )
-        }
+        val serversAfterCurrent = (realCountdownTotal - realCountdownDone - 1).coerceAtLeast(0)
+        val totalSecondsLeft = realCountdownSeconds + serversAfterCurrent * waitSeconds
+        testProgressPanel?.showRealProgress(
+            done = realCountdownDone,
+            total = realCountdownTotal,
+            working = realCountdownWorking,
+            targetWorking = realTargetWorking,
+            currentName = realCountdownName,
+            totalSecondsLeft = totalSecondsLeft
+        )
     }
 
     private fun updateTestPingStatus() {
-        val row = testProgressRow ?: return
-        // Minab Beta v0.9.6.3 (fix #6) — the ping test keeps the
-        // plain row; the green halo is for the real test only.
-        setRealTestHalo(false)
+        val panel = testProgressPanel ?: return
         if (pingTester == null) {
-            row.visibility = View.GONE
+            panel.hide()
             return
         }
-        row.visibility = View.VISIBLE
-        testCancelButton?.visibility = View.VISIBLE
-        testProgressBar?.progress =
-            if (pingTotalCount > 0) pingDoneCount * 100 / pingTotalCount else 0
-        testStatusView?.text = getString(R.string.minab_ping_running, pingTotalCount, pingDoneCount)
+        panel.showPingProgress(pingDoneCount, pingTotalCount, pingOkCount, pingLatestName)
     }
 
     private fun cancelPingTest() {
         pingTester?.cancel()
         pingTester = null
-        if (!realTestActive) testProgressRow?.visibility = View.GONE
+        MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.CONFIGS_PING, false)
+        if (!realTestActive) testProgressPanel?.hide()
     }
 
-    /** Real test: the same two-stage run as Home (ping first when
-        stale, then connect each server in ranked order and fetch
-        Telegram Web through it, stopping after the setting's
-        number of healthy servers have passed — v0.9.6.2 fix #4:
-        the number counts successes, not candidates). The wait per
-        server and the target come from MinabRealTestSettings; the
-        runner is shared, so a real test running on Home blocks
-        starting one here (and vice versa). */
     private fun startRealTest(profiles: List<VpnProfile>) {
         if (profiles.isEmpty()) {
             Toast.makeText(requireContext(), R.string.minab_no_profiles_in_category, Toast.LENGTH_SHORT).show()
@@ -1686,97 +1218,90 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         }
         cancelPingTest()
         cancelRealTest()
-        // Minab Beta v0.9.6.1 (fix #11) — reset before the run:
-        // when the settings leave no server to test, onRealProgress
-        // never fires, so onFinished must see the fresh 0 here,
-        // not a previous run's total.
         realTotalCount = 0
+        realCountdownDone = 0
+        realCountdownTotal = 0
+        realCountdownWorking = 0
+        realPingPhaseActive = true
+        realPingOkCount = 0
+        realTargetWorking = MinabRealTestSettings.getMaxServers(requireContext())
         realTestRunId++
         val runId = realTestRunId
-        // Minab Beta v0.9.6.3 (fix #4) — the run starts from blank
-        // columns: clear the old results from BOTH the ping and the
-        // real-test column first, so the new results replace them
-        // instead of mixing with them. Also stop any real test
-        // running on the other tab (fix #3).
+
         RealTester.cancelCurrent()
-        clearPingResults(profiles)
-        clearRealResults(profiles)
+        clearTestResultsAsync(profiles)
+        lastListSignature = null
         refreshList()
+
         val tester = RealTester(
             requireContext().applicationContext,
             MinabRealTestSettings.getWaitTimeoutMs(requireContext()),
-            MinabRealTestSettings.getMaxServers(requireContext()),
+            realTargetWorking,
             object : RealTester.Listener {
                 override fun onPingProgress(done: Int, total: Int) {
                     if (!isAdded || runId != realTestRunId) return
+                    realPingPhaseActive = true
                     pingDoneCount = done
                     pingTotalCount = total
-                    testProgressRow?.visibility = View.VISIBLE
-                    testCancelButton?.visibility = View.VISIBLE
-                    testProgressBar?.progress =
-                        if (total > 0) done * 100 / total else 0
-                    testStatusView?.text =
-                        getString(R.string.minab_ping_running, total, done)
+                    testProgressPanel?.showRealPingPhase(done, total, realPingOkCount)
                 }
 
                 override fun onRealProgress(
                     done: Int, total: Int, currentName: String?, working: Int
                 ) {
                     if (!isAdded || runId != realTestRunId) return
+                    realPingPhaseActive = false
                     realTotalCount = total
                     realCountdownDone = done
                     realCountdownTotal = total
                     realCountdownWorking = working
-                    // Minab Beta v0.9.6.3 (fix #6) — a new server
-                    // under test restarts the per-server countdown
-                    // (the wait from the real-test settings); when
-                    // the run ends the name is null and the ticker
-                    // stops.
                     if (currentName == null) {
                         stopRealCountdown()
                     } else if (currentName != realCountdownName) {
                         realCountdownName = currentName
-                        realCountdownSeconds =
-                            MinabRealTestSettings.getWaitSeconds(requireContext())
+                        realCountdownSeconds = MinabRealTestSettings.getWaitSeconds(requireContext())
                         realCountdownHandler.removeCallbacks(realCountdownRunnable)
                         realCountdownHandler.postDelayed(realCountdownRunnable, 1000)
                     }
-                    testProgressRow?.visibility = View.VISIBLE
-                    setRealTestHalo(true)
-                    testCancelButton?.visibility = View.VISIBLE
-                    testProgressBar?.progress =
-                        if (total > 0) done * 100 / total else 0
                     updateRealCountdownLine()
                 }
 
                 override fun onProfileResult(profile: VpnProfile) {
                     if (!isAdded || runId != realTestRunId) return
-                    // Minab Beta v0.9.6.4 (fix #6) — the full
-                    // refreshList rebuild (chips + re-measuring
-                    // every row) on EVERY result was the worst of
-                    // the lag: a coalesced re-bind is enough
-                    // while the run is going; onFinished still
-                    // does the full refresh once.
+                    if (realPingPhaseActive && profile.mLastPingMs > 0) {
+                        realPingOkCount++
+                        testProgressPanel?.showRealPingPhase(pingDoneCount, pingTotalCount, realPingOkCount)
+                    }
                     requestListRefresh()
                 }
 
                 override fun onFinished(cancelled: Boolean, working: Int) {
-                    if (!isAdded || runId != realTestRunId) return
+                    if (runId != realTestRunId) return
                     realTester = null
                     realTestActive = false
+                    realPingPhaseActive = false
                     stopRealCountdown()
-                    setRealTestHalo(false)
-                    testProgressRow?.visibility = View.GONE
-                    if (cancelled) return
-                    // Minab Beta v0.9.6.1 (fix #11) — the settings
-                    // may have left no server to test: say so
-                    // plainly instead of claiming the test finished.
+                    MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.CONFIGS_REAL, false)
+                    if (!isAdded) return
+                    if (cancelled) {
+                        testProgressPanel?.hide()
+                        return
+                    }
                     if (realTotalCount == 0) {
+                        testProgressPanel?.hide()
                         Toast.makeText(requireContext(), R.string.minab_real_none_to_test, Toast.LENGTH_LONG).show()
                         return
                     }
+                    lastListSignature = null
                     refreshList()
                     Toast.makeText(requireContext(), R.string.minab_real_done, Toast.LENGTH_SHORT).show()
+                    testProgressPanel?.showFinished(
+                        isReal = true,
+                        summaryText = getString(R.string.minab_sort_by_real),
+                        tested = realCountdownDone,
+                        total = realTotalCount,
+                        found = working
+                    )
                 }
 
                 override fun onConnectRequested(profile: VpnProfile) {
@@ -1791,28 +1316,21 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         }
         realTester = tester
         realTestActive = true
-        // Minab Beta v0.9.6.3 (fix #6) — the green halo goes on the
-        // progress row for the whole run (the ping phase included).
-        setRealTestHalo(true)
+        MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.CONFIGS_REAL, true)
+        testProgressPanel?.showRealPingPhase(0, profiles.size, 0)
     }
 
-    /** Stop our real test: the runner drops the VPN under test (if
-        any), stops scheduling further servers, leaves already-
-        recorded results. No toast here — the caller toasts when
-        the cancel is the user's own tap. Safe to call when
-        nothing runs. */
     private fun cancelRealTest() {
         realTestRunId++
         realTester?.cancel()
         realTester = null
         realTestActive = false
+        realPingPhaseActive = false
         stopRealCountdown()
-        setRealTestHalo(false)
-        testProgressRow?.visibility = View.GONE
+        MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.CONFIGS_REAL, false)
+        if (pingTester == null) testProgressPanel?.hide()
     }
 
-    /** Connect a profile — the same LaunchVPN path as Home's
-        startVPN, so the real test can drive it from this tab. */
     private fun startVPN(profile: VpnProfile) {
         ProfileManager.saveProfile(requireContext(), profile)
         val intent = Intent(requireContext(), LaunchVPN::class.java)
@@ -1823,24 +1341,18 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
         startActivity(intent)
     }
 
-    /** Export every profile as a .ovpn file inside one zip. Runs off
-        the UI thread; the result toast is posted back to it. */
     private fun exportBackup(uri: Uri) {
         val context = requireContext().applicationContext
-        Thread {
+        BACKGROUND_EXECUTOR.execute {
             var count = 0
             var ok = false
             try {
                 val profiles = ProfileManager.getInstance(context).getProfiles().toList()
                 context.contentResolver.openOutputStream(uri)?.use { out ->
-                    // Minab Beta v0.9 — this is now a FULL backup:
-                    // the .ovpn files plus a minab-backup.json with
-                    // groups, credentials, favorites and settings,
-                    // so restoring puts everything back exactly.
                     count = MinabBackup.writeFullBackup(context, profiles, out)
                 }
                 ok = count > 0
-            } catch (ignored: Exception) {
+            } catch (_: Exception) {
             }
             val doneCount = count
             val success = ok
@@ -1853,13 +1365,179 @@ class ConfigsFragment : ListFragment(), VpnStatus.StateListener {
                     Toast.LENGTH_LONG
                 ).show()
             }
-        }.start()
+        }
+    }
+
+    // --- Virtualised RecyclerView Adapter ---
+
+    private class StaticViewHolder(view: View) : RecyclerView.ViewHolder(view)
+
+    private class ConfigRowViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val cardWrapper: View = view.findViewById(R.id.minab_config_card_wrapper)
+        val rowContent: View = view.findViewById(R.id.minab_config_row_content)
+        val name: TextView = view.findViewById(R.id.minab_config_name)
+        val subtitle: TextView = view.findViewById(R.id.minab_config_subtitle)
+        val flag: ImageView = view.findViewById(R.id.minab_config_flag)
+        val connecting: ProgressBar = view.findViewById(R.id.minab_config_connecting_spinner)
+        val badges: View = view.findViewById(R.id.minab_config_badges)
+        val pingBadge: TextView = view.findViewById(R.id.minab_config_ping_badge)
+        val realBadge: TextView = view.findViewById(R.id.minab_config_real_badge)
+        val star: ImageView = view.findViewById(R.id.minab_config_star)
+        val edit: ImageView = view.findViewById(R.id.minab_config_edit)
+        val checkBox: CheckBox = view.findViewById(R.id.minab_config_checkbox)
+    }
+
+    private inner class ConfigsRecyclerAdapter(
+        private val header: View,
+        private val empty: View
+    ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+        private var items: List<VpnProfile> = emptyList()
+        private val selectableItemBgResId: Int = run {
+            val tv = TypedValue()
+            if (requireContext().theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)) {
+                tv.resourceId
+            } else 0
+        }
+
+        override fun getItemCount(): Int {
+            return if (items.isEmpty()) 2 else 1 + items.size
+        }
+
+        override fun getItemViewType(position: Int): Int {
+            if (position == 0) return VIEW_TYPE_HEADER
+            return if (items.isEmpty()) VIEW_TYPE_EMPTY else VIEW_TYPE_ITEM
+        }
+
+        fun submitList(newItems: List<VpnProfile>) {
+            val oldEmpty = items.isEmpty()
+            val oldCount = items.size
+            val snapshot = newItems.toList()
+            val newEmpty = snapshot.isEmpty()
+            val newCount = snapshot.size
+            items = snapshot
+
+            val oldTailCount = if (oldEmpty) 1 else oldCount
+            val newTailCount = if (newEmpty) 1 else newCount
+
+            if (oldEmpty != newEmpty) {
+                notifyItemRangeRemoved(1, oldTailCount)
+                notifyItemRangeInserted(1, newTailCount)
+            } else if (!newEmpty) {
+                val common = min(oldTailCount, newTailCount)
+                if (common > 0) notifyItemRangeChanged(1, common)
+                if (newTailCount > oldTailCount) {
+                    notifyItemRangeInserted(1 + oldTailCount, newTailCount - oldTailCount)
+                } else if (oldTailCount > newTailCount) {
+                    notifyItemRangeRemoved(1 + newTailCount, oldTailCount - newTailCount)
+                }
+            }
+        }
+
+        fun notifyRowsUpdated() {
+            if (items.isNotEmpty()) {
+                notifyItemRangeChanged(1, items.size)
+            }
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+            return when (viewType) {
+                VIEW_TYPE_HEADER -> StaticViewHolder(header).apply { setIsRecyclable(false) }
+                VIEW_TYPE_EMPTY -> StaticViewHolder(empty).apply { setIsRecyclable(false) }
+                else -> {
+                    val v = LayoutInflater.from(parent.context)
+                        .inflate(R.layout.minab_config_row, parent, false)
+                    ConfigRowViewHolder(v)
+                }
+            }
+        }
+
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            if (holder !is ConfigRowViewHolder) return
+            val index = position - 1
+            if (index < 0 || index >= items.size) return
+            try {
+                bindConfigRow(holder, items[index], index, items.size)
+            } catch (e: Exception) {
+                android.util.Log.e("ConfigsFragment", "Minab: row bind failed at $index", e)
+            }
+        }
+
+        private fun bindConfigRow(
+            holder: ConfigRowViewHolder,
+            profile: VpnProfile,
+            index: Int,
+            total: Int
+        ) {
+            val ctx = requireContext()
+
+            holder.cardWrapper.setBackgroundResource(
+                when {
+                    total <= 1 -> R.drawable.minab_row_card_single
+                    index == 0 -> R.drawable.minab_row_card_top
+                    index == total - 1 -> R.drawable.minab_row_card_bottom
+                    else -> R.drawable.minab_row_card_middle
+                }
+            )
+
+            holder.name.text = profile.mName ?: ""
+            holder.subtitle.text = "[" + profile.getCategory() + "]"
+            holder.flag.setImageResource(FlagHelper.flagResForProfile(profile, ctx))
+            holder.flag.visibility = View.VISIBLE
+
+            if (MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)) {
+                holder.rowContent.setBackgroundResource(R.drawable.minab_halo_green)
+                holder.connecting.visibility = View.VISIBLE
+            } else {
+                if (selectableItemBgResId != 0) {
+                    holder.rowContent.setBackgroundResource(selectableItemBgResId)
+                } else {
+                    holder.rowContent.setBackgroundColor(Color.TRANSPARENT)
+                }
+                holder.connecting.visibility = View.GONE
+            }
+
+            val pingShown = setConfigBadge(
+                holder.pingBadge, profile.mLastPingMs, profile.mLastPingResult
+            )
+            val realShown = setConfigBadge(
+                holder.realBadge, profile.mLastRealMs, profile.mLastRealResult
+            )
+            holder.badges.visibility = if (pingShown || realShown) View.VISIBLE else View.GONE
+
+            val isFavorite = cachedFavorites.contains(profile.getUUIDString())
+            holder.star.setImageResource(
+                if (isFavorite) R.drawable.minab_star_on else R.drawable.minab_star_off
+            )
+            holder.star.setOnClickListener {
+                MinabFavorites.toggle(ctx, profile.getUUIDString())
+                refreshList()
+            }
+
+            holder.edit.setOnClickListener { editVPN(profile) }
+
+            val checkBox = holder.checkBox
+            checkBox.setOnCheckedChangeListener(null)
+            checkBox.isChecked = selectedUuids.contains(profile.getUUIDString())
+            checkBox.setOnCheckedChangeListener { _, _ -> toggleSelection(profile) }
+
+            holder.rowContent.setOnClickListener { onConfigRowClick(profile) }
+            holder.rowContent.setOnLongClickListener {
+                toggleSelection(profile)
+                true
+            }
+        }
     }
 
     companion object {
-        // Minab Beta v0.9.6.2 (fix #5): Configs sort modes.
         private const val SORT_NONE = 0
         private const val SORT_PING = 1
         private const val PREF_SORT_MODE = "minab_configs_sort_mode"
+
+        private const val VIEW_TYPE_HEADER = 0
+        private const val VIEW_TYPE_ITEM = 1
+        private const val VIEW_TYPE_EMPTY = 2
+
+        private val BACKGROUND_EXECUTOR = Executors.newSingleThreadExecutor()
     }
 }

@@ -23,8 +23,12 @@ package de.blinkt.openvpn.minab
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 object FlagHelper {
+    private val NON_ALPHA_REGEX = Regex("[^a-z]+")
+    private val profileFlagCache = ConcurrentHashMap<String, Int>()
+    private const val MAX_CACHE_SIZE = 1000
     /** Country name (lower-case) or code -> flag drawable. */
     private val byName: Map<String, Int> = mapOf(
         "united states" to R.drawable.flag_us,
@@ -175,16 +179,32 @@ object FlagHelper {
         } catch (e: Exception) {
             null
         }
+        val detectedCode = if (context != null) {
+            MinabServerCountry.get(context, profile.getUUIDString())
+        } else null
+        val category = profile.getCategory()
+        val cacheKey = "${name ?: ""}\u0000${host ?: ""}\u0000${detectedCode ?: ""}\u0000${category ?: ""}"
+        profileFlagCache[cacheKey]?.let { return it }
+
+        val resolved = resolveFlag(name, host, detectedCode, category)
+        if (profileFlagCache.size > MAX_CACHE_SIZE) profileFlagCache.clear()
+        profileFlagCache[cacheKey] = resolved
+        return resolved
+    }
+
+    private fun resolveFlag(
+        name: String?,
+        host: String?,
+        detectedCode: String?,
+        category: String?
+    ): Int {
         flagEmojiCode(name)?.let { byName[it]?.let { res -> return res } }
         flagEmojiCode(host)?.let { byName[it]?.let { res -> return res } }
         scanCountryToken(name)?.let { return it }
         scanCountryToken(host)?.let { return it }
-        if (context != null) {
-            MinabServerCountry.get(context, profile.getUUIDString())?.let { code ->
-                byName[code.lowercase(Locale.US)]?.let { res -> return res }
-            }
+        if (!detectedCode.isNullOrBlank()) {
+            byName[detectedCode.lowercase(Locale.US)]?.let { res -> return res }
         }
-        val category = profile.getCategory()
         if (!category.isNullOrBlank()) {
             val key = category.trim().lowercase(Locale.US)
             if (key != "uncategorized") {
@@ -192,6 +212,10 @@ object FlagHelper {
             }
         }
         return R.drawable.minab_flag_globe
+    }
+
+    private val longCountryNames: List<Pair<String, Int>> by lazy {
+        byName.entries.filter { it.key.length > 2 }.map { it.key to it.value }
     }
 
     /** The 2-letter country code of the first flag emoji in [text], or null. */
@@ -222,11 +246,11 @@ object FlagHelper {
         if (text.isNullOrBlank()) return null
         val lower = text.lowercase(Locale.US)
         // Full country names first (a long name wins over a short code).
-        for ((name, res) in byName) {
-            if (name.length > 2 && lower.contains(name)) return res
+        for ((name, res) in longCountryNames) {
+            if (lower.contains(name)) return res
         }
         // Then 2-letter codes as separate tokens (split on non-letters).
-        for (token in lower.split(Regex("[^a-z]+"))) {
+        for (token in lower.split(NON_ALPHA_REGEX)) {
             if (token.length == 2) {
                 byName[token]?.let { return it }
             }

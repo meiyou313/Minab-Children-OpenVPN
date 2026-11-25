@@ -18,12 +18,20 @@ object MinabFavorites {
     private const val PREFS = "MinabPrefs"
     private const val KEY = "minab_favorites"
 
-    /** UUIDs of the starred profiles (never null). */
+    @Volatile
+    private var cached: Set<String>? = null
+
+    /** UUIDs of the starred profiles (never null). Cached in memory so
+        RecyclerView row binding never touches SharedPreferences per row. */
     @JvmStatic
     fun getAll(context: Context): Set<String> {
+        cached?.let { return it }
         return try {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getStringSet(KEY, emptySet()) ?: emptySet()
+            val loaded = (context.applicationContext
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getStringSet(KEY, emptySet()) ?: emptySet()).toSet()
+            cached = loaded
+            loaded
         } catch (e: Exception) {
             emptySet()
         }
@@ -46,9 +54,11 @@ object MinabFavorites {
             current.add(uuid)
             true
         }
+        val snapshot = current.toSet()
+        cached = snapshot
         try {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putStringSet(KEY, current).apply()
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putStringSet(KEY, snapshot).apply()
         } catch (e: Exception) {
             // Prefs unavailable: the in-memory toggle is lost, but the
             // list refresh below still shows the tap's effect for now.
@@ -59,9 +69,11 @@ object MinabFavorites {
     /** Replace the whole set (used by backup restore). */
     @JvmStatic
     fun setAll(context: Context, uuids: Set<String>) {
+        val snapshot = uuids.toSet()
+        cached = snapshot
         try {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putStringSet(KEY, uuids.toSet()).apply()
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putStringSet(KEY, snapshot).apply()
         } catch (e: Exception) {
         }
     }

@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
@@ -83,20 +84,30 @@ class MainActivity : BaseActivity() {
 
         mPagerAdapter.addTab(R.string.about, AboutFragment::class.java)
 
-        // Minab Beta v0.9.4 — LAZY tab loading again: v0.9.3 set
-        // offscreenPageLimit = 4, so all five tab fragments were
-        // created eagerly at startup — and v0.9.3 crashed on launch
-        // (only the logo showed, then it closed, before any screen
-        // appeared), while v0.9.2 with the default limit (1) opened
-        // fine. No single throwing line could be pinned in the
-        // 0.9.3 diff, so the eager creation is reverted: tabs are
-        // created when first shown again. A launching app that may
-        // still hang on tab switches is far better than an app that
-        // never opens — and the 0.9.3 per-switch work (signature
-        // cache, ViewHolders, guards) stays, so switches should
-        // still be cheaper than in 0.9.2.
+        // Smooth tab switching: keep Home and Configs warm immediately
+        // (offscreenPageLimit = 1) and cache all 5 tab views in the
+        // internal RecyclerView so switching tabs never tears down or
+        // re-inflates fragments. After Home renders its first frame,
+        // warm up the remaining tabs gently so every tab switch is instant.
         try {
             mPager.setAdapter(mPagerAdapter)
+            mPager.offscreenPageLimit = 1
+            (mPager.getChildAt(0) as? RecyclerView)?.apply {
+                setItemViewCacheSize(5)
+                overScrollMode = View.OVER_SCROLL_NEVER
+            }
+            mPager.postDelayed({
+                if (!isFinishing && !isDestroyed) {
+                    try {
+                        val targetLimit = (mPagerAdapter.itemCount - 1).coerceAtLeast(1)
+                        if (mPager.offscreenPageLimit < targetLimit) {
+                            mPager.offscreenPageLimit = targetLimit
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "Minab: deferred tab warmup failed", e)
+                    }
+                }
+            }, 350L)
         } catch (e: Exception) {
             // Never let pager setup kill the launch: the app still
             // opens (toolbar + empty content) instead of closing.
@@ -321,13 +332,9 @@ class MainActivity : BaseActivity() {
             intent: Intent?
         ) {
             MinabFailover.onStateChanged(this@MainActivity, level)
-            // Minab Beta v0.9.2 — the widget refresh (AppWidgetManager
-            // IPC + profile lookup) must NOT run inside this callback:
-            // updateStateString calls listeners while holding the
-            // VpnStatus class lock, and the IPC can block — tab
-            // switches touch the same lock and stall behind it.
-            // Post it to the main thread instead.
-            runOnUiThread { MinabWidgetProvider.updateAllWidgets(this@MainActivity) }
+            // Widget refresh runs on its own background executor so it
+            // neither holds the VpnStatus lock nor blocks the UI thread.
+            MinabWidgetProvider.updateAllWidgets(this@MainActivity)
         }
 
         override fun setConnectedVPN(uuid: String?) {}

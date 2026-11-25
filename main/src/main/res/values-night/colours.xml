@@ -23,4 +23,11 @@
     <!-- Minab Beta v0.7: connected-row tint, stronger than day mode
          so it still reads on the dark background. -->
     <color name="minab_connected_bg">#260DB37C</color>
+    <color name="minab_test_stat_bg">#232638</color>
+    <color name="minab_test_ping_tint">#1F5B5BD6</color>
+    <color name="minab_test_real_tint">#1F0DB37C</color>
+    <color name="minab_danger">#F87171</color>
+    <color name="minab_danger_tint">#24F87171</color>
+    <color name="minab_danger_border">#80F87171</color>
+    <color name="minab_connect_blocker_pill_bg">#E60B0D18</color>
 </resources>

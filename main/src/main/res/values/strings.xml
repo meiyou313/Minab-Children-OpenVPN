@@ -793,4 +793,27 @@
     <string name="minab_faq_backup_title">How do I back up everything, and restore it?</string>
     <string name="minab_faq_backup">On the Configs tab, “Back up configs” saves all your configs plus your groups, per-config usernames and passwords, favorites and settings into one .zip file. Keep that file private — it contains your passwords. To restore, open bulk import and tap “Restore a Minab backup”, then pick the file: everything comes back exactly as it was, groups included. “Share as zip” still exports plain .ovpn files only.</string>
 
+    <!-- Dynamic animated connect orb & dedicated test progress box -->
+    <string name="minab_status_disconnecting">Disconnecting…</string>
+    <string name="minab_orb_desc_connected">Connected — tap to disconnect</string>
+    <string name="minab_connect_locked_testing">Testing in progress…</string>
+    <string name="minab_connect_locked_toast">A test is running — wait for it to finish or cancel it first.</string>
+    <string name="minab_test_panel_ping_title">Ping test in progress</string>
+    <string name="minab_test_panel_real_ping_title">Real test · Ping phase</string>
+    <string name="minab_test_panel_real_title">Real test in progress</string>
+    <string name="minab_test_panel_ping_done_title">Ping test finished</string>
+    <string name="minab_test_panel_real_done_title">Real test finished</string>
+    <string name="minab_test_stat_tested">Tested</string>
+    <string name="minab_test_stat_remaining">Remaining</string>
+    <string name="minab_test_stat_responded">Responded</string>
+    <string name="minab_test_stat_working">Working</string>
+    <string name="minab_test_percent">%1$d%%</string>
+    <string name="minab_test_working_of">%1$d / %2$d</string>
+    <string name="minab_test_ping_detail_total">Testing %1$d servers in parallel…</string>
+    <string name="minab_test_ping_detail_latest">Latest: %1$s (%2$d of %3$d)</string>
+    <string name="minab_test_real_detail_current">Testing: %1$s</string>
+    <string name="minab_test_real_detail_eta">Testing: %1$s · ~%2$ds left</string>
+    <string name="minab_test_cancel_btn">Cancel test</string>
+    <string name="minab_test_dismiss_btn">Close</string>
+
 </resources>

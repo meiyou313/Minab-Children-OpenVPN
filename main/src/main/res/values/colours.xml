@@ -53,6 +53,43 @@
     <color name="minab_orb_ring">#735B5BD6</color>
     <color name="minab_orb_disc_edge">#66FFFFFF</color>
 
+    <!-- Dynamic animated Connect Orb palette (day + shared accents) -->
+    <color name="minab_orb_idle_start">#7C7FF2</color>
+    <color name="minab_orb_idle_end">#4B4BC8</color>
+    <color name="minab_orb_idle_glow">#4D5B5BD6</color>
+    <color name="minab_orb_idle_ring">#7B7EF4</color>
+
+    <color name="minab_orb_connecting_start">#FBBF24</color>
+    <color name="minab_orb_connecting_end">#EA580C</color>
+    <color name="minab_orb_connecting_glow">#66F59E0B</color>
+    <color name="minab_orb_connecting_ring">#F59E0B</color>
+
+    <color name="minab_orb_connected_start">#34D399</color>
+    <color name="minab_orb_connected_end">#059669</color>
+    <color name="minab_orb_connected_glow">#6610B981</color>
+    <color name="minab_orb_connected_ring">#10B981</color>
+
+    <color name="minab_orb_disconnecting_start">#FB7185</color>
+    <color name="minab_orb_disconnecting_end">#E11D48</color>
+    <color name="minab_orb_disconnecting_glow">#55F43F5E</color>
+    <color name="minab_orb_disconnecting_ring">#F43F5E</color>
+
+    <color name="minab_orb_disabled_start">#94A3B8</color>
+    <color name="minab_orb_disabled_end">#64748B</color>
+    <color name="minab_orb_disabled_glow">#2264748B</color>
+    <color name="minab_orb_disabled_ring">#64748B</color>
+
+    <!-- Dedicated test progress panel colours -->
+    <color name="minab_test_stat_bg">#F1F3FC</color>
+    <color name="minab_test_ping_border">#5B5BD6</color>
+    <color name="minab_test_ping_tint">#0D5B5BD6</color>
+    <color name="minab_test_real_border">#0DB37C</color>
+    <color name="minab_test_real_tint">#0F0DB37C</color>
+    <color name="minab_danger">#DC2626</color>
+    <color name="minab_danger_tint">#14DC2626</color>
+    <color name="minab_danger_border">#66DC2626</color>
+    <color name="minab_connect_blocker_pill_bg">#E6151A35</color>
+
     <color name="switchbar">@android:color/darker_gray</color>
 
 
