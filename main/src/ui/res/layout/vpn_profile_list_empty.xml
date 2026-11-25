@@ -1,54 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<!-- Minimal, clean empty state card for Home tab -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/minab_home_empty_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center"
-    android:orientation="vertical"
     android:paddingLeft="16dp"
-    android:paddingTop="12dp"
+    android:paddingTop="8dp"
     android:paddingRight="16dp"
-    android:paddingBottom="16dp">
+    android:paddingBottom="24dp">
 
-    <TextView
+    <LinearLayout
+        android:id="@+id/minab_empty_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/no_vpn_profiles_defined"
-        android:textAppearance="?android:attr/textAppearanceLarge" />
+        android:background="@drawable/minab_card_bg"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="28dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="24dp">
 
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="12sp" />
+        <FrameLayout
+            android:id="@+id/minab_empty_icon_wrap"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/minab_empty_icon_bg">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:autoLink="web"
-        android:text="@string/openvpn_is_no_free_vpn" />
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/minab_empty_add_btn"
+                android:src="@drawable/ic_minab_import"
+                android:tint="@color/minab_teal" />
+        </FrameLayout>
 
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="12sp" />
+        <TextView
+            android:id="@+id/minab_empty_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="@string/minab_empty_title"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/add_new_vpn_hint"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        tools:ignore="SelectableText" />
+        <TextView
+            android:id="@+id/minab_empty_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="@string/minab_empty_subtitle"
+            android:textColor="@color/minab_text_secondary"
+            android:textSize="12sp" />
 
-    <TextView
-        android:id="@+id/import_vpn_hint"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        tools:ignore="SelectableText" />
-
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="12sp" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/faq_hint" />
-</LinearLayout>
+        <Button
+            android:id="@+id/minab_empty_add_btn"
+            style="@style/Minab.PrimaryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginTop="16dp"
+            android:drawableStart="@drawable/ic_minab_import_small"
+            android:drawablePadding="6dp"
+            android:drawableTint="@android:color/white"
+            android:minHeight="40dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:text="@string/minab_empty_add_btn"
+            android:textSize="13sp" />
+    </LinearLayout>
+</FrameLayout>

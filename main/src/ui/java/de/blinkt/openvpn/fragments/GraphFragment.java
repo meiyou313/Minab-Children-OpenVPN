@@ -29,6 +29,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.github.mikephil.charting.charts.LineChart;
@@ -70,9 +71,14 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     private int mColourOut;
     private int mColourPoint;
     private int mTextColour;
+    private int mGridColour;
 
     private long firstTs;
     private TextView mSpeedStatus;
+    private TextView mDownSpeed;
+    private TextView mUpSpeed;
+    private TextView mDownTotal;
+    private TextView mUpTotal;
     private boolean mLogScale;
 
     // --- Minab v0.7: "Data used" bar charts (daily / weekly /
@@ -134,6 +140,10 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         try {
         mListView = v.findViewById(R.id.graph_listview);
         mSpeedStatus = v.findViewById(R.id.speedStatus);
+        mDownSpeed = v.findViewById(R.id.minab_graph_down_speed);
+        mUpSpeed = v.findViewById(R.id.minab_graph_up_speed);
+        mDownTotal = v.findViewById(R.id.minab_graph_down_total);
+        mUpTotal = v.findViewById(R.id.minab_graph_up_total);
         CheckBox logScaleView = v.findViewById(R.id.useLogScale);
         mLogScale = getActivity().getPreferences(MODE_PRIVATE).getBoolean(PREF_USE_LOG, false);
         logScaleView.setChecked(mLogScale);
@@ -176,19 +186,11 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         mChartAdapter = new ChartDataAdapter(getActivity(), charts);
         mListView.setAdapter(mChartAdapter);
 
-        mColourIn = getActivity().getResources().getColor(R.color.dataIn);
-        mColourOut = getActivity().getResources().getColor(R.color.dataOut);
-        mColourPoint = getActivity().getResources().getColor(android.R.color.black);
-
-        int currentNightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        switch (currentNightMode) {
-            case Configuration.UI_MODE_NIGHT_NO:
-                mTextColour = getActivity().getResources().getColor(android.R.color.primary_text_light);
-                break;
-            case Configuration.UI_MODE_NIGHT_YES:
-                mTextColour = getActivity().getResources().getColor(android.R.color.primary_text_dark);
-                break;
-        }
+        mColourIn = ContextCompat.getColor(getActivity(), R.color.minab_connected);
+        mColourOut = ContextCompat.getColor(getActivity(), R.color.minab_teal);
+        mColourPoint = mColourIn;
+        mTextColour = ContextCompat.getColor(getActivity(), R.color.minab_text_secondary);
+        mGridColour = ContextCompat.getColor(getActivity(), R.color.minab_divider);
 
         logScaleView.setOnCheckedChangeListener((buttonView, isChecked) -> {
             mLogScale = isChecked;
@@ -457,24 +459,26 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         if (getActivity() == null) return;
         Resources res = getActivity().getResources();
 
+        final int byteInterval = Math.max(1, OpenVPNManagement.mBytecountInterval);
+        final String downRate = "↓ " + humanReadableByteCount(diffIn / byteInterval, true, res);
+        final String upRate = "↑ " + humanReadableByteCount(diffOut / byteInterval, true, res);
+        final String downSum = DataUsageStore.formatBytes(Math.max(0L, in));
+        final String upSum = DataUsageStore.formatBytes(Math.max(0L, out));
         final String netstat = String.format(getString(R.string.statusline_bytecount),
                 humanReadableByteCount(in, false, res),
-                humanReadableByteCount(diffIn / OpenVPNManagement.mBytecountInterval, true, res),
+                humanReadableByteCount(diffIn / byteInterval, true, res),
                 humanReadableByteCount(out, false, res),
-                humanReadableByteCount(diffOut / OpenVPNManagement.mBytecountInterval, true, res));
+                humanReadableByteCount(diffOut / byteInterval, true, res));
 
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                // Minab Beta v0.9.5 — AUDIT: this runnable can land
-                // after onCreateView failed early (or after the
-                // view was destroyed): the views and adapter it
-                // touches may be null — a stale tick must not kill
-                // the app on a tab switch.
                 if (mSpeedStatus != null) mSpeedStatus.setText(netstat);
+                if (mDownSpeed != null) mDownSpeed.setText(downRate);
+                if (mUpSpeed != null) mUpSpeed.setText(upRate);
+                if (mDownTotal != null) mDownTotal.setText(downSum);
+                if (mUpTotal != null) mUpTotal.setText(upSum);
                 if (mChartAdapter != null) mChartAdapter.notifyDataSetChanged();
-                // Minab v0.7: the "Data used" bars grow live while
-                // connected (cheap rebuild of plain Views).
                 renderDataUsed();
                 mHandler.removeCallbacks(triggerRefresh);
                 mHandler.postDelayed(triggerRefresh, OpenVPNManagement.mBytecountInterval * 1500);
@@ -521,7 +525,9 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
             xAxis.setDrawGridLines(false);
             xAxis.setDrawAxisLine(true);
+            xAxis.setAxisLineColor(mGridColour);
             xAxis.setTextColor(mTextColour);
+            xAxis.setTextSize(10f);
 
             switch (position) {
                 case TIME_PERIOD_HOURS:
@@ -569,6 +575,10 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
                 }
             });
             yAxis.setTextColor(mTextColour);
+            yAxis.setTextSize(10f);
+            yAxis.setGridColor(mGridColour);
+            yAxis.setAxisLineColor(mGridColour);
+            holder.chart.setNoDataTextColor(mTextColour);
 
             holder.chart.getAxisRight().setEnabled(false);
 
@@ -707,19 +717,16 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         }
 
         private void setLineDataAttributes(LineDataSet dataSet, int colour) {
-            dataSet.setLineWidth(2);
-            dataSet.setCircleRadius(1);
-            dataSet.setDrawCircles(true);
-            dataSet.setCircleColor(mColourPoint);
+            dataSet.setLineWidth(2.2f);
+            dataSet.setDrawCircles(false);
             dataSet.setDrawFilled(true);
-            dataSet.setFillAlpha(42);
+            dataSet.setFillAlpha(52);
             dataSet.setFillColor(colour);
             dataSet.setColor(colour);
-            dataSet.setMode(LineDataSet.Mode.LINEAR);
+            dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
 
             dataSet.setDrawValues(false);
             dataSet.setValueTextColor(mTextColour);
-
         }
     }
 

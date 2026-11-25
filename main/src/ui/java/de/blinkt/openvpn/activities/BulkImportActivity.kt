@@ -51,7 +51,9 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.ArrayAdapter
 import android.widget.TextView
@@ -104,6 +106,12 @@ class BulkImportActivity : BaseActivity() {
     private lateinit var urlField: EditText
     private lateinit var fetchButton: Button
     private lateinit var restoreButton: Button
+    private lateinit var rootScroll: ScrollView
+    private lateinit var resultCard: View
+    private lateinit var resultIcon: ImageView
+    private lateinit var resultTitle: TextView
+    private lateinit var doneButton: Button
+    private lateinit var footerBackButton: Button
     /** Set while a run restores a full backup: the restore summary
         replaces the import summary at the end of the run. */
     private var restoreSummary: String? = null
@@ -132,7 +140,14 @@ class BulkImportActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.bulk_import)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        rootScroll = findViewById(R.id.minab_bulk_root)
+        resultCard = findViewById(R.id.minab_bulk_result_card)
+        resultIcon = findViewById(R.id.minab_bulk_result_icon)
+        resultTitle = findViewById(R.id.minab_bulk_result_title)
+        doneButton = findViewById(R.id.minab_bulk_done_btn)
+        footerBackButton = findViewById(R.id.minab_bulk_footer_back)
         usernameField = findViewById(R.id.minab_bulk_username)
         passwordField = findViewById(R.id.minab_bulk_password)
         applyAllBox = findViewById(R.id.minab_bulk_apply_all)
@@ -147,6 +162,9 @@ class BulkImportActivity : BaseActivity() {
         urlField = findViewById(R.id.minab_bulk_url)
         fetchButton = findViewById(R.id.minab_bulk_fetch_url)
         restoreButton = findViewById(R.id.minab_bulk_restore)
+
+        doneButton.setOnClickListener { finish() }
+        footerBackButton.setOnClickListener { finish() }
 
         // Minab Beta v0.9 — edge-to-edge: this activity never
         // applied the system-bars insets, so its content started
@@ -214,6 +232,11 @@ class BulkImportActivity : BaseActivity() {
         }
     }
 
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        return true
+    }
+
     override fun onDestroy() {
         // Do not keep the bulk password in memory longer than needed.
         if (::passwordField.isInitialized) passwordField.setText("")
@@ -246,7 +269,11 @@ class BulkImportActivity : BaseActivity() {
                 } else {
                     getString(R.string.minab_credentials_none_applied)
                 }
-                statusView.text = message
+                showResultCard(
+                    success = count > 0,
+                    title = getString(R.string.minab_bulk_done_title),
+                    detail = message
+                )
                 Toast.makeText(this@BulkImportActivity, message, Toast.LENGTH_LONG).show()
             }
         }
@@ -320,7 +347,7 @@ class BulkImportActivity : BaseActivity() {
             .setView(entry)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val name = CategoryStore.normalise(entry.text.toString())
-                CategoryStore.addCategory(this, name)
+                CategoryStore.addManualCategory(this, name)
                 onCreated(name)
             }
             .setNegativeButton(android.R.string.cancel) { _, _ ->
@@ -472,19 +499,23 @@ class BulkImportActivity : BaseActivity() {
         statusView.text = getString(R.string.minab_import_progress, done, total)
     }
 
-    /** Runs the import off the UI thread, then auto-categorises, then shows the summary. */
+    /** Runs the import off the UI thread, then IP-based auto-categorises, then shows the clear applied card. */
     private fun runImport(work: suspend (BulkImportHelper.ImportResult, BulkImportHelper.ImportOptions) -> BulkImportHelper.ImportResult) {
         setBusy(true)
+        resultCard.visibility = View.VISIBLE
+        resultCard.setBackgroundResource(R.drawable.minab_card_bg)
+        resultIcon.visibility = View.GONE
+        doneButton.visibility = View.GONE
+        resultTitle.text = getString(R.string.minab_importing)
         progressBar.visibility = View.VISIBLE
         progressBar.isIndeterminate = false
         progressBar.max = 100
         progressBar.progress = 0
         statusView.text = getString(R.string.minab_importing)
-        // Capture the options on the UI thread once; the background work
-        // must never read the EditText / CheckBox views itself.
+        rootScroll.post { rootScroll.smoothScrollTo(0, 0) }
         val opts = options()
         val autoCategorise = autoCategoryBox.isChecked
-        if (opts.category != null) CategoryStore.addCategory(this, opts.category)
+        if (opts.category != null) CategoryStore.addManualCategory(this, opts.category)
         lifecycleScope.launch(Dispatchers.IO) {
             val result = BulkImportHelper.ImportResult()
             try {
@@ -493,48 +524,20 @@ class BulkImportActivity : BaseActivity() {
                 result.failed++
                 result.failedNames.add(e.message ?: "import error")
             }
-            // Auto-categorisation AFTER the import, best-effort, never fatal.
-            // v0.3 bug fix 1: batched, no ~1 s pause per profile.
-            // Pass 1 — offline heuristic for every profile at once
-            // (country code in the name/hostname or the hostname TLD).
-            // Pass 2 — online lookup only for the rest, in chunks of 8
-            // in parallel (ip-api.com is rate-limited; a 429 just
-            // leaves that profile uncategorised).
-            // Minab Beta v0.9.6.3 (fix #5) — auto-detection runs
-            // ONLY when no group was chosen (opts.category == null,
-            // i.e. "All"): a group the user picked always wins, and
-            // the old code overwrote it with the guessed country.
+            // IP-first country auto-detection in parallel chunks of 8.
+            // Uses each server's resolved IP geolocation (cached 30 days) with
+            // offline name/TLD fallback if offline or DNS fails.
             if (autoCategorise && opts.category == null && result.importedProfiles.isNotEmpty()) {
                 val total = result.importedProfiles.size
-                val needOnline = ArrayList<VpnProfile>()
                 var done = 0
-                for (profile in result.importedProfiles) {
-                    try {
-                        val offline = AutoCategory.guessOffline(
-                            profile.mName, null, profile.primaryRemoteHost)
-                        if (offline != null) {
-                            profile.setCategory(offline)
-                            CategoryStore.addCategory(this@BulkImportActivity, offline)
-                            ProfileManager.saveProfile(this@BulkImportActivity, profile)
-                        } else {
-                            needOnline.add(profile)
-                        }
-                    } catch (ignored: Exception) {
-                    }
-                    done++
-                    val shown = done
-                    withContext(Dispatchers.Main) {
-                        statusView.text = getString(
-                            R.string.minab_import_categorising, shown, total)
-                    }
-                }
-                for (chunk in needOnline.chunked(8)) {
+                for (chunk in result.importedProfiles.chunked(8)) {
                     val guessed = chunk.map { profile ->
                         async {
                             profile to try {
                                 AutoCategory.guessCategory(
                                     this@BulkImportActivity,
-                                    profile.mName, null, profile.primaryRemoteHost)
+                                    profile.mName, null, profile.primaryRemoteHost
+                                )
                             } catch (ignored: Exception) {
                                 null
                             }
@@ -552,8 +555,12 @@ class BulkImportActivity : BaseActivity() {
                         done++
                         val shown = done
                         withContext(Dispatchers.Main) {
+                            progressBar.isIndeterminate = false
+                            progressBar.max = total
+                            progressBar.progress = shown
                             statusView.text = getString(
-                                R.string.minab_import_categorising, shown, total)
+                                R.string.minab_import_categorising, shown, total
+                            )
                         }
                     }
                 }
@@ -561,31 +568,48 @@ class BulkImportActivity : BaseActivity() {
             withContext(Dispatchers.Main) {
                 setBusy(false)
                 progressBar.visibility = View.GONE
-                // Minab Beta v0.9 — a full backup was restored:
-                // show the restore summary instead of the import one.
-                val summary = restoreSummary ?: getString(
-                    R.string.minab_import_summary,
+                val restored = restoreSummary
+                restoreSummary = null
+                val summary = restored ?: getString(
+                    R.string.minab_bulk_done_detail,
                     result.imported, result.skippedDuplicates, result.failed
                 )
-                restoreSummary = null
                 val extra = if (result.failedNames.isNotEmpty()) {
-                    "\n" + result.failedNames.take(10).joinToString("\n")
+                    "\n" + result.failedNames.take(6).joinToString("\n")
                 } else ""
-                statusView.text = summary + extra
-                // v0.3 bug fix 1: persist the summary (with the number
-                // of files selected) so it is still there on return —
-                // the Toast alone is gone as soon as the page is left.
+                val isSuccess = result.imported > 0 || restored != null
+                showResultCard(
+                    success = isSuccess,
+                    title = getString(
+                        if (isSuccess) R.string.minab_bulk_done_title
+                        else R.string.minab_bulk_done_partial
+                    ),
+                    detail = summary + extra
+                )
                 ImportSummaryStore.save(
                     this@BulkImportActivity, selectedCount,
                     result.imported, result.skippedDuplicates,
-                    result.failed, result.failedNames)
+                    result.failed, result.failedNames
+                )
                 ImportSummaryStore.formatLastSummary(this@BulkImportActivity)?.let { stored ->
                     lastSummaryView.text = getString(R.string.minab_last_import, stored)
                 }
-                Toast.makeText(this@BulkImportActivity, summary, Toast.LENGTH_LONG).show()
                 if (result.imported > 0) setResult(Activity.RESULT_OK)
+                refreshCategorySpinner(selectedCategory)
             }
         }
+    }
+
+    private fun showResultCard(success: Boolean, title: String, detail: String) {
+        resultCard.visibility = View.VISIBLE
+        resultCard.setBackgroundResource(
+            if (success) R.drawable.minab_bulk_success_bg else R.drawable.minab_card_bg
+        )
+        resultIcon.visibility = if (success) View.VISIBLE else View.GONE
+        resultTitle.text = title
+        statusView.text = detail
+        doneButton.visibility = View.VISIBLE
+        rootScroll.post { rootScroll.smoothScrollTo(0, 0) }
     }
 
     private fun setBusy(busy: Boolean) {
@@ -720,6 +744,7 @@ class BulkImportActivity : BaseActivity() {
         statusView.text = getString(R.string.minab_importing)
         lifecycleScope.launch(Dispatchers.IO) {
             var message: String
+            var ok = false
             try {
                 val bytes = contentResolver.openInputStream(uri)?.use { readAllBytes(it, MAX_ZIP_BYTES) }
                 when {
@@ -727,6 +752,7 @@ class BulkImportActivity : BaseActivity() {
                     !MinabBackup.hasMetadata(bytes) -> message = getString(R.string.minab_restore_no_metadata)
                     else -> {
                         val restore = MinabBackup.restoreBackup(this@BulkImportActivity, bytes)
+                        ok = restore.error == null
                         message = if (restore.error != null) getString(R.string.minab_restore_failed)
                             else getString(R.string.minab_restore_done, restore.profilesRestored)
                         if (restore.imported > 0) setResult(Activity.RESULT_OK)
@@ -737,8 +763,14 @@ class BulkImportActivity : BaseActivity() {
             }
             withContext(Dispatchers.Main) {
                 setBusy(false)
-                statusView.text = message
-                Toast.makeText(this@BulkImportActivity, message, Toast.LENGTH_LONG).show()
+                showResultCard(
+                    success = ok,
+                    title = getString(
+                        if (ok) R.string.minab_bulk_done_title
+                        else R.string.minab_bulk_done_partial
+                    ),
+                    detail = message
+                )
             }
         }
     }

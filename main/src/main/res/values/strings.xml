@@ -816,4 +816,74 @@
     <string name="minab_test_cancel_btn">Cancel test</string>
     <string name="minab_test_dismiss_btn">Close</string>
 
+    <!-- Minab Beta v0.9.7 — theme, languages, debug crash log, live stats,
+         active/inactive tabs, empty state, Graph/About/Bulk Import redesign, widgets -->
+    <string name="minab_appearance_category">Appearance</string>
+    <string name="minab_theme_title">Theme</string>
+    <string name="minab_theme_system">Follow system</string>
+    <string name="minab_theme_light">Light (Day)</string>
+    <string name="minab_theme_dark">Dark (Night)</string>
+    <string name="minab_language_title">Language</string>
+    <string name="minab_lang_system">System default</string>
+    <string name="minab_debug_category">Debug &amp; Diagnostics</string>
+    <string name="minab_crash_report_title">Crash report &amp; debug log</string>
+    <string name="minab_crash_report_summary_clean">No crashes recorded · tap to view recent activity log</string>
+    <string name="minab_crash_report_summary_pending">A crash report is available — tap to inspect or share</string>
+    <string name="minab_crash_report_empty">No crash reports or debug events recorded yet.</string>
+    <string name="minab_crash_share">Share</string>
+    <string name="minab_crash_clear">Clear log</string>
+    <string name="minab_crash_cleared">Crash and debug logs cleared.</string>
+
+    <string name="minab_active_tab">Active</string>
+    <string name="minab_inactive_tab">Inactive</string>
+    <string name="minab_no_active_yet">No active servers yet — run Ping test or Real test first.</string>
+    <string name="minab_no_inactive_yet">All servers are currently active.</string>
+    <string name="minab_session_duration">Duration</string>
+    <string name="minab_session_down">Down</string>
+    <string name="minab_session_up">Up</string>
+    <string name="minab_session_total">Used</string>
+
+    <string name="minab_empty_title">No configs yet</string>
+    <string name="minab_empty_subtitle">Tap below to add your .ovpn or .zip configs</string>
+    <string name="minab_empty_add_btn">Add configs</string>
+    <string name="minab_empty_filter_title">No matching servers</string>
+    <string name="minab_empty_filter_subtitle">Try another group or clear your search filter</string>
+
+    <string name="minab_graph_live_card_title">Live connection speed</string>
+    <string name="minab_graph_download">Download</string>
+    <string name="minab_graph_upload">Upload</string>
+    <string name="minab_graph_session_total">Session: %1$s</string>
+    <string name="minab_graph_idle">Connect to a server to view live speed</string>
+
+    <string name="minab_about_subtitle">Fast, clean OpenVPN client</string>
+    <string name="minab_about_version_badge">Version %1$s</string>
+    <string name="minab_about_update_card_title">App updates</string>
+    <string name="minab_about_download_latest">Download %1$s</string>
+    <string name="minab_about_open_release_assets">Open GitHub release assets</string>
+    <string name="minab_about_update_ready">New version %1$s is available to download.</string>
+    <string name="minab_about_up_to_date">You are up to date (%1$s).</string>
+    <string name="minab_about_highlights_title">Features</string>
+    <string name="minab_about_highlights_body">Bulk .ovpn &amp; .zip import · IP-based country groups · Ping &amp; Real tests · Active/Inactive filters · Live speed &amp; data usage charts · Auto-failover · Per-app VPN · Full backup · Home-screen widgets</string>
+    <string name="minab_about_links_title">Project &amp; Source</string>
+    <string name="minab_about_open_github">GitHub Repository</string>
+    <string name="minab_about_open_releases">Releases &amp; Downloads</string>
+    <string name="minab_about_credits">Built on ics-openvpn (Arne Schwabe, GPLv2). Free, open-source, and ad-free.</string>
+
+    <string name="minab_bulk_step_add">Add configs</string>
+    <string name="minab_bulk_step_group">Group &amp; country detection</string>
+    <string name="minab_bulk_step_more">Link import &amp; backup</string>
+    <string name="minab_bulk_step_login">Shared login (optional)</string>
+    <string name="minab_bulk_done_title">Configs added successfully</string>
+    <string name="minab_bulk_done_partial">Import finished</string>
+    <string name="minab_bulk_done_detail">%1$d imported · %2$d skipped · %3$d failed</string>
+    <string name="minab_bulk_back_home">Done · Back to menu</string>
+    <string name="minab_bulk_auto_ip_hint">Detect country from each server IP automatically</string>
+
+    <string name="minab_widget_label_compact">Minab · Quick Toggle (2×1)</string>
+    <string name="minab_widget_label_mini">Minab · Power Orb (1×1)</string>
+    <string name="minab_widget_label_large">Minab · Status &amp; Speed (4×2)</string>
+    <string name="minab_widget_best_short">Best</string>
+    <string name="minab_widget_ready">Ready to connect</string>
+    <string name="minab_widget_no_server">Tap to open Minab</string>
+
 </resources>

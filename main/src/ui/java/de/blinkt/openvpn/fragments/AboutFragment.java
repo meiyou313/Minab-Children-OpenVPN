@@ -5,177 +5,170 @@
 
 package de.blinkt.openvpn.fragments;
 
-import android.app.PendingIntent;
-import android.content.ComponentName;
-import android.content.Intent;
-import android.content.IntentSender;
-import android.content.ServiceConnection;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
-import android.os.IBinder;
-import android.os.RemoteException;
-import android.text.SpannableString;
-import android.text.Spanned;
-import android.text.method.LinkMovementMethod;
-import android.text.style.ClickableSpan;
-import android.util.Log;
-import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 
-import com.android.vending.billing.IInAppBillingService;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Vector;
-
 import de.blinkt.openvpn.R;
-import de.blinkt.openvpn.core.VpnStatus;
 import de.blinkt.openvpn.minab.MinabUpdateChecker;
 
 public class AboutFragment extends Fragment implements View.OnClickListener {
 
-    private static final String RESPONSE_CODE = "RESPONSE_CODE";
-
-
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-    }
-
+    private View mUpdateCard;
+    private View mProgressRow;
+    private TextView mUpdateBadge;
+    private TextView mUpdateStatus;
+    private Button mCheckButton;
+    private Button mDownloadButton;
+    private Button mAssetsButton;
+    private String mInstalledVersion = "";
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.about, container, false);
-        // Minab Beta v0.9.4 — the About tab must never kill the
-        // launch: a failure while wiring the version / update check
-        // is caught and logged, and the tab shows an empty view.
         try {
-        TextView ver = (TextView) v.findViewById(R.id.version);
+            TextView ver = v.findViewById(R.id.version);
+            String version;
+            try {
+                PackageInfo packageinfo = requireActivity().getPackageManager()
+                        .getPackageInfo(requireActivity().getPackageName(), 0);
+                version = packageinfo.versionName;
+            } catch (NameNotFoundException e) {
+                version = "—";
+            }
+            mInstalledVersion = version;
+            if (ver != null) {
+                ver.setText(getString(R.string.minab_about_version_badge, version));
+            }
 
-        String version;
-        String name = "Openvpn";
-        try {
-            PackageInfo packageinfo = getActivity().getPackageManager().getPackageInfo(getActivity().getPackageName(), 0);
-            version = packageinfo.versionName;
-            name = getString(R.string.app);
-        } catch (NameNotFoundException e) {
-            version = "error fetching version";
-        }
+            mUpdateCard = v.findViewById(R.id.minab_about_update_card);
+            mProgressRow = v.findViewById(R.id.minab_update_progress_row);
+            mUpdateBadge = v.findViewById(R.id.minab_update_badge_pill);
+            mUpdateStatus = v.findViewById(R.id.minab_update_status);
+            mCheckButton = v.findViewById(R.id.minab_about_check_update);
+            mDownloadButton = v.findViewById(R.id.minab_about_download_btn);
+            mAssetsButton = v.findViewById(R.id.minab_about_assets_btn);
 
-        ver.setText(getString(R.string.version_info, name, version));
+            if (mDownloadButton != null) {
+                mDownloadButton.setOnClickListener(view ->
+                        MinabUpdateChecker.openLatestApkDownload(requireContext()));
+            }
+            if (mAssetsButton != null) {
+                mAssetsButton.setOnClickListener(view ->
+                        MinabUpdateChecker.openLatestRelease(requireContext()));
+            }
 
-        // Minab Beta v0.9 — the About text carries the version at
-        // its top (the string has %1$s), so it is set here, not in
-        // the layout.
-        TextView aboutText = v.findViewById(R.id.minab_about_text_view);
-        if (aboutText != null) {
-            aboutText.setText(getString(R.string.minab_about_text, version));
-        }
-
-        // Minab Beta v0.4 — update notice on About. The check is
-        // cached for 24 h inside MinabUpdateChecker.
-        TextView updateStatus = v.findViewById(R.id.minab_update_status);
-        final String installedVersion = version;
-        MinabUpdateChecker.check(getActivity(), false, (latestTag, available) -> {
-            if (getActivity() == null || updateStatus == null) return;
-            renderUpdateStatus(updateStatus, installedVersion, latestTag, available, false);
-        });
-
-        // Minab Beta v0.9 — "Check for updates" at the TOP of the
-        // About screen (like Namaki). A manual check always goes to
-        // the network (force=true) and shows its result clearly,
-        // including a failure message (the automatic check above
-        // just hides the notice when it cannot reach GitHub).
-        android.widget.Button checkUpdateButton =
-                v.findViewById(R.id.minab_about_check_update);
-        if (checkUpdateButton != null) {
-            checkUpdateButton.setOnClickListener(view -> {
-                if (getActivity() == null || updateStatus == null) return;
-                checkUpdateButton.setEnabled(false);
-                updateStatus.setText(getString(R.string.minab_update_checking));
-                updateStatus.setVisibility(View.VISIBLE);
-                updateStatus.setOnClickListener(null);
-                MinabUpdateChecker.check(getActivity(), true, (latestTag, available) -> {
-                    checkUpdateButton.setEnabled(true);
-                    if (getActivity() == null || updateStatus == null) return;
-                    renderUpdateStatus(updateStatus, installedVersion, latestTag, available, true);
-                });
+            // Cached background check on first display
+            MinabUpdateChecker.check(requireActivity(), false, (latestTag, available) -> {
+                if (!isAdded()) return;
+                renderUpdateState(latestTag, available, false);
             });
-        }
 
-        // Minab Beta v0.9.1 — the upstream boilerplate (OpenVPN /
-        // OpenVPN3 / OpenSSL versions, translators, full license
-        // texts) is gone from this screen (fix #1): About now
-        // shows only the version and Minab's own text. The code
-        // that filled those views is gone with them.
+            if (mCheckButton != null) {
+                mCheckButton.setOnClickListener(view -> runManualUpdateCheck());
+            }
 
-        ViewCompat.setOnApplyWindowInsetsListener(v, (view, windowInsets) ->
-                {
-                    Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-                    view.setPadding(view.getPaddingLeft(), view.getPaddingTop(), view.getPaddingRight(), insets.bottom);
-                    return WindowInsetsCompat.CONSUMED;
-                }
-        );
+            Button githubBtn = v.findViewById(R.id.minab_about_github_btn);
+            if (githubBtn != null) {
+                githubBtn.setOnClickListener(view ->
+                        MinabUpdateChecker.openUrl(requireContext(), MinabUpdateChecker.REPO_URL));
+            }
+            Button releasesBtn = v.findViewById(R.id.minab_about_releases_btn);
+            if (releasesBtn != null) {
+                releasesBtn.setOnClickListener(view ->
+                        MinabUpdateChecker.openReleases(requireContext()));
+            }
+
+            ViewCompat.setOnApplyWindowInsetsListener(v, (view, windowInsets) -> {
+                Insets insets = windowInsets.getInsets(
+                        WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                view.setPadding(view.getPaddingLeft(), view.getPaddingTop(),
+                        view.getPaddingRight(), insets.bottom);
+                return WindowInsetsCompat.CONSUMED;
+            });
         } catch (Exception e) {
             android.util.Log.e("AboutFragment", "Minab: onCreateView failed", e);
         }
         return v;
     }
 
-    /** Minab Beta v0.9 — one rendering for the update notice, shared
-        by the automatic check and the manual "Check for updates"
-        button. manual=true also shows a failure message when the
-        check could not reach GitHub at all (the automatic check
-        just hides the notice then). */
-    private void renderUpdateStatus(TextView updateStatus, String installedVersion,
-                                    String latestTag, boolean available, boolean manual) {
+    private void runManualUpdateCheck() {
+        if (!isAdded()) return;
+        if (mCheckButton != null) mCheckButton.setEnabled(false);
+        if (mProgressRow != null) mProgressRow.setVisibility(View.VISIBLE);
+        if (mUpdateStatus != null) mUpdateStatus.setVisibility(View.GONE);
+        if (mDownloadButton != null) mDownloadButton.setVisibility(View.GONE);
+        if (mAssetsButton != null) mAssetsButton.setVisibility(View.GONE);
+
+        MinabUpdateChecker.check(requireActivity(), true, (latestTag, available) -> {
+            if (!isAdded()) return;
+            if (mCheckButton != null) mCheckButton.setEnabled(true);
+            if (mProgressRow != null) mProgressRow.setVisibility(View.GONE);
+            renderUpdateState(latestTag, available, true);
+        });
+    }
+
+    private void renderUpdateState(String latestTag, boolean available, boolean manual) {
+        if (!isAdded() || mUpdateStatus == null) return;
+        if (mProgressRow != null) mProgressRow.setVisibility(View.GONE);
+
         if (latestTag == null) {
+            if (mUpdateBadge != null) mUpdateBadge.setVisibility(View.GONE);
+            if (mDownloadButton != null) mDownloadButton.setVisibility(View.GONE);
+            if (mAssetsButton != null) mAssetsButton.setVisibility(View.GONE);
+            if (mUpdateCard != null) mUpdateCard.setBackgroundResource(R.drawable.minab_card_bg);
             if (manual) {
-                updateStatus.setText(getString(R.string.minab_update_failed));
-                updateStatus.setVisibility(View.VISIBLE);
-                updateStatus.setOnClickListener(null);
+                mUpdateStatus.setText(getString(R.string.minab_update_failed));
+                mUpdateStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.minab_danger));
+                mUpdateStatus.setVisibility(View.VISIBLE);
             } else {
-                updateStatus.setVisibility(View.GONE);
+                mUpdateStatus.setVisibility(View.GONE);
             }
         } else if (available) {
-            updateStatus.setText(getString(R.string.minab_update_available_short, latestTag));
-            updateStatus.setVisibility(View.VISIBLE);
-            updateStatus.setOnClickListener(view -> MinabUpdateChecker.openReleases(getActivity()));
+            if (mUpdateCard != null) {
+                mUpdateCard.setBackgroundResource(R.drawable.minab_connect_card_connected);
+            }
+            if (mUpdateBadge != null) {
+                mUpdateBadge.setText(latestTag);
+                mUpdateBadge.setVisibility(View.VISIBLE);
+            }
+            mUpdateStatus.setText(getString(R.string.minab_about_update_ready, latestTag));
+            mUpdateStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.minab_connected));
+            mUpdateStatus.setVisibility(View.VISIBLE);
+            if (mDownloadButton != null) {
+                mDownloadButton.setText(getString(R.string.minab_about_download_latest, latestTag));
+                mDownloadButton.setVisibility(View.VISIBLE);
+            }
+            if (mAssetsButton != null) {
+                mAssetsButton.setVisibility(View.VISIBLE);
+            }
         } else {
-            updateStatus.setText(getString(R.string.minab_update_none, installedVersion));
-            updateStatus.setVisibility(View.VISIBLE);
-            updateStatus.setOnClickListener(null);
+            if (mUpdateCard != null) mUpdateCard.setBackgroundResource(R.drawable.minab_card_bg);
+            if (mUpdateBadge != null) {
+                mUpdateBadge.setText(latestTag);
+                mUpdateBadge.setVisibility(View.VISIBLE);
+            }
+            mUpdateStatus.setText(getString(R.string.minab_about_up_to_date, mInstalledVersion));
+            mUpdateStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.minab_connected));
+            mUpdateStatus.setVisibility(View.VISIBLE);
+            if (mDownloadButton != null) mDownloadButton.setVisibility(View.GONE);
+            if (mAssetsButton != null) mAssetsButton.setVisibility(View.GONE);
         }
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-    }
-
-
-    @Override
     public void onClick(View v) {
-
     }
 }

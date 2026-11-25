@@ -13,6 +13,7 @@ package de.blinkt.openvpn.fragments
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
@@ -38,6 +39,7 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -61,6 +63,7 @@ import de.blinkt.openvpn.minab.MinabRealTestSettingsPanel
 import de.blinkt.openvpn.minab.MinabServerCountry
 import de.blinkt.openvpn.minab.MinabTestCoordinator
 import de.blinkt.openvpn.minab.MinabTestProgressPanel
+import de.blinkt.openvpn.minab.MinabVpnControl
 import de.blinkt.openvpn.minab.PingTester
 import de.blinkt.openvpn.minab.RealTester
 import de.blinkt.openvpn.minab.SharedCredentials
@@ -411,6 +414,10 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             selectedCategory == null -> all
             selectedCategory == CategoryStore.FAVORITES_TAB ->
                 all.filter { favorites.contains(it.getUUIDString()) }
+            selectedCategory == CategoryStore.ACTIVE_TAB ->
+                all.filter { MinabVpnControl.isHealthy(it) }
+            selectedCategory == CategoryStore.INACTIVE_TAB ->
+                all.filter { !MinabVpnControl.isHealthy(it) }
             else -> all.filter { it.getCategory() == selectedCategory }
         }
         val query = searchQuery.lowercase()
@@ -427,7 +434,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
 
         val signature = listSignature(sorted, favorites)
         if (signature == lastListSignature) {
-            rebuildChips()
+            rebuildChips(all)
             updateSelectionBar()
             return
         }
@@ -435,7 +442,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         cachedFavorites = favorites
         displayedProfiles = sorted.toMutableList()
         configsAdapter?.submitList(displayedProfiles)
-        rebuildChips()
+        rebuildChips(all)
         updateSelectionBar()
     }
 
@@ -646,45 +653,30 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         out: OutputStream
     ): Int = MinabBackup.writeProfilesZip(context, profiles, out)
 
-    private fun rebuildChips() {
+    private fun rebuildChips(allProfiles: Collection<VpnProfile> = ProfileManager.getInstance(requireContext()).getProfiles()) {
         val container = chipsContainer ?: return
         val context = requireContext()
-        val ordered = CategoryStore.getOrderedCategories(context)
+        val ordered = CategoryStore.getDisplayCategories(context, allProfiles)
+        if (selectedCategory != null &&
+            !CategoryStore.isPseudoTab(selectedCategory) &&
+            !ordered.contains(selectedCategory)
+        ) {
+            selectedCategory = null
+        }
         val signature = (selectedCategory ?: "all") + "|" + ordered.joinToString(",")
         if (signature == chipsSignature && container.childCount > 0) return
         chipsSignature = signature
         container.removeAllViews()
         addFavoritesTab(container)
-        val tabs = mutableListOf<String?>(null)
-        tabs.addAll(ordered.filter { it != CategoryStore.DEFAULT_CATEGORY })
-        tabs.add(CategoryStore.DEFAULT_CATEGORY)
-        for (category in tabs) {
-            val label = category ?: getString(R.string.minab_all_tab)
-            val selected = category == selectedCategory
-            val chip = TextView(context).apply {
-                text = label
-                textSize = 11f
-                setTextColor(
-                    ContextCompat.getColor(
-                        context,
-                        if (selected) R.color.minab_teal_dark else R.color.minab_chip_text
-                    )
-                )
-                setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
-                setBackgroundResource(
-                    if (selected) R.drawable.minab_chip_bg_selected else R.drawable.minab_chip_bg
-                )
-                setPadding(dp(10), dp(5), dp(10), dp(5))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginEnd = dp(6) }
-                setOnClickListener {
-                    selectedCategory = category
-                    refreshList()
-                }
-            }
-            container.addView(chip)
+        addSimpleChip(container, null)
+        addStatusFilterTab(container, CategoryStore.ACTIVE_TAB, R.string.minab_active_tab, R.color.minab_connected)
+        addStatusFilterTab(container, CategoryStore.INACTIVE_TAB, R.string.minab_inactive_tab, R.color.minab_ping_fail)
+        for (category in ordered) {
+            if (category == CategoryStore.DEFAULT_CATEGORY) continue
+            addSimpleChip(container, category)
+        }
+        if (ordered.contains(CategoryStore.DEFAULT_CATEGORY)) {
+            addSimpleChip(container, CategoryStore.DEFAULT_CATEGORY)
         }
 
         val manage = TextView(context).apply {
@@ -715,29 +707,109 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         }
         container.addView(add)
 
-        val reorder = ImageView(context).apply {
-            setImageResource(R.drawable.ic_edit)
-            setColorFilter(ContextCompat.getColor(context, R.color.minab_teal))
-            setBackgroundResource(R.drawable.minab_chip_bg)
-            setPadding(dp(8), dp(5), dp(8), dp(5))
-            contentDescription = getString(R.string.minab_reorder_groups)
+        if (ordered.size > 1) {
+            val reorder = ImageView(context).apply {
+                setImageResource(R.drawable.ic_edit)
+                setColorFilter(ContextCompat.getColor(context, R.color.minab_teal))
+                setBackgroundResource(R.drawable.minab_chip_bg)
+                setPadding(dp(8), dp(5), dp(8), dp(5))
+                contentDescription = getString(R.string.minab_reorder_groups)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = dp(6) }
+                setOnClickListener {
+                    MinabCategoryReorder.show(context) {
+                        chipsSignature = null
+                        rebuildChips()
+                        refreshList()
+                    }
+                }
+            }
+            container.addView(reorder)
+        }
+
+        val peek = View(context)
+        peek.layoutParams = LinearLayout.LayoutParams(dp(20), dp(1))
+        container.addView(peek)
+    }
+
+    private fun addSimpleChip(container: LinearLayout, category: String?) {
+        val context = requireContext()
+        val label = category ?: getString(R.string.minab_all_tab)
+        val selected = category == selectedCategory
+        val chip = TextView(context).apply {
+            text = label
+            textSize = 11f
+            setTextColor(
+                ContextCompat.getColor(
+                    context,
+                    if (selected) R.color.minab_teal_dark else R.color.minab_chip_text
+                )
+            )
+            setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+            setBackgroundResource(
+                if (selected) R.drawable.minab_chip_bg_selected else R.drawable.minab_chip_bg
+            )
+            setPadding(dp(10), dp(5), dp(10), dp(5))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { marginEnd = dp(6) }
             setOnClickListener {
-                MinabCategoryReorder.show(context) {
-                    chipsSignature = null
-                    rebuildChips()
-                    refreshList()
-                }
+                selectedCategory = category
+                refreshList()
             }
         }
-        container.addView(reorder)
+        container.addView(chip)
+    }
 
-        val peek = View(context)
-        peek.layoutParams = LinearLayout.LayoutParams(dp(20), dp(1))
-        container.addView(peek)
+    private fun addStatusFilterTab(
+        container: LinearLayout,
+        tabKey: String,
+        labelRes: Int,
+        dotColorRes: Int
+    ) {
+        val context = requireContext()
+        val selected = selectedCategory == tabKey
+        val tab = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(
+                if (selected) R.drawable.minab_chip_bg_selected else R.drawable.minab_chip_bg
+            )
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
+        }
+        val dot = View(context).apply {
+            setBackgroundResource(R.drawable.minab_status_dot)
+            ViewCompat.setBackgroundTintList(
+                this,
+                ColorStateList.valueOf(ContextCompat.getColor(context, dotColorRes))
+            )
+            layoutParams = LinearLayout.LayoutParams(dp(7), dp(7)).apply { marginEnd = dp(5) }
+        }
+        tab.addView(dot)
+        val label = TextView(context).apply {
+            text = getString(labelRes)
+            textSize = 11f
+            setTextColor(
+                ContextCompat.getColor(
+                    context,
+                    if (selected) R.color.minab_teal_dark else R.color.minab_chip_text
+                )
+            )
+            setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+        }
+        tab.addView(label)
+        tab.setOnClickListener {
+            selectedCategory = tabKey
+            refreshList()
+        }
+        container.addView(tab)
     }
 
     private fun addFavoritesTab(container: LinearLayout) {
@@ -985,7 +1057,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             .setView(entry)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val name = CategoryStore.normalise(entry.text.toString())
-                CategoryStore.addCategory(requireContext(), name)
+                CategoryStore.addManualCategory(requireContext(), name)
                 onCreated(name)
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -1054,6 +1126,8 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 val favorites = MinabFavorites.getAll(requireContext())
                 all.filter { favorites.contains(it.getUUIDString()) }
             }
+            wanted == CategoryStore.ACTIVE_TAB -> all.filter { MinabVpnControl.isHealthy(it) }
+            wanted == CategoryStore.INACTIVE_TAB -> all.filter { !MinabVpnControl.isHealthy(it) }
             else -> all.filter { it.getCategory() == wanted }
         }
     }

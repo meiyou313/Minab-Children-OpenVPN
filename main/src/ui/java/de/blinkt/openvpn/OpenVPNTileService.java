@@ -117,6 +117,7 @@ public class OpenVPNTileService extends TileService implements VpnStatus.StateLi
         if (level == ConnectionStatus.LEVEL_AUTH_FAILED || level == ConnectionStatus.LEVEL_NOTCONNECTED) {
             // No VPN connected, use standard VPN
             vpn = getQSVPN();
+            t.setIcon(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_stat_minab_offline));
             if (vpn == null) {
                 t.setLabel(getString(R.string.novpn_selected));
                 t.setState(Tile.STATE_UNAVAILABLE);
@@ -131,6 +132,7 @@ public class OpenVPNTileService extends TileService implements VpnStatus.StateLi
                 name = "null?!";
             else
                 name = vpn.getName();
+            t.setIcon(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_stat_minab));
             t.setLabel(getString(R.string.qs_disconnect, name));
             t.setState(Tile.STATE_ACTIVE);
         }

@@ -2,6 +2,18 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.7 — major UI/UX overhaul, dynamic IP country grouping, multi-language & Day/Night theme, ladybug debug log, dynamic GitHub asset updates, new status-bar icon, and 3 home-screen widgets:
+- Home live connection bar: displays live download/upload speeds, session duration (HH:MM:SS), and session data used inside the Connect Card while connected, plus subtle haptic feedback on connect/disconnect actions.
+- Bottom tab bar icons: crisp custom vector icons paired with labels across Home, Configs, Graph, Settings, and About.
+- Dynamic IP-based country groups + Active/Inactive tabs: no pre-seeded default country groups; country groups are created automatically from each imported server's IP geolocation (using HTTPS GeoIP with 30-day caching), and new Active and Inactive filter tabs sit right after Favorites and All on Home and Configs.
+- Minimal Home empty state: replaced verbose stock OpenVPN instructions with a clean centered card and one-tap "Add configs" action.
+- Graph tab redesign: modern Minab card layout with a dedicated Live Connection Speed card (download/upload speeds & session totals), smooth Bezier charts in emerald & indigo, and night-mode-aware styling.
+- About tab & dynamic GitHub Assets updater: redesigned hero and update cards with a live checking indicator, direct APK download button, and direct link to the latest release's GitHub Assets page.
+- Settings Appearance & Debug: added Day/Night/System theme selector, multi-language selector (Persian, English, Arabic, Turkish, Russian, German, French, Chinese, System default), and moved the Crash Report & Debug Log out of app launch into Settings -> Debug with a ladybug icon.
+- Bulk Import redesign: minimal modular cards with IP-based country auto-detection, a prominent top Applied Success card with checkmark & summary, and a clear "Done · Back to menu" button.
+- Status bar & Quick Settings icon: replaced all legacy OpenVPN status-bar/offline icons with the new monochrome Minab flower-backpack vector icon.
+- Three high-quality Home-Screen Widgets: 1×1 Mini Power Orb, 2×1 Compact Quick Toggle (with flag & glossy state orb), and 4×2 Rich Status & Live Speed Dashboard (with 1-tap Best Server connect).
+
 New in v0.9.6.7 — hotfix for v0.9.6.6 launch crash:
 fixed an immediate startup crash (IllegalStateException: RecyclerView has no LayoutManager) caused by inflating the Home and Configs RecyclerView header/empty layouts before assigning LinearLayoutManager; also added safe view re-attachment guards for retained header/empty ViewHolders and an initialization guard in MinabConnectOrbView.
 

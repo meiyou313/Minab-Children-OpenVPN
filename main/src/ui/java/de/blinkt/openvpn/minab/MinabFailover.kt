@@ -229,7 +229,7 @@ object MinabFailover {
                 manager.createNotificationChannel(channel)
             }
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_logo_sw)
+                .setSmallIcon(R.drawable.ic_stat_minab)
                 .setContentTitle(context.getString(R.string.app))
                 .setContentText(message)
                 .setAutoCancel(true)

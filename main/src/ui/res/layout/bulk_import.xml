@@ -1,255 +1,370 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  ~ Minab Children — addition on top of ics-openvpn (GPLv2).
-  ~ Bulk import screen: pick many .ovpn files or one .zip, one shared
-  ~ username/password for all, a category for the batch, and an
-  ~ opt-in auto-detect-country checkbox.
-  ~
-  ~ Minab Beta v0.3 — Namaki-style card (shadowless, 16dp corners,
-  ~ thin border) on the home gradient, indigo primary button.
-  ~ v0.3 fixes: (1) live import progress — a progress bar plus
-  ~ "Imported X of N…" instead of one static "Importing…" line, and
-  ~ the last import summary is stored and shown again when the user
-  ~ comes back (minab_bulk_last_summary); (2) a real Apply button
-  ~ for the shared username/password (minab_bulk_apply_credentials).
-  ~ All view ids from v0.2 are kept, so BulkImportActivity only adds
-  ~ the new ones.
-  ~ Minab Beta v0.9.6.5 (fix #3) — the page is compact now: the hint
-  ~ is one short sentence, paddings are 12dp and section gaps 8-12dp
-  ~ instead of 20-24dp, so the whole page fits without scrolling on
-  ~ a normal phone (the ScrollView stays as a safety net). The group
-  ~ picker uses custom Vazirmatn item layouts now (minab_spinner_item
-  ~ / minab_spinner_dropdown_item) with the card popup background,
-  ~ instead of the old stock spinner menu.
+  Minab Beta v0.9.7 — minimal, modular, standard Bulk Import screen:
+  1. Top Live Progress / Applied Success Card (with clear "Done · Back to menu" button)
+  2. Add Configs Card (side-by-side .ovpn / .zip pickers + IP country auto-detection)
+  3. Link Import & Restore Backup Card
+  4. Shared Login Card (optional)
+  5. Clear bottom Back button
   -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/minab_bulk_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/minab_home_gradient"
-    android:padding="12dp">
+    android:clipToPadding="false"
+    android:paddingStart="14dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="24dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/minab_card_bg"
-        android:orientation="vertical"
-        android:padding="12dp"
-        android:paddingBottom="16dp">
+        android:orientation="vertical">
 
-        <TextView
+        <!-- 1. Prominent Live Progress & Applied Success Card -->
+        <LinearLayout
+            android:id="@+id/minab_bulk_result_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/vazirmatn"
-            android:text="@string/minab_bulk_import_hint"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:visibility="gone">
 
-        <!-- Minab Beta v0.9.6.4 (fix #2) — the group picker used
-             to sit at the very bottom of this long scrolling page,
-             after the URL import, the restore button and all the
-             credential fields, so it was never seen and read as
-             "not added". It is FIRST now, right under the hint,
-             with a bold label and a boxed spinner: pick a group
-             (or "Create group", or "All") BEFORE picking files. -->
-        <TextView
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/minab_bulk_result_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="10dp"
+                    android:contentDescription="@string/minab_bulk_done_title"
+                    android:src="@drawable/ic_minab_check_circle"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/minab_bulk_result_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="@string/minab_importing"
+                    android:textColor="@color/minab_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/minab_bulk_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:max="100"
+                android:progress="0"
+                android:progressBackgroundTint="@color/minab_divider"
+                android:progressTint="@color/minab_teal"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/minab_bulk_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="@font/vazirmatn"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/minab_bulk_done_btn"
+                style="@style/Minab.PrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="12dp"
+                android:minHeight="44dp"
+                android:text="@string/minab_bulk_back_home"
+                android:textSize="13sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 2. Add Configs & Grouping Card -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:fontFamily="@font/vazirmatn"
-            android:text="@string/minab_import_category"
-            android:textColor="@color/minab_text_primary"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
 
-        <!-- Minab Beta v0.9.6.5 (fix #3) — the dropdown uses the
-             card background and custom Vazirmatn items now (see
-             BulkImportActivity.refreshCategorySpinner); the stock
-             menu looked old and ugly. The spinner keeps its default
-             background (with the dropdown arrow), so it reads as a
-             picker, not a text field. -->
-        <Spinner
-            android:id="@+id/minab_bulk_category"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:popupBackground="@drawable/minab_card_bg" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_bulk_step_add"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
-        <CheckBox
-            android:id="@+id/minab_bulk_auto_category"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:checked="true"
-            android:text="@string/minab_auto_category"
-            android:textColor="@color/minab_text_primary" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_bulk_import_hint"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="12sp" />
 
-        <Button
-            android:id="@+id/minab_bulk_pick"
-            style="@style/Minab.PrimaryButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:drawableStart="@drawable/ic_minab_import"
-            android:drawableTint="@android:color/white"
-            android:text="@string/minab_pick_files" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/minab_bulk_pick_zip"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:drawableStart="@drawable/ic_baseline_archive_24"
-            android:drawableTint="@color/minab_teal"
-            android:text="@string/minab_pick_zip" />
+                <Button
+                    android:id="@+id/minab_bulk_pick"
+                    style="@style/Minab.PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:drawableStart="@drawable/ic_minab_import_small"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="@android:color/white"
+                    android:ellipsize="end"
+                    android:minHeight="44dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:singleLine="true"
+                    android:text="@string/minab_pick_files"
+                    android:textSize="12sp" />
 
-        <!-- Minab Beta v0.9 — import from a link: paste a URL to a
-             .ovpn file or a .zip of .ovpn files, download it and
-             import it like files picked by hand. -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:fontFamily="@font/vazirmatn"
-            android:text="@string/minab_import_from_link"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_primary"
-            android:textStyle="bold" />
+                <Button
+                    android:id="@+id/minab_bulk_pick_zip"
+                    style="@style/Minab.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:drawableStart="@drawable/ic_baseline_archive_24"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="@color/minab_teal"
+                    android:ellipsize="end"
+                    android:minHeight="44dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:singleLine="true"
+                    android:text="@string/minab_pick_zip"
+                    android:textSize="12sp" />
+            </LinearLayout>
 
-        <EditText
-            android:id="@+id/minab_bulk_url"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/minab_input_bg"
-            android:fontFamily="@font/vazirmatn"
-            android:hint="@string/minab_import_url_hint"
-            android:inputType="textUri"
-            android:padding="12dp"
-            android:singleLine="true"
-            android:textColor="@color/minab_text_primary" />
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="10dp"
+                android:background="@color/minab_divider" />
 
-        <Button
-            android:id="@+id/minab_bulk_fetch_url"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/minab_fetch_url" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_import_category"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-        <!-- Minab Beta v0.9 — restore a full Minab backup (configs
-             + groups + credentials + favorites + settings). -->
-        <Button
-            android:id="@+id/minab_bulk_restore"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/minab_restore_backup" />
+            <Spinner
+                android:id="@+id/minab_bulk_category"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:popupBackground="@drawable/minab_card_bg" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:fontFamily="@font/vazirmatn"
-            android:text="@string/minab_shared_credentials_hint"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
+            <CheckBox
+                android:id="@+id/minab_bulk_auto_category"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:buttonTint="@color/minab_teal"
+                android:checked="true"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_bulk_auto_ip_hint"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/minab_username"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
-
-        <EditText
-            android:id="@+id/minab_bulk_username"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/minab_input_bg"
-            android:fontFamily="@font/vazirmatn"
-            android:inputType="textNoSuggestions"
-            android:padding="12dp"
-            android:textColor="@color/minab_text_primary" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/minab_password"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
-
-        <EditText
-            android:id="@+id/minab_bulk_password"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/minab_input_bg"
-            android:fontFamily="@font/vazirmatn"
-            android:hint="@string/pw_query_hint"
-            android:inputType="textPassword"
-            android:padding="12dp"
-            android:textColor="@color/minab_text_primary" />
-
-        <!-- v0.3 bug fix 2: a real Apply button. The old "apply to
-             all" checkbox only affected the batch being imported and
-             had no confirmation; Apply saves the credentials and
-             writes them into ALL profiles that need a
-             username/password — already imported and future ones. -->
-        <Button
-            android:id="@+id/minab_bulk_apply_credentials"
-            style="@style/Minab.PrimaryButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/minab_apply_credentials" />
-
-        <CheckBox
-            android:id="@+id/minab_bulk_apply_all"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:checked="true"
-            android:text="@string/minab_apply_to_all"
-            android:textColor="@color/minab_text_primary" />
-
-        <!-- v0.3 bug fix 1: live progress bar + "Imported X of N…"
-             while an import runs (was one static "Importing…" line). -->
-        <ProgressBar
-            android:id="@+id/minab_bulk_progress"
-            style="?android:attr/progressBarStyleHorizontal"
+        <!-- 3. Import from Link & Restore Backup Card -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:max="100"
-            android:progress="0"
-            android:progressBackgroundTint="@color/minab_divider"
-            android:progressTint="@color/minab_teal"
-            android:visibility="gone" />
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
 
-        <TextView
-            android:id="@+id/minab_bulk_status"
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_bulk_step_more"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/minab_bulk_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/minab_input_bg"
+                android:fontFamily="@font/vazirmatn"
+                android:hint="@string/minab_import_url_hint"
+                android:inputType="textUri"
+                android:padding="11dp"
+                android:singleLine="true"
+                android:textColor="@color/minab_text_primary"
+                android:textColorHint="@color/minab_text_secondary"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/minab_bulk_fetch_url"
+                    style="@style/Minab.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:minHeight="40dp"
+                    android:singleLine="true"
+                    android:text="@string/minab_fetch_url"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/minab_bulk_restore"
+                    style="@style/Minab.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:minHeight="40dp"
+                    android:singleLine="true"
+                    android:text="@string/minab_restore_backup"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 4. Shared Login (optional) Card -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
+            android:layout_marginTop="12dp"
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
 
-        <!-- v0.3 bug fix 1: the last import summary, stored in
-             SharedPreferences and shown again on return (was only a
-             transient Toast, lost when leaving the page). -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_bulk_step_login"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/minab_bulk_username"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/minab_input_bg"
+                    android:fontFamily="@font/vazirmatn"
+                    android:hint="@string/minab_username"
+                    android:inputType="textNoSuggestions"
+                    android:padding="11dp"
+                    android:singleLine="true"
+                    android:textColor="@color/minab_text_primary"
+                    android:textColorHint="@color/minab_text_secondary"
+                    android:textSize="12sp" />
+
+                <EditText
+                    android:id="@+id/minab_bulk_password"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/minab_input_bg"
+                    android:fontFamily="@font/vazirmatn"
+                    android:hint="@string/minab_password"
+                    android:inputType="textPassword"
+                    android:padding="11dp"
+                    android:singleLine="true"
+                    android:textColor="@color/minab_text_primary"
+                    android:textColorHint="@color/minab_text_secondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/minab_bulk_apply_all"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:buttonTint="@color/minab_teal"
+                android:checked="true"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_apply_to_all"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/minab_bulk_apply_credentials"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:minHeight="40dp"
+                android:text="@string/minab_apply_credentials"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Last import caption & persistent Back to Menu button -->
         <TextView
             android:id="@+id/minab_bulk_last_summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/minab_text_secondary" />
+            android:layout_marginTop="10dp"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:textColor="@color/minab_text_secondary"
+            android:textSize="11sp" />
 
+        <Button
+            android:id="@+id/minab_bulk_footer_back"
+            style="@style/Minab.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="10dp"
+            android:minHeight="42dp"
+            android:text="@string/minab_bulk_back_home"
+            android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

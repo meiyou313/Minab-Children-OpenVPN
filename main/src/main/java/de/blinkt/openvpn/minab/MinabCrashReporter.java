@@ -58,6 +58,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import de.blinkt.openvpn.BuildConfig;
+import de.blinkt.openvpn.R;
 
 public final class MinabCrashReporter {
     private static final String CRASH_FILE = "minab-crash-report.txt";
@@ -232,9 +233,95 @@ public final class MinabCrashReporter {
         }
     }
 
-    /** Show the pending-report dialog, if any. Never blocks the app: either button (or the back
-        button) dismisses it, deletes both files, and the app works normally. Must be called on
-        the main thread. */
+    /** True when a real uncaught crash trace is saved on disk. */
+    public static boolean hasSavedCrash(Context ctx) {
+        if (ctx == null) return false;
+        try {
+            return ctx.getFileStreamPath(CRASH_FILE).exists();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    /** On-demand debug & crash report viewer opened from Settings (Debug section). */
+    public static void showReportDialog(final Activity activity, final int iconResId) {
+        if (activity == null || activity.isFinishing()) return;
+        if (Looper.myLooper() != Looper.getMainLooper()) return;
+        final Context ctx = activity.getApplicationContext();
+        try {
+            final String crash = readPrivateFile(ctx, CRASH_FILE);
+            final String crumbs = readPrivateFile(ctx, BREADCRUMB_FILE);
+            final boolean hasCrash = crash != null && !crash.isEmpty();
+            final boolean hasCrumbs = crumbs != null && !crumbs.isEmpty();
+
+            final String displayText;
+            final String shareText;
+            if (!hasCrash && !hasCrumbs) {
+                displayText = activity.getString(R.string.minab_crash_report_empty);
+                shareText = "";
+            } else {
+                StringBuilder sb = new StringBuilder();
+                if (hasCrash) {
+                    sb.append(crash);
+                    if (!crash.endsWith("\n")) sb.append('\n');
+                }
+                if (hasCrumbs) {
+                    if (sb.length() > 0) sb.append("\n---\n");
+                    sb.append(crumbs);
+                }
+                shareText = sb.toString();
+                if (shareText.length() > MAX_DIALOG_CHARS) {
+                    displayText = shareText.substring(0, MAX_DIALOG_CHARS) + "\n…";
+                } else {
+                    displayText = shareText;
+                }
+            }
+
+            TextView textView = new TextView(activity);
+            textView.setText(displayText);
+            textView.setTextIsSelectable(true);
+            textView.setTextSize(12f);
+            int pad = (int) (16 * activity.getResources().getDisplayMetrics().density);
+            textView.setPadding(pad, pad, pad, pad);
+            ScrollView scroll = new ScrollView(activity);
+            scroll.addView(textView);
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(activity)
+                    .setTitle(R.string.minab_crash_report_title)
+                    .setView(scroll)
+                    .setNegativeButton(android.R.string.ok, null);
+            if (iconResId != 0) {
+                builder.setIcon(iconResId);
+            }
+            if (hasCrash || hasCrumbs) {
+                builder.setPositiveButton(R.string.minab_crash_share, (d, which) -> {
+                    try {
+                        Intent send = new Intent(Intent.ACTION_SEND);
+                        send.setType("text/plain");
+                        send.putExtra(Intent.EXTRA_SUBJECT,
+                                "Minab crash report " + BuildConfig.VERSION_NAME);
+                        send.putExtra(Intent.EXTRA_TEXT, shareText);
+                        activity.startActivity(Intent.createChooser(
+                                send, activity.getString(R.string.minab_crash_share)));
+                    } catch (Exception ignored) {
+                    }
+                });
+                builder.setNeutralButton(R.string.minab_crash_clear, (d, which) -> {
+                    clearReports(ctx);
+                    try {
+                        android.widget.Toast.makeText(
+                                activity, R.string.minab_crash_cleared,
+                                android.widget.Toast.LENGTH_SHORT).show();
+                    } catch (Exception ignored) {
+                    }
+                });
+            }
+            builder.show();
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Show the pending-report dialog, if any. Kept for backwards compatibility. */
     public static void showPendingReportDialogIfAny(final Activity activity) {
         if (activity == null || activity.isFinishing()) return;
         if (Looper.myLooper() != Looper.getMainLooper()) return;

@@ -3,15 +3,10 @@
  * Copyright (c) 2026 Minab Children contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * CategoryStore: the list of known category names, kept in a small
- * SharedPreferences file ("MinabCategories"). Categories themselves live
- * on each VpnProfile (VpnProfile.mCategory, persisted with the profile);
- * this store only remembers which category names exist so the filter UI
- * can offer them (including names a user created and then removed from
- * every profile, until explicitly deleted), and so a renamed category
- * can be applied to all profiles that used the old name.
- *
- * Categories are plain user text. They are never sent anywhere.
+ * CategoryStore: manages dynamic IP-based country groups and user-created
+ * groups. Never pre-seeds default country groups — country groups only appear
+ * when imported configs belong to them (or when the user manually creates a
+ * group). Also defines sentinels for Favorites, Active, and Inactive tabs.
  */
 
 package de.blinkt.openvpn.minab;
@@ -20,6 +15,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -32,19 +28,15 @@ import de.blinkt.openvpn.core.ProfileManager;
 public final class CategoryStore {
     public static final String DEFAULT_CATEGORY = "Uncategorized";
 
-    /**
-     * Minab Beta v0.9.1 — sentinel for the favorites pseudo-tab
-     * (fix #7). It is used as the selected-category value, never as
-     * a real category name: it starts with a control character no
-     * user can type into the group-name field, so it can never
-     * collide with a real group.
-     */
+    /** Pseudo-tab sentinels (control-char prefixed so they never collide with group names). */
     public static final String FAVORITES_TAB = "\u0001favorites";
+    public static final String ACTIVE_TAB = "\u0001active";
+    public static final String INACTIVE_TAB = "\u0001inactive";
 
     private static final String PREFS_NAME = "MinabCategories";
     private static final String KEY_CATEGORIES = "categories";
-    /** Minab Beta v0.9.1 — the saved group order (fix #8), a JSON
-        array string: a StringSet would lose the order. */
+    /** Groups explicitly created by the user via "+ New group". */
+    private static final String KEY_MANUAL_CATEGORIES = "manual_categories";
     private static final String KEY_ORDER = "order";
 
     private CategoryStore() {
@@ -63,20 +55,28 @@ public final class CategoryStore {
         return trimmed;
     }
 
-    /** All known categories, sorted, default first. */
+    /** True if the value is a built-in pseudo-tab (favorites / active / inactive). */
+    public static boolean isPseudoTab(String category) {
+        return FAVORITES_TAB.equals(category)
+                || ACTIVE_TAB.equals(category)
+                || INACTIVE_TAB.equals(category);
+    }
+
+    /**
+     * All currently active categories: groups actually used by existing
+     * profiles plus any group explicitly created by the user, with
+     * DEFAULT_CATEGORY first (used by Assign / Copy / Move / Backup dialogs).
+     */
     public static List<String> getCategories(Context context) {
-        Set<String> stored = prefs(context).getStringSet(KEY_CATEGORIES, null);
         TreeSet<String> all = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        if (stored != null) all.addAll(stored);
+        Set<String> manual = prefs(context).getStringSet(KEY_MANUAL_CATEGORIES, null);
+        if (manual != null) all.addAll(manual);
         all.add(DEFAULT_CATEGORY);
-        // Also include categories actually used by profiles, in case the
-        // store was cleared or profiles came from a backup.
         try {
             for (VpnProfile p : ProfileManager.getInstance(context).getProfiles()) {
                 all.add(normalise(p.getCategory()));
             }
         } catch (Exception ignored) {
-            // Profile list not loadable here; stored set is enough.
         }
         List<String> out = new ArrayList<>(all);
         out.remove(DEFAULT_CATEGORY);
@@ -84,8 +84,42 @@ public final class CategoryStore {
         return Collections.unmodifiableList(out);
     }
 
+    /**
+     * Categories to show as filter chips on Home & Configs: ONLY country/group
+     * tabs that currently have at least one profile (plus user-created groups).
+     * DEFAULT_CATEGORY ("Uncategorized") is included ONLY when at least one
+     * profile is actually uncategorized, so a fresh/empty install never shows
+     * phantom default groups.
+     */
+    public static List<String> getDisplayCategories(Context context, Collection<VpnProfile> profiles) {
+        TreeSet<String> active = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        Set<String> manual = prefs(context).getStringSet(KEY_MANUAL_CATEGORIES, null);
+        if (manual != null) {
+            for (String m : manual) {
+                if (!DEFAULT_CATEGORY.equals(m)) active.add(normalise(m));
+            }
+        }
+        boolean hasUncategorized = false;
+        if (profiles != null) {
+            for (VpnProfile p : profiles) {
+                String cat = normalise(p.getCategory());
+                if (DEFAULT_CATEGORY.equals(cat)) {
+                    hasUncategorized = true;
+                } else {
+                    active.add(cat);
+                }
+            }
+        }
+        if (hasUncategorized) {
+            active.add(DEFAULT_CATEGORY);
+        }
+        return applySavedOrder(context, new ArrayList<>(active));
+    }
+
+    /** Record an auto-detected or assigned category. */
     public static void addCategory(Context context, String category) {
         String name = normalise(category);
+        if (DEFAULT_CATEGORY.equals(name)) return;
         Set<String> stored = new HashSet<>();
         Set<String> old = prefs(context).getStringSet(KEY_CATEGORIES, null);
         if (old != null) stored.addAll(old);
@@ -94,12 +128,25 @@ public final class CategoryStore {
         }
     }
 
+    /** Record a group explicitly created by the user so it stays visible even while empty. */
+    public static void addManualCategory(Context context, String category) {
+        String name = normalise(category);
+        if (DEFAULT_CATEGORY.equals(name)) return;
+        addCategory(context, name);
+        Set<String> manual = new HashSet<>();
+        Set<String> old = prefs(context).getStringSet(KEY_MANUAL_CATEGORIES, null);
+        if (old != null) manual.addAll(old);
+        if (manual.add(name)) {
+            prefs(context).edit().putStringSet(KEY_MANUAL_CATEGORIES, manual).apply();
+        }
+    }
+
     /** Rename a category everywhere: store + every profile using it. */
     public static void renameCategory(Context context, String oldName, String newName) {
         String from = normalise(oldName);
         String to = normalise(newName);
         if (from.equals(to)) return;
-        addCategory(context, to);
+        addManualCategory(context, to);
         try {
             ProfileManager pm = ProfileManager.getInstance(context);
             for (VpnProfile p : pm.getProfiles()) {
@@ -135,25 +182,32 @@ public final class CategoryStore {
     }
 
     private static void removeCategoryNameOnly(Context context, String name) {
-        Set<String> stored = new HashSet<>();
-        Set<String> old = prefs(context).getStringSet(KEY_CATEGORIES, null);
-        if (old != null) stored.addAll(old);
-        if (stored.remove(name)) {
-            prefs(context).edit().putStringSet(KEY_CATEGORIES, stored).apply();
+        SharedPreferences p = prefs(context);
+        SharedPreferences.Editor editor = p.edit();
+        boolean changed = false;
+        Set<String> old = p.getStringSet(KEY_CATEGORIES, null);
+        if (old != null && old.contains(name)) {
+            Set<String> copy = new HashSet<>(old);
+            copy.remove(name);
+            editor.putStringSet(KEY_CATEGORIES, copy);
+            changed = true;
         }
+        Set<String> oldManual = p.getStringSet(KEY_MANUAL_CATEGORIES, null);
+        if (oldManual != null && oldManual.contains(name)) {
+            Set<String> copy = new HashSet<>(oldManual);
+            copy.remove(name);
+            editor.putStringSet(KEY_MANUAL_CATEGORIES, copy);
+            changed = true;
+        }
+        if (changed) editor.apply();
     }
 
-    /**
-     * Minab Beta v0.9.1 — the display order of the group tabs
-     * (fix #8). The order the user set with the reorder dialog is
-     * saved; a category with no saved position yet (newly created)
-     * is inserted just before "Uncategorized", and "Uncategorized"
-     * is last unless the user moved it. Categories that no longer
-     * exist are dropped. Without a saved order, the order is the
-     * same as getCategories() (alphabetical, Uncategorized last).
-     */
+    /** Display order of all known categories (used by Reorder & Manage dialogs). */
     public static List<String> getOrderedCategories(Context context) {
-        List<String> known = getCategories(context);
+        return applySavedOrder(context, getCategories(context));
+    }
+
+    private static List<String> applySavedOrder(Context context, List<String> known) {
         List<String> saved = readOrder(context);
         List<String> out = new ArrayList<>();
         for (String name : saved) {
@@ -163,16 +217,19 @@ public final class CategoryStore {
         for (String name : known) {
             if (!out.contains(name)) missing.add(name);
         }
+        // Keep DEFAULT_CATEGORY at the end when inserting newly discovered groups.
+        boolean hadDefaultInMissing = missing.remove(DEFAULT_CATEGORY);
         int uncIdx = out.indexOf(DEFAULT_CATEGORY);
         if (uncIdx < 0) {
             out.addAll(missing);
+            if (hadDefaultInMissing) out.add(DEFAULT_CATEGORY);
         } else {
             out.addAll(uncIdx, missing);
         }
         return out;
     }
 
-    /** Save the group order set by the reorder dialog (fix #8). */
+    /** Save the group order set by the reorder dialog. */
     public static void saveOrder(Context context, List<String> order) {
         org.json.JSONArray arr = new org.json.JSONArray();
         for (String name : order) arr.put(name);
@@ -190,7 +247,6 @@ public final class CategoryStore {
                 if (name != null && !name.isEmpty()) out.add(normalise(name));
             }
         } catch (Exception ignored) {
-            // Corrupt order: fall back to the default order.
         }
         return out;
     }

@@ -21,6 +21,7 @@ import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.core.GlobalPreferences
+import de.blinkt.openvpn.minab.MinabUiPrefs
 
 abstract class BaseActivity : AppCompatActivity() {
     val isAndroidTV: Boolean
@@ -37,6 +38,7 @@ abstract class BaseActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        MinabUiPrefs.applySavedPreferences(this)
         if (isAndroidTV) {
             requestWindowFeature(Window.FEATURE_OPTIONS_PANEL)
         }

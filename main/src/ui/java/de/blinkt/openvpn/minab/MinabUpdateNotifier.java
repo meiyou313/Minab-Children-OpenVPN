@@ -73,13 +73,13 @@ public final class MinabUpdateNotifier {
                 manager.createNotificationChannel(channel);
             }
             Intent releases = new Intent(Intent.ACTION_VIEW,
-                    Uri.parse(MinabUpdateChecker.RELEASES_URL));
+                    Uri.parse(MinabUpdateChecker.getLatestReleaseUrl(context)));
             releases.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             PendingIntent pending = PendingIntent.getActivity(
                     context, 0, releases,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_logo_sw)
+                    .setSmallIcon(R.drawable.ic_stat_minab)
                     .setContentTitle(context.getString(R.string.minab_update_notification_title))
                     .setContentText(context.getString(R.string.minab_update_available, latestTag))
                     .setContentIntent(pending)

@@ -24,6 +24,8 @@ import de.blinkt.openvpn.BuildConfig
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.activities.OpenSSLSpeed
 import de.blinkt.openvpn.minab.MinabAllowedApps
+import de.blinkt.openvpn.minab.MinabCrashReporter
+import de.blinkt.openvpn.minab.MinabUiPrefs
 import de.blinkt.openvpn.minab.MinabUpdateChecker
 import de.blinkt.openvpn.api.ConfirmDialog.ANONYMOUS_PACKAGE
 import de.blinkt.openvpn.api.ExternalAppDatabase
@@ -67,6 +69,12 @@ class GeneralSettings : PreferenceFragmentCompat(), Preference.OnPreferenceClick
         val clearapi = findPreference<Preference>("clearapi") as Preference
         clearapi.onPreferenceClickListener = this
         findPreference<Preference>("osslspeed")!!.onPreferenceClickListener = this
+        // Minab Beta v0.9.7: Theme (Day/Night), Language, and Debug Crash Report (ladybug)
+        findPreference<Preference>("minab_theme")?.onPreferenceClickListener = this
+        findPreference<Preference>("minab_language")?.onPreferenceClickListener = this
+        findPreference<Preference>("minab_crash_report")?.onPreferenceClickListener = this
+        refreshAppearanceAndDebugSummaries()
+
         // Minab Beta v0.5: FAQ lives at the end of Settings now.
         findPreference<Preference>("minab_faq")!!.onPreferenceClickListener = this
         // Minab Beta v0.9: per-app VPN (split tunneling) picker.
@@ -160,9 +168,63 @@ class GeneralSettings : PreferenceFragmentCompat(), Preference.OnPreferenceClick
             // Minab Beta v0.9.1 — show the active per-app VPN mode
             // (fix #2) in the "Apps using the VPN" row.
             refreshPerAppSummary()
+            refreshAppearanceAndDebugSummaries()
         } catch (e: Exception) {
             android.util.Log.e("GeneralSettings", "Minab: onResume failed", e)
         }
+    }
+
+    private fun refreshAppearanceAndDebugSummaries() {
+        val ctx = context ?: return
+        findPreference<Preference>("minab_theme")?.summary = MinabUiPrefs.themeDisplayName(ctx)
+        findPreference<Preference>("minab_language")?.summary = MinabUiPrefs.languageDisplayName(ctx)
+        findPreference<Preference>("minab_crash_report")?.summary = getString(
+            if (MinabCrashReporter.hasSavedCrash(ctx))
+                R.string.minab_crash_report_summary_pending
+            else
+                R.string.minab_crash_report_summary_clean
+        )
+    }
+
+    private fun showThemeDialog() {
+        val ctx = context ?: return
+        val modes = arrayOf(MinabUiPrefs.THEME_SYSTEM, MinabUiPrefs.THEME_LIGHT, MinabUiPrefs.THEME_DARK)
+        val labels = arrayOf(
+            getString(R.string.minab_theme_system),
+            getString(R.string.minab_theme_light),
+            getString(R.string.minab_theme_dark)
+        )
+        val currentIdx = modes.indexOf(MinabUiPrefs.getThemeMode(ctx)).coerceAtLeast(0)
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.minab_theme_title)
+            .setSingleChoiceItems(labels, currentIdx) { dialog, which ->
+                dialog.dismiss()
+                MinabUiPrefs.setThemeMode(ctx, modes[which])
+                refreshAppearanceAndDebugSummaries()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showLanguageDialog() {
+        val ctx = context ?: return
+        val options = MinabUiPrefs.SUPPORTED_LANGUAGES
+        val labels = options.map { opt ->
+            if (opt.tag == MinabUiPrefs.LANG_SYSTEM) getString(R.string.minab_lang_system)
+            else opt.nativeLabel
+        }.toTypedArray()
+        val currentTag = MinabUiPrefs.getLanguageTag(ctx)
+        val currentIdx = options.indexOfFirst { it.tag.equals(currentTag, ignoreCase = true) }
+            .coerceAtLeast(0)
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.minab_language_title)
+            .setSingleChoiceItems(labels, currentIdx) { dialog, which ->
+                dialog.dismiss()
+                MinabUiPrefs.setLanguageTag(ctx, options[which].tag)
+                refreshAppearanceAndDebugSummaries()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     /** Minab Beta v0.9.1 — the Settings row says which per-app VPN
@@ -264,6 +326,12 @@ class GeneralSettings : PreferenceFragmentCompat(), Preference.OnPreferenceClick
             builder.show()
         } else if (preference.key == "osslspeed") {
             startActivity(Intent(activity, OpenSSLSpeed::class.java))
+        } else if (preference.key == "minab_theme") {
+            showThemeDialog()
+        } else if (preference.key == "minab_language") {
+            showLanguageDialog()
+        } else if (preference.key == "minab_crash_report") {
+            MinabCrashReporter.showReportDialog(requireActivity(), R.drawable.ic_minab_ladybug)
         } else if (preference.key == "minab_faq") {
             // Minab Beta v0.5 — FAQ moved out of the bottom tab bar
             // and to the end of Settings; it opens full-screen over
@@ -276,7 +344,7 @@ class GeneralSettings : PreferenceFragmentCompat(), Preference.OnPreferenceClick
             if (minabLatestTag != null &&
                 MinabUpdateChecker.isNewer(BuildConfig.VERSION_NAME, minabLatestTag!!)
             ) {
-                MinabUpdateChecker.openReleases(requireContext())
+                MinabUpdateChecker.openLatestRelease(requireContext())
             } else {
                 preference.summary = getString(R.string.minab_update_checking)
                 refreshUpdateSummary(preference, true)

@@ -388,27 +388,20 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     private int getIconByConnectionStatus(ConnectionStatus level) {
         switch (level) {
             case LEVEL_CONNECTED:
-                return R.drawable.ic_stat_vpn;
+                return R.drawable.ic_stat_minab;
             case LEVEL_AUTH_FAILED:
             case LEVEL_NONETWORK:
             case LEVEL_NOTCONNECTED:
-                return R.drawable.ic_stat_vpn_offline;
+            case LEVEL_VPNPAUSED:
+                return R.drawable.ic_stat_minab_offline;
             case LEVEL_CONNECTING_NO_SERVER_REPLY_YET:
             case LEVEL_WAITING_FOR_USER_INPUT:
-                // Minab Beta v0.9.2 — the backpack while connecting,
-                // not the stock key icon: ic_stat_vpn is the white
-                // backpack, ic_logo_sw the black-and-white one, so
-                // the alternation between connecting phases still
-                // reads as a blink.
-                return R.drawable.ic_stat_vpn;
+                return R.drawable.ic_stat_minab;
             case LEVEL_CONNECTING_SERVER_REPLIED:
-                return R.drawable.ic_logo_sw;
-            case LEVEL_VPNPAUSED:
-                return android.R.drawable.ic_media_pause;
+                return R.drawable.ic_stat_minab_offline;
             case UNKNOWN_LEVEL:
             default:
-                return R.drawable.ic_stat_vpn;
-
+                return R.drawable.ic_stat_minab;
         }
     }
 
@@ -639,8 +632,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
         Notification.Builder nbuilder = new Notification.Builder(this);
         nbuilder.setAutoCancel(true);
-        int icon = android.R.drawable.ic_dialog_info;
-        nbuilder.setSmallIcon(icon);
+        nbuilder.setSmallIcon(R.drawable.ic_stat_minab);
 
         Intent launchVPNIntent = new Intent(this, LaunchVPN.class);
         launchVPNIntent.putExtra(LaunchVPN.EXTRA_KEY, startprofile.getUUIDString());
@@ -1460,8 +1452,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
         Notification.Builder nbuilder = new Notification.Builder(this);
         nbuilder.setAutoCancel(true);
-        int icon = android.R.drawable.ic_dialog_info;
-        nbuilder.setSmallIcon(icon);
+        nbuilder.setSmallIcon(R.drawable.ic_stat_minab);
 
         Intent intent;
         int reason;

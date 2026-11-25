@@ -3,31 +3,9 @@
  * Copyright (c) 2026 Minab Children contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * AutoCategory: best-effort automatic categorisation of a profile by
- * country, from its remote host. It NEVER throws and NEVER blocks an
- * import: every failure returns null and the caller keeps the manual
- * category ("Uncategorized" unless the user picked one).
- *
- * Order of attempts:
- *   1. Offline heuristic — a 2-letter country code in the profile name,
- *      file name or remote hostname (e.g. "us-01.vpn.example.com",
- *      "de.ovpn", "nl-server"). This needs no network at all.
- *   2. Online lookup — resolve the remote host to an IP (background
- *      thread only), then GET https://ip-api.com/json/<ip>?fields=status,
- *      countryCode (3 s connect + 3 s read timeout). Result is cached in
- *      SharedPreferences ("MinabGeoCache", ip -> "CC|expiry") for 30 days.
- *
- * Honest limits (also documented in README.md):
- *   - ip-api.com free endpoint is rate-limited (~45 requests/minute from
- *     one IP). Bulk imports therefore do the lookup in chunks of 8 in
- *     parallel with no artificial delay (v0.3; v0.2 paused 1 s per
- *     profile), and any 429 / error simply leaves the profile
- *     uncategorised instead of failing.
- *   - Offline, or when DNS fails, only step 1 runs.
- *   - A hostname can be a CDN / anycast address whose country is not the
- *     country in its name; the heuristic is a guess, the user can always
- *     re-assign the category by hand (long-press in the list, or the
- *     Category field in the profile editor).
+ * AutoCategory: IP-based automatic country categorisation for imported VPN
+ * profiles, with an offline hostname/filename fallback when offline or DNS
+ * fails. Uses HTTPS GeoIP endpoints with 30-day SharedPreferences caching.
  */
 
 package de.blinkt.openvpn.minab;
@@ -50,16 +28,10 @@ import java.util.regex.Pattern;
 public final class AutoCategory {
     private static final String GEO_CACHE_PREFS = "MinabGeoCache";
     private static final long CACHE_TTL_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
-    private static final int HTTP_TIMEOUT_MS = 3000;
+    private static final int HTTP_TIMEOUT_MS = 3500;
 
-    /** Non-letter/digit boundaries around a 2-letter token, e.g. "-us-", "_de.", ".nl-".
-        Minab Beta v0.9.6.3 (fix #5): the token may be followed by a DIGIT too ("de20", "us16",
-        "fr2311" — vpnbook-style names), so the trailing boundary is "not a letter" instead of
-        "not a letter or digit". A following LETTER still blocks the match, so "free" never
-        matches "fr" and "book" never matches "bo". */
     private static final Pattern CODE_TOKEN =
             Pattern.compile("(?:^|[^a-z0-9])([a-z]{2})(?:[^a-z]|$)");
-    /** A 2-letter TLD at the end of a hostname, e.g. example.de */
     private static final Pattern TLD =
             Pattern.compile("\\.([a-z]{2})$");
 
@@ -67,43 +39,36 @@ public final class AutoCategory {
     }
 
     /**
-     * Best-effort country category for a profile. Returns a country name
-     * (e.g. "Germany") or null when nothing could be determined.
-     * Safe to call from a background thread only — it may do DNS and HTTP.
+     * IP-first country category detection for a profile.
+     * 1. Resolve remoteHost -> IP -> 30-day cache or HTTPS GeoIP lookup.
+     * 2. Fall back to offline country-code heuristic in profileName / fileName / host.
+     * Safe to call from a background thread only. Never throws.
      */
     public static String guessCategory(Context context, String profileName,
                                        String fileName, String remoteHost) {
-        // 1. Offline heuristic, cheapest first.
-        String code = codeFromText(profileName);
-        if (code == null) code = codeFromText(fileName);
-        if (code == null) code = codeFromText(remoteHost);
-        if (code == null) code = tldCode(remoteHost);
-        if (code != null) return CountryCodes.nameForCode(code);
-
-        // 2. Online lookup, only if we have a host to resolve.
-        if (context == null || TextUtils.isEmpty(remoteHost)) return null;
-        try {
-            String ip = resolveIp(remoteHost);
-            if (ip == null) return null;
-            String cached = cachedCountryCode(context, ip);
-            if (cached != null) return CountryCodes.nameForCode(cached);
-            String fetched = lookupCountryCode(ip);
-            if (fetched != null) {
-                cacheCountryCode(context, ip, fetched);
-                return CountryCodes.nameForCode(fetched);
+        // 1. IP-based country lookup first (most accurate for real server location).
+        if (context != null && !TextUtils.isEmpty(remoteHost)) {
+            try {
+                String ip = resolveIp(remoteHost);
+                if (ip != null) {
+                    String code = countryCodeForIp(context, ip);
+                    if (code != null) {
+                        String name = CountryCodes.nameForCode(code);
+                        if (name != null) return name;
+                    }
+                }
+            } catch (Exception ignored) {
             }
-        } catch (Exception ignored) {
-            // Any failure (no network, DNS, HTTP, JSON) -> no auto category.
         }
-        return null;
+
+        // 2. Offline heuristic fallback when offline, DNS failed, or rate-limited.
+        return guessOffline(profileName, fileName, remoteHost);
     }
 
     /**
-     * Minab Beta v0.9.6.5 (fix #2) — the country code for one
-     * already-resolved IP, for the row flag: same 30-day cache and
-     * ip-api.com lookup as guessCategory, but without re-doing DNS
-     * (the ping test already resolved the host). Background thread
-     * only. Returns the lower-case 2-letter code, or null.
+     * Resolve country code (lower-case 2-letter ISO) for an IP address,
+     * using the 30-day cache and HTTPS GeoIP fallback chain.
+     * Background thread only.
      */
     public static String countryCodeForIp(Context context, String ip) {
         if (context == null || TextUtils.isEmpty(ip)) return null;
@@ -116,12 +81,11 @@ public final class AutoCategory {
                 return fetched;
             }
         } catch (Exception ignored) {
-            // Any failure -> no country; the row keeps the globe.
         }
         return null;
     }
 
-    /** Offline-only part, usable from unit tests without a Context. */
+    /** Offline-only heuristic, usable without network or Context. */
     public static String guessOffline(String profileName, String fileName, String remoteHost) {
         String code = codeFromText(profileName);
         if (code == null) code = codeFromText(fileName);
@@ -150,11 +114,11 @@ public final class AutoCategory {
 
     private static String resolveIp(String host) {
         try {
-            // Already an IP literal: no DNS needed.
-            if (host.matches("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$") || host.contains(":")) {
-                return host;
+            String clean = host.trim();
+            if (clean.matches("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$") || clean.contains(":")) {
+                return clean;
             }
-            InetAddress addr = InetAddress.getByName(host);
+            InetAddress addr = InetAddress.getByName(clean);
             return addr == null ? null : addr.getHostAddress();
         } catch (Exception e) {
             return null;
@@ -183,19 +147,32 @@ public final class AutoCategory {
     }
 
     /**
-     * ip-api.com free endpoint. No API key. Fields are limited to what we
-     * need. Returns the lower-case country code, or null on any failure
-     * (including HTTP 429 rate-limiting).
+     * HTTPS GeoIP lookup chain (no API key, free public endpoints):
+     *   1. ipwho.is (JSON: {"success":true,"country_code":"DE"})
+     *   2. get.geojs.io (JSON: {"country":"DE"})
+     *   3. ipinfo.io (plain text: "DE")
      */
     private static String lookupCountryCode(String ip) {
+        String code = queryJsonField("https://ipwho.is/" + ip + "?fields=success,country_code",
+                "success", "country_code");
+        if (code != null) return code;
+
+        code = queryJsonField("https://get.geojs.io/v1/ip/country/" + ip + ".json",
+                null, "country");
+        if (code != null) return code;
+
+        return queryPlainCode("https://ipinfo.io/" + ip + "/country");
+    }
+
+    private static String queryJsonField(String urlStr, String boolGateKey, String codeKey) {
         HttpURLConnection conn = null;
         try {
-            URL url = new URL("https://ip-api.com/json/" + ip + "?fields=status,countryCode");
-            conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) new URL(urlStr).openConnection();
             conn.setConnectTimeout(HTTP_TIMEOUT_MS);
             conn.setReadTimeout(HTTP_TIMEOUT_MS);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("User-Agent", "Minab");
             if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) return null;
             StringBuilder sb = new StringBuilder();
             try (BufferedReader r = new BufferedReader(
@@ -204,11 +181,34 @@ public final class AutoCategory {
                 while ((line = r.readLine()) != null) sb.append(line);
             }
             JSONObject json = new JSONObject(sb.toString());
-            if (!"success".equals(json.optString("status"))) return null;
-            String code = json.optString("countryCode", null);
+            if (boolGateKey != null && !json.optBoolean(boolGateKey, false)) return null;
+            String code = json.optString(codeKey, null);
             if (TextUtils.isEmpty(code)) return null;
-            code = code.toLowerCase(Locale.US);
+            code = code.trim().toLowerCase(Locale.US);
             return CountryCodes.isKnownCode(code) ? code : null;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static String queryPlainCode(String urlStr) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setConnectTimeout(HTTP_TIMEOUT_MS);
+            conn.setReadTimeout(HTTP_TIMEOUT_MS);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "Minab");
+            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) return null;
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                String line = r.readLine();
+                if (TextUtils.isEmpty(line)) return null;
+                String code = line.trim().toLowerCase(Locale.US);
+                return CountryCodes.isKnownCode(code) ? code : null;
+            }
         } catch (Exception e) {
             return null;
         } finally {

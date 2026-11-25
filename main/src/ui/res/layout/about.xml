@@ -1,87 +1,295 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-  ~ Copyright (c) 2012-2016 Arne Schwabe
-  ~ Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
-  ~
-  ~ Minab Beta v0.9.1 — About is short now (fix #1): only the
-  ~ "Check for updates" button, its result RIGHT UNDER the button,
-  ~ the app version, and Minab's own text (version + the extra
-  ~ features vs similar apps). The upstream boilerplate (copyright
-  ~ notices, OpenVPN / OpenVPN3 / OpenSSL versions, translators,
-  ~ privacy policy, full license texts) is gone from this screen —
-  ~ the v0.9 trim had only cut Minab's own text, so the screen was
-  ~ still ~90% boilerplate. The thanks to ics-openvpn stays in
-  ~ minab_about_text, and the full licenses stay in the source
-  ~ repo (doc/LICENSE.txt, full_licenses.html in assets).
-  -->
-
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minab Beta v0.9.7 — modern card-based About screen with dynamic update checker -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:tools="http://schemas.android.com/tools"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingLeft="@dimen/stdpadding"
-        android:paddingRight="@dimen/stdpadding"
-        android:clipToPadding="false"
-        android:scrollbarStyle="outsideOverlay">
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/minab_home_gradient"
+    android:clipToPadding="false"
+    android:scrollbarStyle="outsideOverlay">
 
     <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
 
-        <!-- Minab Beta v0.9 — check for updates, at the TOP of the
-             About screen (like Namaki). Tapping it checks GitHub
-             now (no 24 h cache) and the result shows in
-             minab_update_status directly under the button. -->
-        <Button
-            android:id="@+id/minab_about_check_update"
-            style="@style/Minab.OutlinedButton"
+        <!-- 1. Hero brand card -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:layout_marginTop="8dp"
-            android:minHeight="40dp"
-            android:text="@string/minab_check_update"
-            android:textSize="13sp" />
+            android:layout_height="wrap_content"
+            android:background="@drawable/minab_card_bg"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingTop="22dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="18dp">
 
-        <!-- Minab Beta v0.9.1 — the check result, RIGHT UNDER the
-             button (fix #1): it used to sit below the whole About
-             text, so the user had to scroll to find it. -->
-        <TextView
-                android:id="@+id/minab_update_status"
-                android:layout_width="match_parent"
+            <ImageView
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:contentDescription="@string/app"
+                android:src="@drawable/ic_logo_bunt" />
+
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/minab_banner_bg"
-                android:backgroundTint="@color/minab_teal_tint"
+                android:layout_marginTop="10dp"
                 android:fontFamily="@font/vazirmatn"
-                android:padding="10dp"
+                android:text="@string/app"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_about_subtitle"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/version"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/minab_version_badge_bg"
+                android:fontFamily="@font/vazirmatn"
+                android:paddingStart="14dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="4dp"
                 android:textColor="@color/minab_teal_dark"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:visibility="gone" />
+                tools:text="Version 0.9.7-beta" />
 
-        <TextView
-                android:id="@+id/version"
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="14dp"
+                android:background="@color/minab_divider" />
+
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:textAppearance="?android:attr/textAppearanceLarge"
-                tools:ignore="SelectableText"
-                tools:text="OpenVPN for Android 1.2.3" />
+                android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
+                android:text="@string/minab_memorial"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
 
-        <!-- Minab Beta v0.4 — what Minab is, in Minab's own words.
-             Minab Beta v0.8 — autoLink="web" so the GitHub links
-             in minab_about_text are tappable.
-             Minab Beta v0.9 — the text is set in code
-             (AboutFragment) so the version appears in it. -->
-        <TextView
+        <!-- 2. Dynamic App Update card -->
+        <LinearLayout
+            android:id="@+id/minab_about_update_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="@string/minab_about_update_card_title"
+                    android:textColor="@color/minab_text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/minab_update_badge_pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/minab_version_badge_bg"
+                    android:fontFamily="@font/vazirmatn"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:textColor="@color/minab_teal_dark"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="v0.9.8" />
+            </LinearLayout>
+
+            <!-- Live checking spinner row -->
+            <LinearLayout
+                android:id="@+id/minab_update_progress_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ProgressBar
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginEnd="8dp"
+                    android:indeterminate="true"
+                    android:indeterminateTint="@color/minab_teal" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="@string/minab_update_checking"
+                    android:textColor="@color/minab_text_secondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Dynamic update result status -->
+            <TextView
+                android:id="@+id/minab_update_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/minab_live_stats_bg"
+                android:fontFamily="@font/vazirmatn"
+                android:padding="10dp"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <!-- Shown dynamically when a newer version is found: direct APK download + release assets -->
+            <Button
+                android:id="@+id/minab_about_download_btn"
+                style="@style/Minab.PrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="12dp"
+                android:minHeight="44dp"
+                android:textSize="13sp"
+                android:visibility="gone"
+                tools:text="Download v0.9.8" />
+
+            <Button
+                android:id="@+id/minab_about_assets_btn"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="8dp"
+                android:minHeight="40dp"
+                android:text="@string/minab_about_open_release_assets"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/minab_about_check_update"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="12dp"
+                android:minHeight="42dp"
+                android:text="@string/minab_check_update"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- 3. Features card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_about_highlights_title"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
                 android:id="@+id/minab_about_text_view"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:autoLink="web"
                 android:fontFamily="@font/vazirmatn"
+                android:lineSpacingExtra="4dp"
+                android:text="@string/minab_about_highlights_body"
                 android:textColor="@color/minab_text_secondary"
-                android:textSize="13sp" />
-    </LinearLayout>
+                android:textSize="12sp" />
+        </LinearLayout>
 
+        <!-- 4. Project & Source card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_about_links_title"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/minab_about_github_btn"
+                    style="@style/Minab.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="40dp"
+                    android:text="@string/minab_about_open_github"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/minab_about_releases_btn"
+                    style="@style/Minab.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="40dp"
+                    android:text="@string/minab_about_open_releases"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_about_credits"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+    </LinearLayout>
 </ScrollView>

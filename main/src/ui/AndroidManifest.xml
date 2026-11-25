@@ -70,17 +70,39 @@
             android:exported="false"
             android:label="@string/minab_per_app_vpn" />
 
-        <!-- Minab Beta v0.9 — home-screen widget: quick connect/disconnect. -->
+        <!-- Minab Beta v0.9.7 — home-screen widgets (2×1 Quick Toggle, 1×1 Mini Orb, 4×2 Dashboard). -->
         <receiver
             android:name=".minab.MinabWidgetProvider"
             android:exported="false"
-            android:label="@string/app">
+            android:label="@string/minab_widget_label_compact">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/minab_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".minab.MinabMiniWidgetProvider"
+            android:exported="false"
+            android:label="@string/minab_widget_label_mini">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/minab_widget_mini_info" />
+        </receiver>
+        <receiver
+            android:name=".minab.MinabLargeWidgetProvider"
+            android:exported="false"
+            android:label="@string/minab_widget_label_large">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/minab_widget_large_info" />
         </receiver>
         <service
                 android:exported="true"

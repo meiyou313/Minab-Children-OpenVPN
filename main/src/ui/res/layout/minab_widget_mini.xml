@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minab Beta v0.9.7 — Mini 1×1 Power Orb Widget.
+  One-tap glowing state-colored circular orb with crisp state indicator.
+  -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/minab_widget_mini_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/minab_widget_card_idle"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <FrameLayout
+        android:id="@+id/minab_widget_mini_orb"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/minab_widget_orb_idle">
+
+        <ImageView
+            android:layout_width="21dp"
+            android:layout_height="21dp"
+            android:layout_gravity="center"
+            android:contentDescription="@string/minab_tap_to_connect"
+            android:src="@drawable/ic_minab_power_white" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/minab_widget_mini_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:text="@string/app"
+        android:textColor="#E2E8F0"
+        android:textSize="9sp"
+        android:textStyle="bold" />
+</LinearLayout>

@@ -81,139 +81,273 @@
             android:background="@drawable/minab_card_bg"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:padding="12dp">
 
-            <!-- Dynamic animated Connect Orb (distinct colour gradients,
-                 glowing halo, orbital arcs, radar ripples & spring pop). -->
-            <de.blinkt.openvpn.minab.MinabConnectOrbView
-                android:id="@+id/minab_power_orb"
-                android:layout_width="88dp"
-                android:layout_height="88dp"
-                android:contentDescription="@string/minab_tap_to_connect" />
-
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- Dynamic animated Connect Orb (distinct colour gradients,
+                     glowing halo, orbital arcs, radar ripples & spring pop). -->
+                <de.blinkt.openvpn.minab.MinabConnectOrbView
+                    android:id="@+id/minab_power_orb"
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
+                    android:contentDescription="@string/minab_tap_to_connect" />
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="48dp"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/vazirmatn"
+                            android:text="@string/minab_conn_status"
+                            android:textColor="@color/minab_text_secondary"
+                            android:textSize="11sp" />
+
+                        <View
+                            android:id="@+id/minab_conn_status_dot"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/minab_status_dot" />
+
+                        <TextView
+                            android:id="@+id/minab_conn_status"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/vazirmatn"
+                            android:text="@string/minab_status_disconnected"
+                            android:textColor="@color/minab_text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="48dp"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/vazirmatn"
+                            android:text="@string/minab_conn_name"
+                            android:textColor="@color/minab_text_secondary"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/minab_conn_name"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/vazirmatn"
+                            android:maxLines="3"
+                            android:textColor="@color/minab_text_primary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="48dp"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/vazirmatn"
+                            android:text="@string/minab_conn_ip"
+                            android:textColor="@color/minab_text_secondary"
+                            android:textSize="11sp" />
+
+                        <ImageView
+                            android:id="@+id/minab_conn_ip_flag"
+                            android:layout_width="20dp"
+                            android:layout_height="15dp"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginEnd="6dp"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/minab_conn_ip"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/vazirmatn"
+                            android:textColor="@color/minab_text_primary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="48dp"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/vazirmatn"
+                            android:text="@string/minab_conn_ping"
+                            android:textColor="@color/minab_text_secondary"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/minab_conn_ping"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="true"
+                            android:contentDescription="@string/minab_connected_ping_desc"
+                            android:focusable="true"
+                            android:fontFamily="@font/vazirmatn"
+                            android:textColor="@color/minab_text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Live speed, session duration & session data bar (shown while connected) -->
+            <LinearLayout
+                android:id="@+id/minab_live_stats_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/minab_live_stats_bg"
+                android:orientation="horizontal"
+                android:paddingStart="6dp"
+                android:paddingTop="7dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="7dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
 
                     <TextView
-                        android:layout_width="48dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/vazirmatn"
-                        android:text="@string/minab_conn_status"
+                        android:text="@string/minab_session_down"
                         android:textColor="@color/minab_text_secondary"
-                        android:textSize="11sp" />
-
-                    <View
-                        android:id="@+id/minab_conn_status_dot"
-                        android:layout_width="8dp"
-                        android:layout_height="8dp"
-                        android:layout_marginEnd="6dp"
-                        android:background="@drawable/minab_status_dot" />
+                        android:textSize="9sp" />
 
                     <TextView
-                        android:id="@+id/minab_conn_status"
-                        android:layout_width="0dp"
+                        android:id="@+id/minab_live_down"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
+                        android:ellipsize="end"
                         android:fontFamily="@font/vazirmatn"
-                        android:text="@string/minab_status_disconnected"
-                        android:textColor="@color/minab_text_secondary"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:text="↓ 0 B/s"
+                        android:textColor="@color/minab_connected"
+                        android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:orientation="horizontal">
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
 
                     <TextView
-                        android:layout_width="48dp"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/vazirmatn"
-                        android:text="@string/minab_conn_name"
-                        android:textColor="@color/minab_text_secondary"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/minab_conn_name"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:fontFamily="@font/vazirmatn"
-                        android:maxLines="3"
-                        android:textColor="@color/minab_text_primary"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="48dp"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/vazirmatn"
-                        android:text="@string/minab_conn_ip"
-                        android:textColor="@color/minab_text_secondary"
-                        android:textSize="11sp" />
-
-                    <ImageView
-                        android:id="@+id/minab_conn_ip_flag"
-                        android:layout_width="20dp"
-                        android:layout_height="15dp"
-                        android:layout_gravity="center_vertical"
-                        android:layout_marginEnd="6dp"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/minab_conn_ip"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:fontFamily="@font/vazirmatn"
-                        android:textColor="@color/minab_text_primary"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="48dp"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/vazirmatn"
-                        android:text="@string/minab_conn_ping"
-                        android:textColor="@color/minab_text_secondary"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/minab_conn_ping"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:clickable="true"
-                        android:contentDescription="@string/minab_connected_ping_desc"
-                        android:focusable="true"
                         android:fontFamily="@font/vazirmatn"
+                        android:text="@string/minab_session_up"
                         android:textColor="@color/minab_text_secondary"
-                        android:textSize="12sp"
+                        android:textSize="9sp" />
+
+                    <TextView
+                        android:id="@+id/minab_live_up"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/vazirmatn"
+                        android:maxLines="1"
+                        android:text="↑ 0 B/s"
+                        android:textColor="@color/minab_teal"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/vazirmatn"
+                        android:text="@string/minab_session_duration"
+                        android:textColor="@color/minab_text_secondary"
+                        android:textSize="9sp" />
+
+                    <TextView
+                        android:id="@+id/minab_live_duration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/vazirmatn"
+                        android:maxLines="1"
+                        android:text="00:00:00"
+                        android:textColor="@color/minab_text_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/vazirmatn"
+                        android:text="@string/minab_session_total"
+                        android:textColor="@color/minab_text_secondary"
+                        android:textSize="9sp" />
+
+                    <TextView
+                        android:id="@+id/minab_live_total"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/vazirmatn"
+                        android:maxLines="1"
+                        android:text="0 B"
+                        android:textColor="@color/minab_text_primary"
+                        android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>

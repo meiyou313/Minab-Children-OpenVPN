@@ -6,6 +6,24 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Minab Beta v0.9.7 — Appearance: Theme (Day/Night) & Language -->
+    <PreferenceCategory
+            android:key="minab_appearance"
+            android:title="@string/minab_appearance_category">
+        <Preference app:iconSpaceReserved="false"
+                android:key="minab_theme"
+                android:persistent="false"
+                android:singleLineTitle="false"
+                android:title="@string/minab_theme_title" />
+
+        <Preference app:iconSpaceReserved="false"
+                android:key="minab_language"
+                android:persistent="false"
+                android:singleLineTitle="false"
+                android:title="@string/minab_language_title" />
+    </PreferenceCategory>
+
     <PreferenceCategory
             android:key="app_behaviour"
             android:title="@string/appbehaviour">
@@ -141,6 +159,21 @@
                 android:key="useInternalFileSelector"
                 android:summary="Always use the very basic file browser instead of the Android file browser. Use this option if you have problems selecting files."
                 android:title="Use internal file browser" />
+    </PreferenceCategory>
+
+    <!-- Minab Beta v0.9.7 — Debug & Diagnostics: Crash report moved out of
+         launch popup into Settings with a ladybug icon. -->
+    <PreferenceCategory
+            android:key="minab_debug"
+            android:title="@string/minab_debug_category">
+        <Preference
+                android:icon="@drawable/ic_minab_ladybug"
+                android:key="minab_crash_report"
+                android:persistent="false"
+                android:singleLineTitle="false"
+                android:summary="@string/minab_crash_report_summary_clean"
+                android:title="@string/minab_crash_report_title"
+                app:iconSpaceReserved="true" />
     </PreferenceCategory>
 
     <!-- Minab Beta v0.5 — FAQ moved out of the bottom tab bar and

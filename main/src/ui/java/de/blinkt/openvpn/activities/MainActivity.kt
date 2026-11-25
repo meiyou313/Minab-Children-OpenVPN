@@ -39,15 +39,6 @@ class MainActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Minab Beta v0.9.5 — if the last run crashed (or was
-        // killed mid-switch with no trace), show the recorded
-        // report FIRST, before this session writes its own first
-        // breadcrumb — the check reads the previous session's
-        // files, so it must run before anything appends to them.
-        try {
-            MinabCrashReporter.showPendingReportDialogIfAny(this)
-        } catch (e: Exception) {
-        }
         val view = layoutInflater.inflate(R.layout.main_activity, null)
 
         // Instantiate a ViewPager and a PagerAdapter.
@@ -121,6 +112,15 @@ class MainActivity : BaseActivity() {
         try {
             TabLayoutMediator(tablayout, mPager) { tab, position ->
                 tab.text = mPagerAdapter.getPageTitle(position)
+                val iconRes = when (position) {
+                    mPagerAdapter.indexOfFragment(VPNProfileList::class.java) -> R.drawable.ic_tab_home
+                    mPagerAdapter.indexOfFragment(ConfigsFragment::class.java) -> R.drawable.ic_tab_configs
+                    mPagerAdapter.indexOfFragment(GraphFragment::class.java) -> R.drawable.ic_tab_graph
+                    mPagerAdapter.indexOfFragment(GeneralSettings::class.java) -> R.drawable.ic_tab_settings
+                    mPagerAdapter.indexOfFragment(AboutFragment::class.java) -> R.drawable.ic_tab_about
+                    else -> 0
+                }
+                if (iconRes != 0) tab.setIcon(iconRes)
             }.attach()
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Minab: tab mediator failed", e)

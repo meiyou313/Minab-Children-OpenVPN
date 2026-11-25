@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core tabs & settings -->
+    <string name="graph">نمودار</string>
+    <string name="generalsettings">تنظیمات</string>
+    <string name="about">درباره</string>
+    <string name="faq">سوالات متداول</string>
+    <string name="openvpn_log">گزارش OpenVPN</string>
+    <string name="appbehaviour">رفتار برنامه</string>
+    <string name="vpnbehaviour">رفتار VPN</string>
+    <string name="device_specific">تنظیمات دستگاه</string>
+    <string name="defaultvpn">VPN پیش‌فرض</string>
+    <string name="show_log_window">نمایش پنجره گزارش</string>
+    <string name="keep_vpn_connected">اتصال مجدد هنگام راه‌اندازی</string>
+    <string name="encrypt_profiles">رمزگذاری پروفایل‌ها</string>
+    <string name="use_logarithmic_scale">مقیاس لگاریتمی</string>
+    <string name="last5minutes">۵ دقیقه گذشته</string>
+    <string name="avgmin">میانگین دقیقه‌ای</string>
+    <string name="avghour">میانگین ساعتی</string>
+    <string name="data_in">دانلود</string>
+    <string name="data_out">آپلود</string>
+    <string name="notenoughdata">داده کافی برای نمایش نمودار وجود ندارد</string>
+
+    <!-- Minab UI -->
+    <string name="minab_home_tab">خانه</string>
+    <string name="minab_configs_tab">کانفیگ‌ها</string>
+    <string name="minab_memorial">به یاد ۱۶۸ کودک بی‌گناه دبستان میناب که خیلی زود آسمانی شدند.</string>
+    <string name="minab_tap_to_connect">برای اتصال لمس کنید</string>
+    <string name="minab_status_connected">متصل</string>
+    <string name="minab_status_connecting">در حال اتصال…</string>
+    <string name="minab_status_disconnecting">در حال قطع اتصال…</string>
+    <string name="minab_status_disconnected">قطع</string>
+    <string name="minab_status_testing">در حال تست سرورها…</string>
+    <string name="minab_orb_desc_connected">متصل — برای قطع لمس کنید</string>
+    <string name="minab_conn_status">وضعیت</string>
+    <string name="minab_conn_name">سرور</string>
+    <string name="minab_conn_ip">آی‌پی</string>
+    <string name="minab_conn_ping">پینگ</string>
+    <string name="minab_import_short">افزودن</string>
+    <string name="minab_test_ping">پینگ تست</string>
+    <string name="minab_real_test">ریل تست</string>
+    <string name="minab_best_server">اتصال به بهترین سرور</string>
+    <string name="minab_best_none">ابتدا پینگ تست یا ریل تست را اجرا کنید.</string>
+    <string name="minab_tests_explained">پینگ تست: سریع اما تقریبی\nریل تست: کندتر اما دقیق و واقعی</string>
+    <string name="minab_search_hint">جستجوی سرور بر اساس نام یا کشور…</string>
+    <string name="minab_favorites_tab">علاقه‌مندی</string>
+    <string name="minab_all_tab">همه</string>
+    <string name="minab_active_tab">فعال</string>
+    <string name="minab_inactive_tab">غیرفعال</string>
+    <string name="minab_no_favorites_yet">هنوز سروری را ستاره‌دار نکرده‌اید.</string>
+    <string name="minab_no_active_yet">هنوز سرور فعالی یافت نشده — ابتدا پینگ تست یا ریل تست را اجرا کنید.</string>
+    <string name="minab_no_inactive_yet">همه سرورها در حال حاضر فعال هستند.</string>
+    <string name="minab_manage_categories">مدیریت گروه‌ها</string>
+    <string name="minab_new_group">گروه جدید</string>
+    <string name="minab_new_category">گروه جدید</string>
+    <string name="minab_rename_category">تغییر نام گروه</string>
+    <string name="minab_delete_category">حذف گروه</string>
+    <string name="minab_assign_category">انتقال به گروه</string>
+    <string name="minab_reorder_groups">مرتب‌سازی گروه‌ها</string>
+    <string name="minab_all_categories">همه گروه‌ها</string>
+    <string name="minab_filter_category">فیلتر بر اساس گروه</string>
+    <string name="minab_no_profiles_yet">هیچ کانفیگی وجود ندارد — ابتدا کانفیگ اضافه کنید.</string>
+    <string name="minab_notification_off">اعلان‌ها غیرفعال است — برای فعال‌سازی لمس کنید</string>
+
+    <!-- Live session stats -->
+    <string name="minab_session_duration">مدت</string>
+    <string name="minab_session_down">دانلود</string>
+    <string name="minab_session_up">آپلود</string>
+    <string name="minab_session_total">مصرف</string>
+
+    <!-- Minimal empty state -->
+    <string name="minab_empty_title">هنوز کانفیگی اضافه نشده</string>
+    <string name="minab_empty_subtitle">برای اضافه کردن فایل‌های .ovpn یا .zip روی دکمه زیر کلیک کنید</string>
+    <string name="minab_empty_add_btn">افزودن کانفیگ</string>
+    <string name="minab_empty_filter_title">سروری یافت نشد</string>
+    <string name="minab_empty_filter_subtitle">گروه دیگری را انتخاب کنید یا متن جستجو را پاک کنید</string>
+
+    <!-- Test progress box & connect lock -->
+    <string name="minab_connect_locked_testing">در حال انجام تست…</string>
+    <string name="minab_connect_locked_toast">تست در حال اجراست — تا پایان تست صبر کنید یا آن را لغو کنید.</string>
+    <string name="minab_test_panel_ping_title">پینگ تست در حال اجرا</string>
+    <string name="minab_test_panel_real_ping_title">ریل تست · مرحله پینگ</string>
+    <string name="minab_test_panel_real_title">ریل تست در حال اجرا</string>
+    <string name="minab_test_panel_ping_done_title">پینگ تست پایان یافت</string>
+    <string name="minab_test_panel_real_done_title">ریل تست پایان یافت</string>
+    <string name="minab_test_stat_tested">تست شده</string>
+    <string name="minab_test_stat_remaining">باقی‌مانده</string>
+    <string name="minab_test_stat_responded">پاسخ‌داده</string>
+    <string name="minab_test_stat_working">سالم</string>
+    <string name="minab_test_ping_detail_total">در حال تست هم‌زمان %1$d سرور…</string>
+    <string name="minab_test_ping_detail_latest">آخرین: %1$s (%2$d از %3$d)</string>
+    <string name="minab_test_real_detail_current">در حال تست: %1$s</string>
+    <string name="minab_test_real_detail_eta">در حال تست: %1$s · حدود %2$d ثانیه مانده</string>
+    <string name="minab_test_cancel_btn">لغو تست</string>
+    <string name="minab_test_dismiss_btn">بستن</string>
+    <string name="minab_ping_done">پینگ تست تمام شد. سریع‌ترین‌ها در ابتدا هستند.</string>
+    <string name="minab_ping_cancelled">پینگ تست لغو شد.</string>
+    <string name="minab_real_done">ریل تست تمام شد. سرورهای سالم در ابتدا هستند.</string>
+    <string name="minab_real_cancelled">ریل تست لغو شد.</string>
+    <string name="minab_real_blocked">مسدود</string>
+
+    <!-- Real test settings -->
+    <string name="minab_real_settings_title">تنظیمات ریل تست</string>
+    <string name="minab_real_settings_wait">زمان انتظار هر سرور</string>
+    <string name="minab_real_settings_wait_hint">پیشنهادی: ۱۲ ثانیه</string>
+    <string name="minab_real_settings_max">تعداد سرور سالم</string>
+    <string name="minab_real_settings_max_hint">پیشنهادی: ۵</string>
+    <string name="minab_real_settings_unpinged">تست سرورهای بدون پاسخ پینگ</string>
+    <string name="minab_real_settings_unpinged_hint">پیشنهادی: خاموش</string>
+    <string name="minab_real_settings_reset">بازنشانی به پیش‌فرض</string>
+
+    <!-- Settings: Theme, Language, Debug -->
+    <string name="minab_appearance_category">ظاهر و زبان</string>
+    <string name="minab_theme_title">حالت نمایش (شب و روز)</string>
+    <string name="minab_theme_system">هماهنگ با سیستم</string>
+    <string name="minab_theme_light">حالت روز (روشن)</string>
+    <string name="minab_theme_dark">حالت شب (تیره)</string>
+    <string name="minab_language_title">زبان برنامه</string>
+    <string name="minab_lang_system">پیش‌فرض سیستم</string>
+    <string name="minab_debug_category">عیب‌یابی (Debug)</string>
+    <string name="minab_crash_report_title">گزارش خرابی و لاگ عیب‌یابی</string>
+    <string name="minab_crash_report_summary_clean">خطایی ثبت نشده · برای مشاهده لاگ اخیر لمس کنید</string>
+    <string name="minab_crash_report_summary_pending">یک گزارش خرابی ثبت شده — برای مشاهده یا اشتراک‌گذاری لمس کنید</string>
+    <string name="minab_crash_report_empty">هیچ گزارش خرابی یا رویدادی ثبت نشده است.</string>
+    <string name="minab_crash_share">اشتراک‌گذاری</string>
+    <string name="minab_crash_clear">پاک کردن</string>
+    <string name="minab_crash_cleared">گزارش‌های خرابی پاک شدند.</string>
+    <string name="minab_show_speed_notification">نمایش سرعت در اعلان</string>
+    <string name="minab_show_speed_notification_summary">نمایش سرعت لحظه‌ای دانلود و آپلود در نوار اعلان</string>
+    <string name="minab_failover">تغییر خودکار سرور هنگام قطع اتصال</string>
+    <string name="minab_failover_summary">در صورت قطع سرور، اتصال خودکار به سرور سالم بعدی (حداکثر ۳ بار)</string>
+    <string name="minab_per_app_vpn">برنامه‌های متصل به VPN</string>
+    <string name="minab_per_app_vpn_summary">انتخاب برنامه‌هایی که از VPN عبور کنند یا مستقیم باشند</string>
+    <string name="minab_per_app_vpn_summary_bypass">دور زدن: همه برنامه‌ها به‌جز موارد انتخابی</string>
+    <string name="minab_per_app_vpn_summary_only">فقط برنامه‌های انتخاب‌شده از VPN استفاده می‌کنند</string>
+    <string name="minab_check_update">بررسی بروزرسانی</string>
+    <string name="minab_check_update_summary">بررسی گیت‌هاب برای نسخه جدید میناب</string>
+    <string name="minab_faq_settings_summary">راهنمای افزودن کانفیگ، گروه‌بندی، تست‌ها، پشتیبان‌گیری و ویجت</string>
+
+    <!-- Graph -->
+    <string name="minab_data_used">حجم مصرفی</string>
+    <string name="minab_data_daily">روزانه</string>
+    <string name="minab_data_weekly">هفتگی</string>
+    <string name="minab_data_monthly">ماهانه</string>
+    <string name="minab_data_total">مجموع: %1$s</string>
+    <string name="minab_data_none_yet">هنوز مصرفی ثبت نشده — با اتصال به سرور، آمار مصرف اینجا نمایش داده می‌شود.</string>
+    <string name="minab_live_speed">سرعت لحظه‌ای</string>
+    <string name="minab_graph_live_card_title">سرعت لحظه‌ای اتصال</string>
+    <string name="minab_graph_download">دانلود</string>
+    <string name="minab_graph_upload">آپلود</string>
+    <string name="minab_graph_session_total">مصرف این اتصال: %1$s</string>
+    <string name="minab_graph_idle">برای مشاهده سرعت لحظه‌ای به یک سرور متصل شوید</string>
+
+    <!-- About & Dynamic Updates -->
+    <string name="minab_about_subtitle">کلاینت سریع و مدرن OpenVPN</string>
+    <string name="minab_about_version_badge">نسخه %1$s</string>
+    <string name="minab_about_update_card_title">بروزرسانی برنامه</string>
+    <string name="minab_about_download_latest">دانلود نسخه %1$s</string>
+    <string name="minab_about_open_release_assets">باز کردن بخش فایل‌ها (Assets) در گیت‌هاب</string>
+    <string name="minab_about_update_ready">نسخه جدید %1$s برای دانلود آماده است.</string>
+    <string name="minab_about_up_to_date">شما از آخرین نسخه (%1$s) استفاده می‌کنید.</string>
+    <string name="minab_update_checking">در حال بررسی نسخه جدید…</string>
+    <string name="minab_update_none">برنامه بروز است (%1$s).</string>
+    <string name="minab_update_available">نسخه جدید %1$s منتشر شد — برای دانلود لمس کنید</string>
+    <string name="minab_update_available_short">نسخه جدید موجود است: %1$s</string>
+    <string name="minab_update_failed">اتصال به گیت‌هاب ممکن نشد. اینترنت خود را بررسی کنید و دوباره تلاش کنید.</string>
+    <string name="minab_about_highlights_title">ویژگی‌های میناب</string>
+    <string name="minab_about_highlights_body">افزودن گروهی .ovpn و .zip · گروه‌بندی خودکار کشور بر اساس IP · پینگ تست و ریل تست · فیلتر فعال/غیرفعال · نمودار سرعت و مصرف · تعویض خودکار سرور · فیلتر برنامه‌ها · پشتیبان‌گیری کامل · ویجت‌های صفحه اصلی</string>
+    <string name="minab_about_links_title">پروژه و کد منبع</string>
+    <string name="minab_about_open_github">مخزن گیت‌هاب (GitHub)</string>
+    <string name="minab_about_open_releases">صفحه نسخه‌ها و دانلود</string>
+    <string name="minab_about_credits">ساخته‌شده بر پایه ics-openvpn (آرنه شوابه، GPLv2). متن‌باز، رایگان و بدون تبلیغات.</string>
+
+    <!-- Bulk Import -->
+    <string name="minab_bulk_import_title">افزودن کانفیگ‌ها</string>
+    <string name="minab_bulk_import_hint">فایل‌های .ovpn یا فایل .zip خود را انتخاب کنید تا همگی با هم اضافه شوند.</string>
+    <string name="minab_bulk_step_add">افزودن کانفیگ</string>
+    <string name="minab_bulk_step_group">گروه‌بندی و تشخیص کشور</string>
+    <string name="minab_bulk_step_more">افزودن از لینک یا پشتیبان</string>
+    <string name="minab_bulk_step_login">نام کاربری و رمز مشترک (اختیاری)</string>
+    <string name="minab_pick_files">انتخاب فایل‌های .ovpn</string>
+    <string name="minab_pick_zip">انتخاب فایل .zip</string>
+    <string name="minab_import_category">گروه مقصد</string>
+    <string name="minab_import_create_group">ساخت گروه جدید…</string>
+    <string name="minab_import_category_all">تشخیص خودکار (بر اساس کشور IP)</string>
+    <string name="minab_auto_category">تشخیص خودکار کشور از روی آی‌پی سرور</string>
+    <string name="minab_bulk_auto_ip_hint">تشخیص خودکار کشور هر سرور بر اساس آی‌پی آن</string>
+    <string name="minab_import_from_link">افزودن از لینک</string>
+    <string name="minab_import_url_hint">لینک مستقیم فایل .ovpn یا .zip را وارد کنید</string>
+    <string name="minab_fetch_url">دانلود و افزودن</string>
+    <string name="minab_restore_backup">بازیابی پشتیبان میناب</string>
+    <string name="minab_username">نام کاربری</string>
+    <string name="minab_password">رمز عبور</string>
+    <string name="minab_apply_credentials">اعمال روی همه کانفیگ‌ها</string>
+    <string name="minab_apply_to_all">اعمال برای کانفیگ‌های جدید</string>
+    <string name="minab_importing">در حال افزودن کانفیگ‌ها…</string>
+    <string name="minab_import_progress">%1$d از %2$d اضافه شد…</string>
+    <string name="minab_import_categorising">تشخیص کشور سرورها… %1$d از %2$d</string>
+    <string name="minab_import_summary">اضافه شد: %1$d · تکراری: %2$d · ناموفق: %3$d</string>
+    <string name="minab_bulk_done_title">کانفیگ‌ها با موفقیت اعمال شدند</string>
+    <string name="minab_bulk_done_partial">عملیات افزودن به پایان رسید</string>
+    <string name="minab_bulk_done_detail">%1$d اضافه شد · %2$d تکراری · %3$d ناموفق</string>
+    <string name="minab_bulk_back_home">انجام شد · بازگشت به منو</string>
+    <string name="minab_last_import">آخرین عملیات: %1$s</string>
+    <string name="minab_credentials_applied">روی %1$d پروفایل اعمال و ذخیره شد.</string>
+
+    <!-- Configs tab -->
+    <string name="minab_configs_title">کانفیگ‌ها</string>
+    <string name="minab_configs_hint">برای ویرایش لمس کنید؛ برای حذف، کپی یا انتقال، تیک بزنید.</string>
+    <string name="minab_credentials_for_group">رمز برای این گروه</string>
+    <string name="minab_credentials_for_all">رمز برای همه</string>
+    <string name="minab_backup_configs">پشتیبان‌گیری</string>
+    <string name="minab_share_all">اشتراک‌گذاری همه</string>
+    <string name="minab_share_group">اشتراک این گروه</string>
+    <string name="minab_share_selected_short">اشتراک (%1$d)</string>
+    <string name="minab_delete_short">حذف</string>
+    <string name="minab_copy_selected">کپی</string>
+    <string name="minab_move_selected">انتقال</string>
+
+    <!-- Widgets -->
+    <string name="minab_widget_label_compact">میناب · اتصال سریع (۲×۱)</string>
+    <string name="minab_widget_label_mini">میناب · دکمه کوچک (۱×۱)</string>
+    <string name="minab_widget_label_large">میناب · وضعیت و سرعت (۴×۲)</string>
+    <string name="minab_widget_best_short">بهترین</string>
+    <string name="minab_widget_ready">آماده اتصال</string>
+    <string name="minab_widget_no_server">برای افزودن کانفیگ لمس کنید</string>
+</resources>
