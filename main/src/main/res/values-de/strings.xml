@@ -12,7 +12,7 @@
     <string name="minab_test_ping">Ping-Test</string>
     <string name="minab_real_test">Echt-Test</string>
     <string name="minab_best_server">Mit bestem Server verbinden</string>
-    <string name="minab_search_hint">Server nach Name oder Land suchen…</string>
+    <string name="minab_search_hint">Server suchen…</string>
     <string name="minab_favorites_tab">Favoriten</string>
     <string name="minab_all_tab">Alle</string>
     <string name="minab_active_tab">Aktiv</string>
@@ -74,4 +74,27 @@
     <string name="minab_credentials_for_scope">Für %1$s</string>
     <string name="minab_test_compact_ping_done">Ping fertig · %1$d von %2$d aktiv</string>
     <string name="minab_test_compact_real_done">Realtest fertig · %1$d von %2$d aktiv</string>
+    <string name="minab_theme_auto_short">Auto</string>
+    <string name="minab_theme_light_short">Hell</string>
+    <string name="minab_theme_dark_short">Dunkel</string>
+    <string name="minab_settings_cat_connection">Verbindung &amp; Smart-VPN</string>
+    <string name="minab_settings_cat_privacy">Netzwerk &amp; Datenschutz</string>
+    <string name="minab_settings_cat_advanced">Erweitert</string>
+    <string name="minab_settings_cat_advanced_hint">OpenVPN-Kern, Protokolle &amp; Tools</string>
+    <string name="minab_settings_cat_help">Hilfe &amp; Diagnose</string>
+    <string name="minab_settings_failover_short">Automatisches Failover</string>
+    <string name="minab_settings_default_vpn_none">Nicht festgelegt (tippen)</string>
+    <string name="minab_settings_screenoff_short">VPN bei ausgeschaltetem Bildschirm nach 60 s Leerlauf pausieren</string>
+    <string name="minab_settings_none_option">Keine</string>
+    <string name="minab_configs_login_short">Login</string>
+    <string name="minab_configs_backup_short">Backup</string>
+    <string name="minab_configs_share_short">Teilen</string>
+    <string name="minab_configs_cleanup_short">Aufräumen</string>
+    <string name="minab_configs_selected_count">%1$d ausgewählt</string>
+    <string name="minab_configs_backup_scope_title">Konfigs sichern</string>
+    <string name="minab_configs_backup_scope_selected">Ausgewählte (%1$d)</string>
+    <string name="minab_configs_backup_scope_group">Aktuelle Gruppe: %1$s (%2$d)</string>
+    <string name="minab_configs_backup_scope_all">Voll-Backup · Alle (%1$d)</string>
+    <string name="minab_configs_cleanup_scope_title">Aufräumen · %1$s</string>
+    <string name="minab_connect_server">Verbinden</string>
 </resources>

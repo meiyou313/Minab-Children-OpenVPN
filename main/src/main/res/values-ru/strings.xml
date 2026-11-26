@@ -12,7 +12,7 @@
     <string name="minab_test_ping">Пинг-тест</string>
     <string name="minab_real_test">Реал-тест</string>
     <string name="minab_best_server">Подключить лучший сервер</string>
-    <string name="minab_search_hint">Поиск серверов по имени или стране…</string>
+    <string name="minab_search_hint">Поиск серверов…</string>
     <string name="minab_favorites_tab">избранное</string>
     <string name="minab_all_tab">все</string>
     <string name="minab_active_tab">Активные</string>
@@ -74,4 +74,27 @@
     <string name="minab_credentials_for_scope">Для %1$s</string>
     <string name="minab_test_compact_ping_done">Пинг готов · %1$d из %2$d</string>
     <string name="minab_test_compact_real_done">Реал-тест готов · %1$d из %2$d</string>
+    <string name="minab_theme_auto_short">Авто</string>
+    <string name="minab_theme_light_short">Светлая</string>
+    <string name="minab_theme_dark_short">Тёмная</string>
+    <string name="minab_settings_cat_connection">Подключение и Smart VPN</string>
+    <string name="minab_settings_cat_privacy">Сеть и приватность</string>
+    <string name="minab_settings_cat_advanced">Дополнительно</string>
+    <string name="minab_settings_cat_advanced_hint">Ядро OpenVPN, логи и инструменты</string>
+    <string name="minab_settings_cat_help">Помощь и диагностика</string>
+    <string name="minab_settings_failover_short">Автопереключение сервера</string>
+    <string name="minab_settings_default_vpn_none">Не задан (нажмите)</string>
+    <string name="minab_settings_screenoff_short">Пауза VPN при выключенном экране и простое 60 с</string>
+    <string name="minab_settings_none_option">Нет</string>
+    <string name="minab_configs_login_short">Логин</string>
+    <string name="minab_configs_backup_short">Бэкап</string>
+    <string name="minab_configs_share_short">Поделиться</string>
+    <string name="minab_configs_cleanup_short">Очистка</string>
+    <string name="minab_configs_selected_count">Выбрано: %1$d</string>
+    <string name="minab_configs_backup_scope_title">Резервная копия</string>
+    <string name="minab_configs_backup_scope_selected">Выбранные (%1$d)</string>
+    <string name="minab_configs_backup_scope_group">Текущая группа: %1$s (%2$d)</string>
+    <string name="minab_configs_backup_scope_all">Полный бэкап · Все (%1$d)</string>
+    <string name="minab_configs_cleanup_scope_title">Очистка · %1$s</string>
+    <string name="minab_connect_server">Подключиться</string>
 </resources>

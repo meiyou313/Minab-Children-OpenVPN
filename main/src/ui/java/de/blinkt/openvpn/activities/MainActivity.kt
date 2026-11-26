@@ -5,13 +5,19 @@
 package de.blinkt.openvpn.activities
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.recyclerview.widget.RecyclerView
@@ -35,10 +41,16 @@ import de.blinkt.openvpn.views.ScreenSlidePagerAdapter
 class MainActivity : BaseActivity() {
     private lateinit var mPager: ViewPager2
     private lateinit var mPagerAdapter: ScreenSlidePagerAdapter
+    private var tabBaseTypeface: Typeface? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        tabBaseTypeface = try {
+            ResourcesCompat.getFont(this, R.font.vazirmatn)
+        } catch (_: Exception) {
+            null
+        }
         val view = layoutInflater.inflate(R.layout.main_activity, null)
 
         // Instantiate a ViewPager and a PagerAdapter.
@@ -111,7 +123,7 @@ class MainActivity : BaseActivity() {
 
         try {
             TabLayoutMediator(tablayout, mPager) { tab, position ->
-                tab.text = mPagerAdapter.getPageTitle(position)
+                val title = mPagerAdapter.getPageTitle(position)
                 val iconRes = when (position) {
                     mPagerAdapter.indexOfFragment(VPNProfileList::class.java) -> R.drawable.ic_tab_home
                     mPagerAdapter.indexOfFragment(ConfigsFragment::class.java) -> R.drawable.ic_tab_configs
@@ -120,8 +132,36 @@ class MainActivity : BaseActivity() {
                     mPagerAdapter.indexOfFragment(AboutFragment::class.java) -> R.drawable.ic_tab_about
                     else -> 0
                 }
-                if (iconRes != 0) tab.setIcon(iconRes)
+                val customView = layoutInflater.inflate(R.layout.minab_bottom_tab_item, tablayout, false)
+                customView.findViewById<TextView>(R.id.minab_tab_label)?.text = title
+                val iconView = customView.findViewById<ImageView>(R.id.minab_tab_icon)
+                if (iconRes != 0) {
+                    iconView?.setImageResource(iconRes)
+                    iconView?.visibility = View.VISIBLE
+                } else {
+                    iconView?.visibility = View.GONE
+                }
+                tab.contentDescription = title
+                tab.customView = customView
+                styleBottomTab(tab, position == mPager.currentItem)
             }.attach()
+            tablayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+                override fun onTabSelected(tab: TabLayout.Tab?) {
+                    styleBottomTab(tab, true)
+                }
+
+                override fun onTabUnselected(tab: TabLayout.Tab?) {
+                    styleBottomTab(tab, false)
+                }
+
+                override fun onTabReselected(tab: TabLayout.Tab?) {
+                    styleBottomTab(tab, true)
+                }
+            })
+            for (i in 0 until tablayout.tabCount) {
+                val t = tablayout.getTabAt(i)
+                styleBottomTab(t, t?.isSelected == true)
+            }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Minab: tab mediator failed", e)
         }
@@ -251,6 +291,20 @@ class MainActivity : BaseActivity() {
         if (container.visibility != View.VISIBLE) return false
         container.visibility = View.GONE
         return true
+    }
+
+    private fun styleBottomTab(tab: TabLayout.Tab?, selected: Boolean) {
+        val custom = tab?.customView ?: return
+        val color = ContextCompat.getColor(
+            this,
+            if (selected) R.color.minab_teal else R.color.minab_text_secondary
+        )
+        custom.findViewById<ImageView>(R.id.minab_tab_icon)?.imageTintList =
+            ColorStateList.valueOf(color)
+        custom.findViewById<TextView>(R.id.minab_tab_label)?.apply {
+            setTextColor(color)
+            setTypeface(tabBaseTypeface, if (selected) Typeface.BOLD else Typeface.NORMAL)
+        }
     }
 
     /** Index of the Settings tab (Home 0, Configs 1, Graph 2,

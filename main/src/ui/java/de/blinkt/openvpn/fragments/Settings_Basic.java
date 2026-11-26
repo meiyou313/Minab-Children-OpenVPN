@@ -91,6 +91,10 @@ public class Settings_Basic extends KeyChainSettingsFragment implements OnItemSe
         mCaCert.setShowClear();
         mCrlFile.setShowClear();
 
+        bindSpinnerAdapter(mCompatMode, R.array.compat_mode);
+        bindSpinnerAdapter(mType, R.array.vpn_types);
+        bindSpinnerAdapter(mAuthRetry, R.array.auth_retry_type);
+
         mType.setOnItemSelectedListener(this);
         mAuthRetry.setOnItemSelectedListener(this);
         mEnablePeerFingerprint.setOnCheckedChangeListener(this);
@@ -98,6 +102,13 @@ public class Settings_Basic extends KeyChainSettingsFragment implements OnItemSe
         initKeychainViews(mView);
 
         return mView;
+    }
+
+    private void bindSpinnerAdapter(Spinner spinner, int arrayResId) {
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                requireContext(), arrayResId, R.layout.minab_edit_spinner_item);
+        adapter.setDropDownViewResource(R.layout.minab_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
     }
 
 
@@ -183,7 +194,16 @@ public class Settings_Basic extends KeyChainSettingsFragment implements OnItemSe
                 break;
         }
 
-
+        boolean hasCa = mView.findViewById(R.id.cacert).getVisibility() == View.VISIBLE;
+        boolean hasCrl = mView.findViewById(R.id.crlfile).getVisibility() == View.VISIBLE;
+        View divider = mView.findViewById(R.id.minab_certs_divider);
+        if (divider != null) {
+            divider.setVisibility(hasCa && hasCrl ? View.VISIBLE : View.GONE);
+        }
+        View certsCard = mView.findViewById(R.id.minab_certs_card);
+        if (certsCard != null) {
+            certsCard.setVisibility(hasCa || hasCrl ? View.VISIBLE : View.GONE);
+        }
     }
 
     protected void loadPreferences() {

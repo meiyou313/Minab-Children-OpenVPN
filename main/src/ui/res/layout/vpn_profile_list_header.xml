@@ -12,9 +12,9 @@
     android:clipToPadding="false"
     android:orientation="vertical"
     android:paddingLeft="16dp"
-    android:paddingTop="8dp"
+    android:paddingTop="6dp"
     android:paddingRight="16dp"
-    android:paddingBottom="10dp">
+    android:paddingBottom="8dp">
 
     <!-- Minimal one-line notification banner -->
     <TextView
@@ -57,7 +57,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:fontFamily="@font/vazirmatn"
         android:gravity="center"
         android:text="@string/minab_memorial"
@@ -70,7 +70,7 @@
         android:id="@+id/minab_connect_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -82,7 +82,7 @@
             android:clipChildren="false"
             android:clipToPadding="false"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="10dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -96,8 +96,8 @@
                      glowing halo, orbital arcs, radar ripples & spring pop). -->
                 <de.blinkt.openvpn.minab.MinabConnectOrbView
                     android:id="@+id/minab_power_orb"
-                    android:layout_width="88dp"
-                    android:layout_height="88dp"
+                    android:layout_width="78dp"
+                    android:layout_height="78dp"
                     android:contentDescription="@string/minab_tap_to_connect" />
 
                 <LinearLayout
@@ -384,7 +384,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
         android:orientation="horizontal">
 
         <Button
@@ -429,7 +429,7 @@
             android:layout_width="0dp"
             android:layout_height="36dp"
             android:layout_weight="1"
-            android:drawableStart="@drawable/ic_minab_ping_small"
+            android:drawableStart="@drawable/ic_minab_real_test_small"
             android:drawablePadding="4dp"
             android:drawableTint="@color/minab_teal"
             android:ellipsize="end"
@@ -447,7 +447,7 @@
             android:layout_marginStart="2dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/minab_real_settings_desc"
-            android:src="@drawable/ic_minab_settings"
+            android:src="@drawable/ic_minab_tune"
             android:tint="@color/minab_teal" />
 
         <ImageButton
@@ -473,8 +473,8 @@
         style="@style/Minab.OutlinedButton"
         android:layout_width="match_parent"
         android:layout_height="36dp"
-        android:layout_marginTop="8dp"
-        android:drawableStart="@drawable/ic_minab_ping_small"
+        android:layout_marginTop="6dp"
+        android:drawableStart="@drawable/ic_minab_bolt_small"
         android:drawablePadding="4dp"
         android:drawableTint="@color/minab_teal"
         android:ellipsize="end"
@@ -483,23 +483,13 @@
         android:text="@string/minab_best_server"
         android:textSize="11sp" />
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_tests_explained"
-        android:textColor="@color/minab_text_secondary"
-        android:textSize="11sp" />
-
     <HorizontalScrollView
         android:id="@+id/minab_category_chips_scroll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:fadingEdge="horizontal"
-        android:fadingEdgeLength="24dp"
-        android:requiresFadingEdge="horizontal"
+        android:layout_marginTop="8dp"
+        android:clipChildren="true"
+        android:clipToPadding="true"
         android:scrollbars="none">
 
         <LinearLayout
@@ -512,7 +502,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -526,16 +516,17 @@
                 android:layout_width="match_parent"
                 android:layout_height="38dp"
                 android:background="@drawable/minab_input_bg"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
                 android:hint="@string/minab_search_hint"
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:paddingStart="10dp"
-                android:paddingEnd="34dp"
+                android:paddingEnd="28dp"
                 android:singleLine="true"
                 android:textColor="@color/minab_text_primary"
                 android:textColorHint="@color/minab_text_secondary"
-                android:textSize="12sp" />
+                android:textSize="11.5sp" />
 
             <ImageButton
                 android:id="@+id/minab_search_clear"
@@ -576,7 +567,7 @@
             android:background="@drawable/minab_input_bg"
             android:contentDescription="@string/minab_tools_menu_title"
             android:padding="8dp"
-            android:src="@drawable/ic_minab_dedup"
+            android:src="@drawable/ic_minab_tools"
             android:tint="@color/minab_teal" />
     </LinearLayout>
 

@@ -36,15 +36,21 @@
         android:background="@android:color/transparent"
         android:focusable="false"
         android:gravity="center_vertical"
-        android:minHeight="48dp">
+        android:minHeight="48dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="4dp">
 
         <TextView
             android:id="@+id/minab_row_index"
-            android:layout_width="24dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:fontFamily="@font/vazirmatn"
             android:gravity="center"
+            android:minWidth="22dp"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
             android:singleLine="true"
             android:textColor="@color/minab_text_secondary"
             android:textSize="10sp"
@@ -53,9 +59,9 @@
 
         <ImageView
             android:id="@+id/minab_flag"
-            android:layout_width="24dp"
-            android:layout_height="18dp"
-            android:layout_marginStart="4dp"
+            android:layout_width="22dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="2dp"
             android:layout_marginEnd="6dp"
             android:contentDescription="@string/minab_flag_description"
             android:visibility="gone" />
@@ -73,83 +79,91 @@
         <LinearLayout
             android:id="@+id/vpn_list_item_left"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:background="?android:attr/selectableItemBackground"
             android:focusable="true"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingTop="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp">
+
+            <TextView
+                android:id="@+id/vpn_item_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:maxLines="1"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="11.5sp"
+                tools:text="Vpn Name" />
 
             <LinearLayout
                 android:id="@android:id/widget_frame"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:gravity="center_vertical"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/vpn_item_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:fontFamily="@font/vazirmatn"
-                    android:maxLines="1"
-                    android:textColor="@color/minab_text_primary"
-                    android:textSize="10sp"
-                    tools:text="Vpn Name" />
+                android:orientation="horizontal">
 
                 <TextView
                     android:id="@+id/vpn_item_subtitle"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:ellipsize="end"
                     android:fontFamily="@font/vazirmatn"
                     android:maxLines="1"
                     android:singleLine="true"
                     android:textColor="@color/minab_text_secondary"
-                    android:textSize="9sp"
-                    tools:text="Not connected!" />
+                    android:textSize="9.5sp"
+                    tools:text="[United States]" />
+
+                <LinearLayout
+                    android:id="@+id/minab_badges"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:gravity="center_vertical"
+                    android:layoutDirection="ltr"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/minab_ping_badge"
+                        style="@style/Minab.PingBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/minab_ping_badge_fast"
+                        android:drawableStart="@drawable/ic_minab_badge_ping"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textSize="8.5sp"
+                        android:visibility="gone"
+                        tools:text="24 ms"
+                        tools:visibility="visible" />
+
+                    <TextView
+                        android:id="@+id/minab_real_badge"
+                        style="@style/Minab.PingBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/minab_ping_badge_fast"
+                        android:drawableStart="@drawable/ic_minab_badge_real_ok"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textSize="8.5sp"
+                        android:visibility="gone"
+                        tools:text="850 ms"
+                        tools:visibility="visible" />
+                </LinearLayout>
             </LinearLayout>
 
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/minab_badges"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:layoutDirection="ltr"
-            android:orientation="horizontal"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/minab_ping_badge"
-                style="@style/Minab.PingBadge"
-                android:layout_width="54dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:background="@drawable/minab_ping_badge_fast"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:singleLine="true"
-                android:textSize="9sp"
-                android:visibility="invisible"
-                tools:text="24 ms"
-                tools:visibility="visible" />
-
-            <TextView
-                android:id="@+id/minab_real_badge"
-                style="@style/Minab.PingBadge"
-                android:layout_width="54dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:background="@drawable/minab_ping_badge_fast"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:singleLine="true"
-                android:textSize="9sp"
-                android:visibility="invisible"
-                tools:text="850 ms"
-                tools:visibility="visible" />
         </LinearLayout>
 
         <ImageView
@@ -161,26 +175,16 @@
             android:contentDescription="@string/minab_favorite_desc"
             android:src="@drawable/minab_star_off" />
 
-        <View
-            android:layout_width="1dip"
-            android:layout_height="match_parent"
-            android:layout_marginTop="8dip"
-            android:layout_marginBottom="8dip"
-            android:background="@android:drawable/divider_horizontal_dark"
-            android:focusable="false" />
-
         <ImageView
             android:id="@+id/quickedit_settings"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
+            android:layout_width="26dp"
+            android:layout_height="32dp"
             android:layout_gravity="center"
             android:background="?android:attr/selectableItemBackground"
             android:contentDescription="@string/configure_the_vpn"
             android:focusable="true"
-            android:paddingStart="4dip"
-            android:paddingLeft="4dip"
-            android:paddingEnd="4dip"
-            android:paddingRight="4dip"
+            android:padding="4dp"
+            android:scaleType="centerInside"
             android:src="@drawable/ic_edit" />
 
     </LinearLayout>

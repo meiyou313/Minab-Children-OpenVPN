@@ -16,55 +16,60 @@
 -->
 
 <!-- A layout to select a certificate, akin to a file selector on web pages. -->
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_margin="8dip"
-                android:gravity="center_vertical">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
     <TextView
-            android:textStyle="bold"
-            android:id="@+id/extauth_title"
-            style="@style/item"
-            android:text="@string/external_authenticator"
-            android:textAppearance="?android:attr/textAppearanceSmall"/>
+        android:id="@+id/extauth_title"
+        style="@style/Minab.EditLabel"
+        android:layout_marginTop="0dp"
+        android:text="@string/external_authenticator" />
 
     <Spinner
-            android:id="@+id/extauth_spinner"
-            style="@style/item"
-            android:layout_below="@id/extauth_title"
-            android:layout_marginBottom="20dp"
-    />
+        android:id="@+id/extauth_spinner"
+        style="@style/Minab.EditSpinner"
+        android:layout_marginBottom="8dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="28dp" />
 
-    <Button
-            android:layout_below="@id/extauth_spinner"
-            android:id="@+id/configure_extauth_button"
-            style="@style/accountSetupButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
-            android:text="@string/configure"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <TextView
-            android:layout_below="@id/extauth_spinner"
+        <TextView
             android:id="@+id/title"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:layout_toLeftOf="@+id/select_keystore_button"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
             android:text="@string/client_certificate_title"
-            android:textStyle="bold"
-            android:layout_alignParentStart="true"
-            android:layout_toStartOf="@+id/select_keystore_button"/>
+            android:textColor="@color/minab_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/configure_extauth_button"
+            style="@style/Minab.EditCompactButton"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:text="@string/configure" />
+    </LinearLayout>
 
     <TextView
-            android:id="@+id/extauth_detail"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:layout_below="@+id/title"
-            android:layout_marginLeft="16dip"
-            android:layout_toLeftOf="@+id/select_keystore_button"
-            android:ellipsize="end"
-            android:singleLine="false"
-            android:text="@string/no_certificate"/>
-</RelativeLayout>
+        android:id="@+id/extauth_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/vazirmatn"
+        android:singleLine="false"
+        android:text="@string/no_certificate"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="11.5sp" />
+</LinearLayout>

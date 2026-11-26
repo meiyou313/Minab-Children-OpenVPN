@@ -28,28 +28,31 @@
                 android:layout_height="0dp"
                 android:layout_weight="3" />
 
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/minab_divider" />
+
         <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tab_layout"
-                style="@style/blinkt.tabLayout"
+                style="@style/Widget.Design.TabLayout"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:layout_gravity="bottom"
                 android:background="@color/minab_surface"
-                app:tabBackground="@drawable/minab_tab_bg"
-                app:tabIconTint="@color/minab_tab_icon_tint"
+                app:tabBackground="?attr/selectableItemBackgroundBorderless"
+                app:tabGravity="fill"
                 app:tabIndicatorColor="@color/minab_teal"
+                app:tabIndicatorFullWidth="false"
+                app:tabIndicatorGravity="top"
                 app:tabIndicatorHeight="2dp"
-                app:tabInlineLabel="false"
                 app:tabMaxWidth="0dp"
                 app:tabMinWidth="0dp"
                 app:tabMode="fixed"
-                app:tabPaddingBottom="2dp"
-                app:tabPaddingEnd="2dp"
-                app:tabPaddingStart="2dp"
-                app:tabPaddingTop="3dp"
-                app:tabSelectedTextColor="@color/minab_teal"
-                app:tabTextAppearance="@style/Minab.TabText"
-                app:tabTextColor="@color/minab_text_secondary" />
+                app:tabPaddingBottom="0dp"
+                app:tabPaddingEnd="0dp"
+                app:tabPaddingStart="0dp"
+                app:tabPaddingTop="0dp" />
 
     </LinearLayout>
 

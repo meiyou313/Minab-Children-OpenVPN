@@ -4,72 +4,84 @@
   -->
 
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
-
+    android:background="@drawable/minab_home_gradient">
 
     <RelativeLayout
-        android:animateLayoutChanges="true"
         android:id="@+id/switchBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="?android:attr/actionBarSize"
-        android:background="@drawable/bg_switchbar"
-        android:elevation="1dp"
-        android:paddingStart="@dimen/switchbar_pad"
-        android:paddingEnd="@dimen/switchbar_pad"
-        >
-        <Switch
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="12dp"
+        android:animateLayoutChanges="true"
+        android:background="@drawable/minab_card_bg"
+        android:minHeight="46dp"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
+
+        <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/remote_random"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentRight="true"
-            android:layout_centerVertical="true"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            app:thumbTint="@color/minab_switch_thumb"
+            app:trackTint="@color/minab_switch_track" />
+
         <TextView
             android:id="@+id/default_allow_text"
-            style="@android:style/TextAppearance.Medium.Inverse"
-            android:text="@string/remote_random"
-            android:layout_toStartOf="@id/remote_random"
-            android:layout_toLeftOf="@id/remote_random"
-            android:layout_width="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_height="wrap_content" />
-
-    </RelativeLayout>
-
-
-    <TextView
-            android:id="@+id/noserver_active_warning"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="10dp"
-            android:drawableLeft="@drawable/ic_dialog_alert"
-            android:drawableStart="@drawable/ic_dialog_alert"
-            android:drawablePadding="10dp"
-            android:elevation="2dp"
-            android:gravity="center_vertical"
-            android:padding="@dimen/stdpadding"
-            android:layout_below="@id/switchBar"
-            android:text="@string/remote_no_server_selected"
-            android:visibility="visible"
-            tools:visibility="visible" />
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="8dp"
+            android:layout_toStartOf="@id/remote_random"
+            android:fontFamily="@font/vazirmatn"
+            android:text="@string/remote_random"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="12.5sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <TextView
+        android:id="@+id/noserver_active_warning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/switchBar"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/minab_card_bg"
+        android:drawablePadding="8dp"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center_vertical"
+        android:padding="10dp"
+        android:text="@string/remote_no_server_selected"
+        android:textColor="@color/minab_busy"
+        android:textSize="12sp"
+        android:visibility="visible"
+        app:drawableStartCompat="@drawable/ic_dialog_alert"
+        app:drawableTint="@color/minab_busy"
+        tools:visibility="visible" />
 
     <androidx.recyclerview.widget.RecyclerView
-        android:layout_margin="@dimen/vpn_setting_padding"
         android:id="@+id/connection_recycler_view"
-        android:layout_below="@id/noserver_active_warning"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:verticalSpacing="@dimen/stdpadding"
-        android:horizontalSpacing="@dimen/stdpadding"
-        />
-
-
-
+        android:layout_below="@id/noserver_active_warning"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="0dp"
+        android:clipToPadding="false"
+        android:paddingTop="4dp"
+        android:paddingBottom="12dp" />
 
     <include layout="@layout/connection_fab" />
-
 </RelativeLayout>

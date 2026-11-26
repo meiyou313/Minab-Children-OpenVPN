@@ -21,6 +21,10 @@ import androidx.core.content.ContextCompat
 import androidx.viewpager2.widget.ViewPager2
 import android.graphics.Typeface
 import android.text.TextUtils
+import android.util.TypedValue
+import androidx.appcompat.widget.AppCompatTextView
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.widget.TextViewCompat
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
 import de.blinkt.openvpn.core.ProfileManager
@@ -151,20 +155,25 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
         val count = mPagerAdapter.itemCount
         val split = if (count > 4) (count + 1) / 2 else count
         val tabPills = mutableListOf<TextView>()
+        val vazir = ResourcesCompat.getFont(this, R.font.vazirmatn)
+        val dp2 = (2 * resources.displayMetrics.density).toInt()
         val dp4 = (4 * resources.displayMetrics.density).toInt()
-        val dp32 = (30 * resources.displayMetrics.density).toInt()
+        val dp30 = (30 * resources.displayMetrics.density).toInt()
         if (count > 4) row2.visibility = View.VISIBLE else row2.visibility = View.GONE
 
         for (i in 0 until count) {
-            val pill = TextView(this).apply {
+            val pill = AppCompatTextView(this).apply {
                 text = mPagerAdapter.getPageTitle(i)
-                textSize = 10.5f
                 gravity = Gravity.CENTER
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 includeFontPadding = false
-                setPadding(dp4, dp4, dp4, dp4)
-                layoutParams = LinearLayout.LayoutParams(0, dp32, 1f).apply {
+                typeface = vazir
+                setPadding(dp2, dp4, dp2, dp4)
+                TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    this, 8, 10, 1, TypedValue.COMPLEX_UNIT_SP
+                )
+                layoutParams = LinearLayout.LayoutParams(0, dp30, 1f).apply {
                     setMargins(dp4 / 2, 0, dp4 / 2, 0)
                 }
                 setOnClickListener { mPager.setCurrentItem(i, true) }
@@ -186,7 +195,7 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
                         if (active) R.color.minab_teal_dark else R.color.minab_chip_text
                     )
                 )
-                pill.setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
+                pill.setTypeface(vazir, if (active) Typeface.BOLD else Typeface.NORMAL)
             }
         }
         updateTabSelection(0)

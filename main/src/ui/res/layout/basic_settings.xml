@@ -7,153 +7,195 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:blinkt="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="wrap_content"
-    android:padding="@dimen/vpn_setting_padding"
-    android:layout_height="wrap_content" >
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/minab_home_gradient"
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:paddingStart="12dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="14dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="4dp" >
+        android:orientation="vertical">
 
-        <TextView
-            style="@style/item"
-            android:text="@string/profilename"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:labelFor="@id/profilename"
-            />
+        <!-- Card 1: Profile & Compatibility -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/minab_card_bg"
+            android:orientation="vertical"
+            android:padding="12dp">
 
-        <EditText
-            android:id="@+id/profilename"
-            style="@style/item"
-            android:inputType="text" />
+            <TextView
+                style="@style/Minab.EditLabel"
+                android:layout_marginTop="0dp"
+                android:labelFor="@id/profilename"
+                android:text="@string/profilename" />
 
-        <!-- Minab Children: category of this profile -->
-        <TextView
-                style="@style/item"
-                android:text="@string/minab_category"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:labelFor="@id/profile_category" />
+            <EditText
+                android:id="@+id/profilename"
+                style="@style/Minab.EditInput"
+                android:inputType="text" />
 
-        <EditText
+            <!-- Minab Children: category of this profile -->
+            <TextView
+                style="@style/Minab.EditLabel"
+                android:labelFor="@id/profile_category"
+                android:text="@string/minab_category" />
+
+            <EditText
                 android:id="@+id/profile_category"
-                style="@style/item"
+                style="@style/Minab.EditInput"
                 android:hint="@string/minab_category_hint"
                 android:inputType="text" />
 
-        <TextView
-                style="@style/item"
-                android:text="@string/compat_mode_label"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
-        <Spinner
-                android:id="@+id/compatmode"
-                style="@style/item"
-                android:prompt="@string/compatmode"
-                android:entries="@array/compat_mode"
-            />
+            <TextView
+                style="@style/Minab.EditLabel"
+                android:text="@string/compat_mode_label" />
 
-        <CheckBox
+            <Spinner
+                android:id="@+id/compatmode"
+                style="@style/Minab.EditSpinner"
+                android:prompt="@string/compatmode" />
+
+            <CheckBox
                 android:id="@+id/legacyprovider"
-                style="@style/item"
+                style="@style/Minab.EditCheckBox"
+                android:layout_marginTop="6dp"
                 android:text="@string/loadossllegacy" />
 
-        <CheckBox
-            android:id="@+id/lzo"
-            style="@style/item"
-            android:text="@string/useLZO" />
+            <CheckBox
+                android:id="@+id/lzo"
+                style="@style/Minab.EditCheckBox"
+                android:text="@string/useLZO" />
+        </LinearLayout>
 
-        <TextView
-            style="@style/item"
-            android:text="@string/vpn_type"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
-
-        <Spinner
-            android:id="@+id/type"
-            style="@style/item"
-            android:entries="@array/vpn_types"
-            android:prompt="@string/vpn_type" />
-
+        <!-- Card 2: Authentication & Login -->
         <LinearLayout
-            android:id="@+id/keystore"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/minab_card_bg"
             android:orientation="vertical"
-            android:visibility="gone"
-            tools:visibility="gone">
-
-            <include layout="@layout/keystore_selector" />
+            android:padding="12dp">
 
             <TextView
-                style="@style/item"
-                android:singleLine="false"
-                android:text="@string/extracahint"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
-        </LinearLayout>
-        <LinearLayout
-                android:id="@+id/external_auth"
+                style="@style/Minab.EditLabel"
+                android:layout_marginTop="0dp"
+                android:text="@string/vpn_type" />
+
+            <Spinner
+                android:id="@+id/type"
+                style="@style/Minab.EditSpinner"
+                android:prompt="@string/vpn_type" />
+
+            <LinearLayout
+                android:id="@+id/keystore"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
                 android:orientation="vertical"
                 android:visibility="gone"
                 tools:visibility="gone">
 
-            <include layout="@layout/extauth_provider"/>
-        </LinearLayout>
+                <include layout="@layout/keystore_selector" />
 
-        <LinearLayout
-            android:id="@+id/cacert"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            tools:visibility="visible"
-            android:visibility="gone" >
-
-            <de.blinkt.openvpn.views.FileSelectLayout
-                android:id="@+id/caselect"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                blinkt:showClear="true"
-                blinkt:fileTitle="@string/ca_title" />
-
-            <CheckBox
-                android:id="@+id/enable_peer_fingerprint"
-                style="@style/item"
-                android:text="@string/check_peer_fingerprint"
-                />
-
-            <EditText
-                    android:id="@+id/peer_fingerprint"
-                    style="@style/item"
-                    android:inputType="textMultiLine"
-                    android:layout_marginLeft="8dip"
-                    android:layout_marginRight="8dip"
-                    android:hint="@string/fingerprint"
-                    android:visibility="gone" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/certs"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone" >
-
-            <de.blinkt.openvpn.views.FileSelectLayout
-                android:id="@+id/certselect"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                blinkt:fileTitle="@string/client_certificate_title" />
-
-            <de.blinkt.openvpn.views.FileSelectLayout
-                android:id="@+id/keyselect"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                blinkt:certificate="false"
-                blinkt:fileTitle="@string/client_key_title" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:singleLine="false"
+                    android:text="@string/extracahint"
+                    android:textColor="@color/minab_text_secondary"
+                    android:textSize="11.5sp" />
+            </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/key_password_layout"
+                android:id="@+id/external_auth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="gone">
+
+                <include layout="@layout/extauth_provider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/certs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <de.blinkt.openvpn.views.FileSelectLayout
+                    android:id="@+id/certselect"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    blinkt:fileTitle="@string/client_certificate_title" />
+
+                <de.blinkt.openvpn.views.FileSelectLayout
+                    android:id="@+id/keyselect"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    blinkt:certificate="false"
+                    blinkt:fileTitle="@string/client_key_title" />
+
+                <LinearLayout
+                    android:id="@+id/key_password_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <TextView
+                        style="@style/Minab.EditLabel"
+                        android:text="@string/private_key_password" />
+
+                    <EditText
+                        android:id="@+id/key_password"
+                        style="@style/Minab.EditInput"
+                        android:hint="@string/pw_query_hint"
+                        android:inputType="textPassword" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/pkcs12"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <de.blinkt.openvpn.views.FileSelectLayout
+                    android:id="@+id/pkcs12select"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    blinkt:certificate="false"
+                    blinkt:fileTitle="@string/client_pkcs12_title" />
+
+                <TextView
+                    style="@style/Minab.EditLabel"
+                    android:text="@string/pkcs12pwquery" />
+
+                <EditText
+                    android:id="@+id/pkcs12password"
+                    style="@style/Minab.EditInput"
+                    android:hint="@string/pw_query_hint"
+                    android:inputType="textPassword" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/userpassword"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
@@ -161,126 +203,111 @@
                 tools:visibility="visible">
 
                 <TextView
-                    style="@style/item"
-                    android:layout_marginLeft="8dip"
-                    android:layout_marginRight="8dip"
-                    android:text="@string/private_key_password"
-                    android:textAppearance="?android:attr/textAppearanceSmall" />
+                    style="@style/Minab.EditLabel"
+                    android:text="@string/auth_username" />
 
                 <EditText
-                    android:id="@+id/key_password"
-                    style="@style/item"
-                    android:layout_marginLeft="8dip"
-                    android:layout_marginRight="8dip"
+                    android:id="@+id/auth_username"
+                    style="@style/Minab.EditInput"
+                    android:inputType="textNoSuggestions" />
+
+                <TextView
+                    style="@style/Minab.EditLabel"
+                    android:text="@string/auth_pwquery" />
+
+                <EditText
+                    android:id="@+id/auth_password"
+                    style="@style/Minab.EditInput"
                     android:hint="@string/pw_query_hint"
                     android:inputType="textPassword" />
+
+                <TextView
+                    style="@style/Minab.EditLabel"
+                    android:text="@string/auth_failed_behaviour" />
+
+                <Spinner
+                    android:id="@+id/auth_retry"
+                    style="@style/Minab.EditSpinner"
+                    android:prompt="@string/auth_failed_behaviour" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/statickeys"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/vazirmatn"
+                    android:singleLine="false"
+                    android:text="@string/static_keys_info"
+                    android:textColor="@color/minab_text_secondary"
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Card 3: Certificates & CRL -->
         <LinearLayout
-            android:id="@+id/pkcs12"
+            android:id="@+id/minab_certs_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/minab_card_bg"
             android:orientation="vertical"
-            android:visibility="gone" >
+            android:padding="12dp">
+
+            <LinearLayout
+                android:id="@+id/cacert"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <de.blinkt.openvpn.views.FileSelectLayout
+                    android:id="@+id/caselect"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    blinkt:fileTitle="@string/ca_title"
+                    blinkt:showClear="true" />
+
+                <CheckBox
+                    android:id="@+id/enable_peer_fingerprint"
+                    style="@style/Minab.EditCheckBox"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/check_peer_fingerprint" />
+
+                <EditText
+                    android:id="@+id/peer_fingerprint"
+                    style="@style/Minab.EditInput"
+                    android:layout_marginTop="4dp"
+                    android:gravity="top|start"
+                    android:hint="@string/fingerprint"
+                    android:inputType="textMultiLine"
+                    android:minLines="2"
+                    android:singleLine="false"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <View
+                android:id="@+id/minab_certs_divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="6dp"
+                android:background="@color/minab_divider" />
 
             <de.blinkt.openvpn.views.FileSelectLayout
-                android:id="@+id/pkcs12select"
+                android:id="@+id/crlfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 blinkt:certificate="false"
-                blinkt:fileTitle="@string/client_pkcs12_title" />
-
-            <TextView
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:text="@string/pkcs12pwquery"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
-
-            <EditText
-                android:id="@+id/pkcs12password"
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:hint="@string/pw_query_hint"
-                android:inputType="textPassword" />
+                blinkt:fileTitle="@string/crl_title"
+                blinkt:showClear="true" />
         </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/userpassword"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            tools:visibility="visible"
-            android:visibility="gone" >
-
-            <TextView
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:text="@string/auth_username"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
-
-            <EditText
-                android:id="@+id/auth_username"
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:inputType="textNoSuggestions" />
-
-            <TextView
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:text="@string/auth_pwquery"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
-
-            <EditText
-                android:id="@+id/auth_password"
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:hint="@string/pw_query_hint"
-                android:inputType="textPassword" />
-
-            <TextView
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:text="@string/auth_failed_behaviour"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
-
-            <Spinner
-                android:id="@+id/auth_retry"
-                style="@style/item"
-                android:layout_marginLeft="8dip"
-                android:layout_marginRight="8dip"
-                android:prompt="@string/auth_failed_behaviour"
-                android:entries="@array/auth_retry_type"
-                />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/statickeys"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone" >
-
-            <TextView
-                style="@style/item"
-                android:singleLine="false"
-                android:text="@string/static_keys_info" />
-        </LinearLayout>
-        <de.blinkt.openvpn.views.FileSelectLayout
-            android:id="@+id/crlfile"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            blinkt:certificate="false"
-            blinkt:showClear="true"
-            blinkt:fileTitle="@string/crl_title" />
     </LinearLayout>
-
 </ScrollView>

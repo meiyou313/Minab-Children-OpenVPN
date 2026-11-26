@@ -65,13 +65,20 @@ object MinabRedetectIpDialog {
         labels.add(context.getString(R.string.minab_redetect_scope_all, allProfiles.size))
         targets.add(allProfiles)
 
-        AlertDialog.Builder(context)
-            .setTitle(R.string.minab_redetect_title)
-            .setItems(labels.toTypedArray()) { _, which ->
-                runRedetect(context, targets[which])
+        val items = labels.mapIndexed { idx, label ->
+            MinabDialogs.ActionItem(
+                title = label,
+                iconRes = R.drawable.ic_minab_globe_refresh
+            ) {
+                runRedetect(context, targets[idx])
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
+        MinabDialogs.showActionList(
+            context = context,
+            title = context.getString(R.string.minab_redetect_title),
+            iconRes = R.drawable.ic_minab_globe_refresh,
+            items = items
+        )
     }
 
     private fun runRedetect(context: Context, targetList: List<VpnProfile>) {

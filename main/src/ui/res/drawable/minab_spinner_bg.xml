@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/minab_input_bg" />
+    <item
+        android:width="18dp"
+        android:height="18dp"
+        android:drawable="@drawable/ic_minab_dropdown_arrow"
+        android:end="10dp"
+        android:gravity="end|center_vertical" />
+</layer-list>

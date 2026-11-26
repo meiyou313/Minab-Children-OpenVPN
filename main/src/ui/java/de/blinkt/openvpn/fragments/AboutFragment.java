@@ -15,9 +15,6 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 
 import de.blinkt.openvpn.R;
@@ -90,14 +87,6 @@ public class AboutFragment extends Fragment implements View.OnClickListener {
                 releasesBtn.setOnClickListener(view ->
                         MinabUpdateChecker.openReleases(requireContext()));
             }
-
-            ViewCompat.setOnApplyWindowInsetsListener(v, (view, windowInsets) -> {
-                Insets insets = windowInsets.getInsets(
-                        WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-                view.setPadding(view.getPaddingLeft(), view.getPaddingTop(),
-                        view.getPaddingRight(), insets.bottom);
-                return WindowInsetsCompat.CONSUMED;
-            });
         } catch (Exception e) {
             android.util.Log.e("AboutFragment", "Minab: onCreateView failed", e);
         }
@@ -156,10 +145,7 @@ public class AboutFragment extends Fragment implements View.OnClickListener {
             }
         } else {
             if (mUpdateCard != null) mUpdateCard.setBackgroundResource(R.drawable.minab_card_bg);
-            if (mUpdateBadge != null) {
-                mUpdateBadge.setText(latestTag);
-                mUpdateBadge.setVisibility(View.VISIBLE);
-            }
+            if (mUpdateBadge != null) mUpdateBadge.setVisibility(View.GONE);
             mUpdateStatus.setText(getString(R.string.minab_about_up_to_date, mInstalledVersion));
             mUpdateStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.minab_connected));
             mUpdateStatus.setVisibility(View.VISIBLE);

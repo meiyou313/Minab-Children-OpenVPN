@@ -8,6 +8,7 @@ package de.blinkt.openvpn.views;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.TypedArray;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -143,6 +144,7 @@ public class FileSelectLayout extends LinearLayout implements OnClickListener {
         if (data == null) {
             mDataView.setText(c.getString(R.string.no_data));
             mDataDetails.setText("");
+            mDataDetails.setVisibility(GONE);
             mShowClearButton.setVisibility(GONE);
         } else {
             if (mData.startsWith(VpnProfile.DISPLAYNAME_TAG)) {
@@ -152,7 +154,12 @@ public class FileSelectLayout extends LinearLayout implements OnClickListener {
             else
                 mDataView.setText(data);
             if (mIsCertificate) {
-                mDataDetails.setText(X509Utils.getCertificateFriendlyName(c, data));
+                String friendlyName = X509Utils.getCertificateFriendlyName(c, data);
+                mDataDetails.setText(friendlyName);
+                mDataDetails.setVisibility(TextUtils.isEmpty(friendlyName) ? GONE : VISIBLE);
+            } else {
+                mDataDetails.setText("");
+                mDataDetails.setVisibility(GONE);
             }
 
             // Show clear button if it should be shown

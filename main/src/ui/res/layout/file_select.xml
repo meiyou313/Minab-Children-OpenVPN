@@ -16,62 +16,72 @@
 -->
 
 <!-- A layout to select a certificate, akin to a file selector on web pages. -->
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dip"
-    android:gravity="center_vertical">
+    android:orientation="vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
 
-<Button
-            android:id="@+id/file_select_button"
-            style="@style/accountSetupButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
-            android:text="@string/file_select" />
-
-    <Button
-        android:id="@+id/file_clear_button"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:layout_toLeftOf="@id/file_select_button"
-        android:visibility="gone"
-        tools:visibility="visible"
-        android:text="@string/clear"/>
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <TextView
+        <TextView
             android:id="@+id/file_title"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentTop="true"
-            android:layout_toLeftOf="@+id/file_clear_button"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
             android:text="@string/client_certificate_title"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
-    <TextView
-            android:id="@+id/file_selected_item"
+        <Button
+            android:id="@+id/file_clear_button"
+            style="@style/Minab.EditCompactButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:layout_below="@+id/file_title"
-            android:layout_marginLeft="16dip"
-            android:layout_toLeftOf="@+id/file_clear_button"
-            android:ellipsize="end"
-            android:singleLine="true"
-            android:text="@string/file_nothing_selected" />
+            android:layout_height="30dp"
+            android:layout_marginEnd="6dp"
+            android:text="@string/clear"
+            android:textColor="@color/minab_danger"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <Button
+            android:id="@+id/file_select_button"
+            style="@style/Minab.EditCompactButton"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:text="@string/file_select" />
+    </LinearLayout>
 
     <TextView
-            android:id="@+id/file_selected_description"
-            android:layout_width="wrap_content"
-            android:textIsSelectable="true"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:layout_below="@+id/file_selected_item"
-            android:layout_marginLeft="16dip"
-            android:layout_toLeftOf="@+id/file_select_button"
-            android:ellipsize="end" />
+        android:id="@+id/file_selected_item"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/vazirmatn"
+        android:singleLine="true"
+        android:text="@string/file_nothing_selected"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="11.5sp" />
 
-</RelativeLayout>
+    <TextView
+        android:id="@+id/file_selected_description"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/vazirmatn"
+        android:lineSpacingExtra="2dp"
+        android:textColor="@color/minab_text_secondary"
+        android:textIsSelectable="true"
+        android:textSize="11sp"
+        android:visibility="gone" />
+</LinearLayout>

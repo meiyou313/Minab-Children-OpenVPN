@@ -14,6 +14,7 @@ import android.content.res.ColorStateList
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -26,6 +27,7 @@ class MinabTestProgressPanel(
 ) {
     private val expandedBody: View = root.findViewById(R.id.minab_test_expanded_body)
     private val compactBar: View = root.findViewById(R.id.minab_test_compact_bar)
+    private val compactIcon: ImageView = root.findViewById(R.id.minab_test_compact_icon)
     private val compactSummary: TextView = root.findViewById(R.id.minab_test_compact_summary)
 
     private val spinner: ProgressBar = root.findViewById(R.id.minab_test_spinner)
@@ -167,6 +169,9 @@ class MinabTestProgressPanel(
         compactBar.visibility = View.VISIBLE
         root.setBackgroundResource(
             if (found > 0) R.drawable.minab_row_halo_connected else R.drawable.minab_card_bg
+        )
+        compactIcon.setImageResource(
+            if (found > 0) R.drawable.ic_minab_check_circle else R.drawable.ic_minab_info_circle
         )
         compactSummary.text = if (isReal) {
             context.getString(R.string.minab_test_compact_real_done, found, tested)

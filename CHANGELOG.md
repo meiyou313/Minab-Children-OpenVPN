@@ -2,6 +2,15 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.7.2 — comprehensive UI/UX polish across Home, Configs, Graph, Settings, About, Edit Configs & dialogs:
+- Home, server rows, bottom bar & GeoIP: crisp 2-line server rows preserving `[Group]` intact with full-width server names and compact icon-backed Ping / Real Test badges (Real Test passes never render gray; `<2000ms` green, `2000–4499ms` amber, `>=4500ms` indigo), amber info icon when 0 working servers are found, tightened header & distinct toolbar icons, muted ping pill when disconnected, flat 48dp bottom navigation bar with non-ALL-CAPS Vazirmatn labels, and GeoIP country flag fallback via `get.geojs.io`.
+- About tab: compact single-screen layout with 40dp logo, aligned GitHub / Releases buttons, removed phantom bottom inset scroll gap, and hidden redundant up-to-date badge.
+- Graph tab: unified scrolling with Live connection speed inside the list header, logarithmic scale toggle moved above the 3 live speed charts, aligned Total / selected date / jump-to-now footer, compact 72dp empty-chart height with Vazirmatn text, wider 44dp daily bars, and thread-safe speed updates.
+- Settings tab: full modern 5-card redesign with 1-tap segmented Auto / Light / Dark theme selector, flag-card Language & Default VPN pickers, modern `SwitchCompat` toggles, collapsible `Advanced` card (collapsed by default), and `Check for updates` kept in both Settings and About alongside FAQ and ladybug debug log.
+- Configs tab: compact 3-row tools card, category chips moved directly above Search & server list, unified scope model (`Selected` -> `Current Group` -> `All`) across Ping/Real tests, scope-aware 2-option Backup picker, scope-aware Clean up, single-step blank-by-default Login dialog with optional 1-tap saved fill, always-on long-press actions menu (including Connect), and dynamic `(N)` labels when rows are selected.
+- Edit Configs (`VPNPreferences`): compact Vazirmatn typography (`11.5–12.5sp`) and rounded inputs/spinners grouped into 3 cards in `Basic`, compact `Select...` / `Clear` buttons hiding blank certificate details, auto-sized Vazirmatn bottom pill tabs reducing truncation, unified `Server List` cards, and monospace card view for `Generated Config`.
+- Modern dialogs: redesigned rounded card dialogs for `Server tools` (with duplicate/inactive counts), `Manage categories` (with country flags, server counts, and direct 1-tap rename/delete buttons across Home & Configs), `Re-detect IP`, `New / Rename category`, and danger-styled confirmation prompts.
+
 New in v0.9.7.1 — UI refinement, instant halos, sorting, IP re-detection, scoped login, and network Test History:
 - Fixed disconnect auto-reconnect loop where tapping Disconnect restarted a connection attempt after a few seconds.
 - Zero-lag connecting & connected luminous row halos on both Home and Configs tabs.

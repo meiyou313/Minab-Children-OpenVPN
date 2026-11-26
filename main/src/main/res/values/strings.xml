@@ -724,7 +724,7 @@
     <string name="minab_update_notification_title">New Minab version available</string>
     <string name="minab_best_server">Connect to best server</string>
     <string name="minab_best_none">No tested server yet — run a ping test or a real test first.</string>
-    <string name="minab_search_hint">Search servers by name or country…</string>
+    <string name="minab_search_hint">Search servers…</string>
     <string name="minab_favorite_desc">Favorite</string>
     <string name="minab_failover">Switch server automatically if the connection drops</string>
     <string name="minab_failover_summary">When the connected server drops, Minab connects to the next healthy server from the last test (up to 3 tries). Works while the app is open.</string>
@@ -856,7 +856,7 @@
     <string name="minab_graph_idle">Connect to a server to view live speed</string>
 
     <string name="minab_about_subtitle">Fast, clean OpenVPN client</string>
-    <string name="minab_about_version_badge">Version %1$s</string>
+    <string name="minab_about_version_badge">v%1$s</string>
     <string name="minab_about_update_card_title">App updates</string>
     <string name="minab_about_download_latest">Download %1$s</string>
     <string name="minab_about_open_release_assets">Open GitHub release assets</string>
@@ -945,5 +945,28 @@
     <string name="minab_bulk_login_scope_all">All configs</string>
     <string name="minab_bulk_no_last_import">No recently imported configs found. Pick another scope.</string>
     <string name="minab_bulk_pick_configs_title">Select configs to apply login</string>
+    <string name="minab_theme_auto_short">Auto</string>
+    <string name="minab_theme_light_short">Light</string>
+    <string name="minab_theme_dark_short">Dark</string>
+    <string name="minab_settings_cat_connection">Connection &amp; Smart VPN</string>
+    <string name="minab_settings_cat_privacy">Network &amp; Privacy</string>
+    <string name="minab_settings_cat_advanced">Advanced</string>
+    <string name="minab_settings_cat_advanced_hint">OpenVPN core, logs &amp; tools</string>
+    <string name="minab_settings_cat_help">Help &amp; Diagnostics</string>
+    <string name="minab_settings_failover_short">Auto-failover</string>
+    <string name="minab_settings_default_vpn_none">Not set (tap to choose)</string>
+    <string name="minab_settings_screenoff_short">Pause VPN when screen is off and idle for 60s</string>
+    <string name="minab_settings_none_option">None</string>
+    <string name="minab_configs_login_short">Login</string>
+    <string name="minab_configs_backup_short">Back up</string>
+    <string name="minab_configs_share_short">Share</string>
+    <string name="minab_configs_cleanup_short">Clean up</string>
+    <string name="minab_configs_selected_count">%1$d selected</string>
+    <string name="minab_configs_backup_scope_title">Back up configs</string>
+    <string name="minab_configs_backup_scope_selected">Selected configs (%1$d)</string>
+    <string name="minab_configs_backup_scope_group">Current group: %1$s (%2$d)</string>
+    <string name="minab_configs_backup_scope_all">Full backup · All configs (%1$d)</string>
+    <string name="minab_configs_cleanup_scope_title">Clean up · %1$s</string>
+    <string name="minab_connect_server">Connect</string>
 
 </resources>

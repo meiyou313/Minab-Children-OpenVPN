@@ -42,7 +42,7 @@
     <string name="minab_best_server">اتصال به بهترین سرور</string>
     <string name="minab_best_none">ابتدا پینگ تست یا ریل تست را اجرا کنید.</string>
     <string name="minab_tests_explained">پینگ تست: سریع اما تقریبی\nریل تست: کندتر اما دقیق و واقعی</string>
-    <string name="minab_search_hint">جستجوی سرور بر اساس نام یا کشور…</string>
+    <string name="minab_search_hint">جستجوی سرور…</string>
     <string name="minab_favorites_tab">علاقه‌مندی</string>
     <string name="minab_all_tab">همه</string>
     <string name="minab_active_tab">فعال</string>
@@ -153,7 +153,7 @@
 
     <!-- About & Dynamic Updates -->
     <string name="minab_about_subtitle">کلاینت سریع و مدرن OpenVPN</string>
-    <string name="minab_about_version_badge">نسخه %1$s</string>
+    <string name="minab_about_version_badge">v%1$s</string>
     <string name="minab_about_update_card_title">بروزرسانی برنامه</string>
     <string name="minab_about_download_latest">دانلود نسخه %1$s</string>
     <string name="minab_about_open_release_assets">باز کردن بخش فایل‌ها (Assets) در گیت‌هاب</string>
@@ -284,4 +284,27 @@
     <string name="minab_bulk_login_scope_all">همه کانفیگ‌ها</string>
     <string name="minab_bulk_no_last_import">کانفیگ تازه‌ای یافت نشد؛ گزینه دیگری انتخاب کنید.</string>
     <string name="minab_bulk_pick_configs_title">انتخاب کانفیگ‌ها برای اعمال رمز</string>
+    <string name="minab_theme_auto_short">خودکار</string>
+    <string name="minab_theme_light_short">روشن</string>
+    <string name="minab_theme_dark_short">تیره</string>
+    <string name="minab_settings_cat_connection">اتصال هوشمند</string>
+    <string name="minab_settings_cat_privacy">شبکه و حریم خصوصی</string>
+    <string name="minab_settings_cat_advanced">تنظیمات پیشرفته</string>
+    <string name="minab_settings_cat_advanced_hint">هسته OpenVPN، لاگ‌ها و ابزارهای فنی</string>
+    <string name="minab_settings_cat_help">راهنما و عیب‌یابی</string>
+    <string name="minab_settings_failover_short">تغییر خودکار سرور</string>
+    <string name="minab_settings_default_vpn_none">تنظیم نشده (برای انتخاب لمس کنید)</string>
+    <string name="minab_settings_screenoff_short">توقف موقت VPN هنگام خاموشی صفحه و بیکاری ۶۰ ثانیه‌ای</string>
+    <string name="minab_settings_none_option">هیچ‌کدام</string>
+    <string name="minab_configs_login_short">رمز ورود</string>
+    <string name="minab_configs_backup_short">پشتیبان</string>
+    <string name="minab_configs_share_short">اشتراک</string>
+    <string name="minab_configs_cleanup_short">پاک‌سازی</string>
+    <string name="minab_configs_selected_count">%1$d انتخاب‌شده</string>
+    <string name="minab_configs_backup_scope_title">پشتیبان‌گیری از کانفیگ‌ها</string>
+    <string name="minab_configs_backup_scope_selected">کانفیگ‌های انتخاب‌شده (%1$d)</string>
+    <string name="minab_configs_backup_scope_group">گروه فعلی: %1$s (%2$d)</string>
+    <string name="minab_configs_backup_scope_all">پشتیبان کامل · همه کانفیگ‌ها (%1$d)</string>
+    <string name="minab_configs_cleanup_scope_title">پاک‌سازی · %1$s</string>
+    <string name="minab_connect_server">اتصال</string>
 </resources>

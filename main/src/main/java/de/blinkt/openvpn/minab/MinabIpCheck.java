@@ -33,6 +33,7 @@ public final class MinabIpCheck {
     private static final String[] IP_URLS = {
             "https://ipinfo.io/json",
             "https://ip-api.com/json",
+            "https://get.geojs.io/v1/ip/geo.json",
             "https://api.ipify.org?format=json"
     };
     private static final int TIMEOUT_MS = 5000;
@@ -106,6 +107,11 @@ public final class MinabIpCheck {
                 String ip = json.optString("query", "");
                 if (ip.isEmpty()) return null;
                 return new IpInfo(ip, json.optString("countryCode", ""));
+            }
+            if (urlString.contains("geojs.io")) {
+                String ip = json.optString("ip", "");
+                if (ip.isEmpty()) return null;
+                return new IpInfo(ip, json.optString("country_code", ""));
             }
             String ip = json.optString("ip", "");
             if (ip.isEmpty()) return null;

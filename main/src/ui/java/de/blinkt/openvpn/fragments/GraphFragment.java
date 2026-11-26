@@ -5,6 +5,7 @@
 
 package de.blinkt.openvpn.fragments;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -30,6 +31,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
 import androidx.fragment.app.Fragment;
 
 import com.github.mikephil.charting.charts.LineChart;
@@ -80,6 +82,7 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     private TextView mDownTotal;
     private TextView mUpTotal;
     private boolean mLogScale;
+    private Typeface mChartTypeface;
 
     // --- Minab v0.7: "Data used" bar charts (daily / weekly /
     // monthly) above the live charts. The bars are plain Views
@@ -139,24 +142,28 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         // caught and logged, and the tab shows an empty view.
         try {
         mListView = v.findViewById(R.id.graph_listview);
-        mSpeedStatus = v.findViewById(R.id.speedStatus);
-        mDownSpeed = v.findViewById(R.id.minab_graph_down_speed);
-        mUpSpeed = v.findViewById(R.id.minab_graph_up_speed);
-        mDownTotal = v.findViewById(R.id.minab_graph_down_total);
-        mUpTotal = v.findViewById(R.id.minab_graph_up_total);
-        CheckBox logScaleView = v.findViewById(R.id.useLogScale);
-        mLogScale = getActivity().getPreferences(MODE_PRIVATE).getBoolean(PREF_USE_LOG, false);
+        // Minab v0.7: the header (Live connection speed + Data used +
+        // Live speed heading with its log-scale toggle) is added as a
+        // ListView header so the entire Graph tab scrolls together.
+        View dataHeader = inflater.inflate(R.layout.graph_data_used, mListView, false);
+        mSpeedStatus = dataHeader.findViewById(R.id.speedStatus);
+        mDownSpeed = dataHeader.findViewById(R.id.minab_graph_down_speed);
+        mUpSpeed = dataHeader.findViewById(R.id.minab_graph_up_speed);
+        mDownTotal = dataHeader.findViewById(R.id.minab_graph_down_total);
+        mUpTotal = dataHeader.findViewById(R.id.minab_graph_up_total);
+        CheckBox logScaleView = dataHeader.findViewById(R.id.useLogScale);
+        mLogScale = requireActivity().getPreferences(MODE_PRIVATE).getBoolean(PREF_USE_LOG, false);
         logScaleView.setChecked(mLogScale);
+        try {
+            mChartTypeface = ResourcesCompat.getFont(requireContext(), R.font.vazirmatn);
+        } catch (Exception ignored) {
+        }
 
         List<Integer> charts = new LinkedList<>();
         charts.add(TIME_PERIOD_SECDONS);
         charts.add(TIME_PERIOD_MINUTES);
         charts.add(TIME_PERIOD_HOURS);
 
-        // Minab v0.7: the "Data used" card is a ListView header
-        // (added before the adapter, as ListView requires) — the
-        // live line charts below it are unchanged.
-        View dataHeader = inflater.inflate(R.layout.graph_data_used, mListView, false);
         mDataBars = dataHeader.findViewById(R.id.minab_data_bars);
         mDataBarsScroll = dataHeader.findViewById(R.id.minab_data_bars_scroll);
         mDataTotal = dataHeader.findViewById(R.id.minab_data_total);
@@ -181,7 +188,7 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         mDataDaily.setOnClickListener(v1 -> setDataMode(DATA_DAILY));
         mDataWeekly.setOnClickListener(v1 -> setDataMode(DATA_WEEKLY));
         mDataMonthly.setOnClickListener(v1 -> setDataMode(DATA_MONTHLY));
-        mListView.addHeaderView(dataHeader);
+        mListView.addHeaderView(dataHeader, null, false);
 
         mChartAdapter = new ChartDataAdapter(getActivity(), charts);
         mListView.setAdapter(mChartAdapter);
@@ -214,7 +221,14 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
     /** Minab v0.7: switch the "Data used" view and remember it. */
     private void setDataMode(int mode) {
         mDataMode = mode;
-        getActivity().getPreferences(MODE_PRIVATE).edit().putInt(PREF_DATA_MODE, mode).apply();
+        Activity act = getActivity();
+        if (act != null) {
+            act.getPreferences(MODE_PRIVATE).edit().putInt(PREF_DATA_MODE, mode).apply();
+        }
+        if (mDataSelected != null) {
+            mDataSelected.setText("");
+            mDataSelected.setVisibility(View.INVISIBLE);
+        }
         mScrollDataToEnd = true;
         renderDataUsed();
     }
@@ -263,7 +277,7 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         float density = getResources().getDisplayMetrics().density;
         int colWidthPx;
         if (daily) {
-            colWidthPx = (int) (40 * density);
+            colWidthPx = (int) (44 * density);
         } else {
             int viewportW = mDataBarsScroll != null ? mDataBarsScroll.getWidth() : 0;
             if (viewportW <= 0) {
@@ -303,6 +317,8 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
         mDataBars.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 (int) (130 * density)));
+        int padPx = (int) (4 * density);
+        mDataBars.setPadding(padPx, 0, padPx, 0);
         int dividerColor = getResources().getColor(R.color.minab_divider);
         int currentLabelColor = getResources().getColor(R.color.minab_connected);
         int secondaryLabelColor = getResources().getColor(R.color.minab_text_secondary);
@@ -451,28 +467,25 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
 
         long now = (System.currentTimeMillis() / 100) - firstTs;
         int interval = OpenVPNManagement.mBytecountInterval * 10;
-        // Minab Beta v0.9.3 — a byte-count tick can arrive after
-        // the fragment detached (the listener is removed in
-        // onPause, but a tick already in flight keeps going):
-        // getActivity() is null then and the NPE killed the app
-        // on a tab switch.
-        if (getActivity() == null) return;
-        Resources res = getActivity().getResources();
+        final Activity act = getActivity();
+        if (act == null || !isAdded()) return;
+        Resources res = act.getResources();
 
         final int byteInterval = Math.max(1, OpenVPNManagement.mBytecountInterval);
         final String downRate = "↓ " + humanReadableByteCount(diffIn / byteInterval, true, res);
         final String upRate = "↑ " + humanReadableByteCount(diffOut / byteInterval, true, res);
         final String downSum = DataUsageStore.formatBytes(Math.max(0L, in));
         final String upSum = DataUsageStore.formatBytes(Math.max(0L, out));
-        final String netstat = String.format(getString(R.string.statusline_bytecount),
+        final String netstat = String.format(act.getString(R.string.statusline_bytecount),
                 humanReadableByteCount(in, false, res),
                 humanReadableByteCount(diffIn / byteInterval, true, res),
                 humanReadableByteCount(out, false, res),
                 humanReadableByteCount(diffOut / byteInterval, true, res));
 
-        getActivity().runOnUiThread(new Runnable() {
+        act.runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                if (!isAdded()) return;
                 if (mSpeedStatus != null) mSpeedStatus.setText(netstat);
                 if (mDownSpeed != null) mDownSpeed.setText(downRate);
                 if (mUpSpeed != null) mUpSpeed.setText(upRate);
@@ -579,6 +592,9 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
             yAxis.setGridColor(mGridColour);
             yAxis.setAxisLineColor(mGridColour);
             holder.chart.setNoDataTextColor(mTextColour);
+            if (mChartTypeface != null) {
+                holder.chart.setNoDataTextTypeface(mChartTypeface);
+            }
 
             holder.chart.getAxisRight().setEnabled(false);
 
@@ -595,12 +611,20 @@ public class GraphFragment extends Fragment implements VpnStatus.ByteCountListen
                 yAxis.setLabelCount(6);
             }
 
-            if (data.getDataSetByIndex(0).getEntryCount() < 3)
+            boolean hasData = data.getDataSetByIndex(0).getEntryCount() >= 3;
+            if (!hasData)
                 holder.chart.setData(null);
             else
                 holder.chart.setData(data);
 
-            holder.chart.setNoDataText(getString(R.string.notenoughdata));
+            int desiredHeight = (int) ((hasData ? 185 : 72) * res.getDisplayMetrics().density);
+            ViewGroup.LayoutParams chartLp = holder.chart.getLayoutParams();
+            if (chartLp != null && chartLp.height != desiredHeight) {
+                chartLp.height = desiredHeight;
+                holder.chart.setLayoutParams(chartLp);
+            }
+
+            holder.chart.setNoDataText(mContext.getString(R.string.notenoughdata));
 
             holder.chart.invalidate();
             //holder.chart.animateX(750);

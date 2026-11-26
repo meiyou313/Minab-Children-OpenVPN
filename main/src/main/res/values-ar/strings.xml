@@ -26,7 +26,7 @@
     <string name="minab_test_ping">اختبار البينج</string>
     <string name="minab_real_test">اختبار حقيقي</string>
     <string name="minab_best_server">الاتصال بأفضل خادم</string>
-    <string name="minab_search_hint">ابحث عن الخوادم بالاسم أو الدولة…</string>
+    <string name="minab_search_hint">ابحث عن خادم…</string>
     <string name="minab_favorites_tab">المفضلة</string>
     <string name="minab_all_tab">الكل</string>
     <string name="minab_active_tab">نشط</string>
@@ -104,4 +104,27 @@
     <string name="minab_credentials_for_scope">بيانات %1$s</string>
     <string name="minab_test_compact_ping_done">انتهى البينغ · استجاب %1$d من %2$d</string>
     <string name="minab_test_compact_real_done">انتهى الفحص · يعمل %1$d من %2$d</string>
+    <string name="minab_theme_auto_short">تلقائي</string>
+    <string name="minab_theme_light_short">فاتح</string>
+    <string name="minab_theme_dark_short">داكن</string>
+    <string name="minab_settings_cat_connection">الاتصال الذكي</string>
+    <string name="minab_settings_cat_privacy">الشبكة والخصوصية</string>
+    <string name="minab_settings_cat_advanced">إعدادات متقدمة</string>
+    <string name="minab_settings_cat_advanced_hint">نواة OpenVPN والسجلات والأدوات</string>
+    <string name="minab_settings_cat_help">المساعدة والتشخيص</string>
+    <string name="minab_settings_failover_short">التبديل التلقائي للخادم</string>
+    <string name="minab_settings_default_vpn_none">غير محدد (انقر للاختيار)</string>
+    <string name="minab_settings_screenoff_short">إيقاف VPN مؤقتاً عند إطفاء الشاشة وخمولها 60 ثانية</string>
+    <string name="minab_settings_none_option">بلا</string>
+    <string name="minab_configs_login_short">الدخول</string>
+    <string name="minab_configs_backup_short">نسخ احتياطي</string>
+    <string name="minab_configs_share_short">مشاركة</string>
+    <string name="minab_configs_cleanup_short">تنظيف</string>
+    <string name="minab_configs_selected_count">تم تحديد %1$d</string>
+    <string name="minab_configs_backup_scope_title">نسخ احتياطي للإعدادات</string>
+    <string name="minab_configs_backup_scope_selected">المحددة (%1$d)</string>
+    <string name="minab_configs_backup_scope_group">المجموعة الحالية: %1$s (%2$d)</string>
+    <string name="minab_configs_backup_scope_all">نسخة كاملة · الكل (%1$d)</string>
+    <string name="minab_configs_cleanup_scope_title">تنظيف · %1$s</string>
+    <string name="minab_connect_server">اتصال</string>
 </resources>

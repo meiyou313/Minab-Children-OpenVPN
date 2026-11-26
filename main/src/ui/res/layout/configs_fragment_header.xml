@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Configs tab header item inside minab_configs_recycler: title, group chips,
-  credentials, backup/share, Ping & Real tests with inline settings panel
-  and dedicated Test Progress box, selection action bar, and search field.
+  Configs tab header item inside minab_configs_recycler: compact single tools card
+  (tests, credentials/backup/share, quick utilities), inline Real test settings
+  & progress panel, selection bar, category chips directly above Search & list.
   -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -11,178 +11,197 @@
     android:paddingLeft="16dp"
     android:paddingTop="8dp"
     android:paddingRight="16dp"
-    android:paddingBottom="10dp">
+    android:paddingBottom="8dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_configs_title"
-        android:textColor="@color/minab_text_primary"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_configs_hint"
-        android:textColor="@color/minab_text_secondary"
-        android:textSize="12sp" />
-
+    <!-- 1. Compact Configs management & diagnostics card -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
         android:background="@drawable/minab_card_bg"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:padding="10dp">
 
-        <HorizontalScrollView
-            android:id="@+id/minab_configs_chips_scroll"
+        <!-- Row 1: Tests + inline settings + Test History -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fadingEdge="horizontal"
-            android:fadingEdgeLength="24dp"
-            android:requiresFadingEdge="horizontal"
-            android:scrollbars="none">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <LinearLayout
-                android:id="@+id/minab_configs_chips"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal" />
-        </HorizontalScrollView>
-    </LinearLayout>
+            <Button
+                android:id="@+id/minab_configs_test_ping"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_minab_ping_small"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/minab_teal"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_test_ping"
+                android:textSize="11sp" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_credentials_title"
-        android:textColor="@color/minab_text_primary"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+            <Button
+                android:id="@+id/minab_configs_test_real"
+                style="@style/Minab.PrimaryButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_minab_real_test_small"
+                android:drawablePadding="4dp"
+                android:drawableTint="@android:color/white"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_real_test"
+                android:textSize="11sp" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_credentials_explained"
-        android:textColor="@color/minab_text_secondary"
-        android:textSize="12sp" />
+            <ImageButton
+                android:id="@+id/minab_configs_btn_real_test_settings"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginStart="2dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/minab_real_settings_desc"
+                android:src="@drawable/ic_minab_tune"
+                android:tint="@color/minab_teal" />
 
-    <Button
-        android:id="@+id/minab_configs_credentials_smart"
-        style="@style/Minab.PrimaryButton"
-        android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:layout_marginTop="8dp"
-        android:ellipsize="end"
-        android:minHeight="36dp"
-        android:singleLine="true"
-        android:text="@string/minab_credentials_for_all"
-        android:textSize="12sp" />
+            <ImageButton
+                android:id="@+id/minab_configs_btn_test_history"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginStart="2dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/minab_history_desc"
+                android:src="@drawable/ic_minab_history"
+                android:tint="@color/minab_teal" />
+        </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
+        <!-- Row 2: Scoped management (Login, Back up, Share) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/minab_configs_backup"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:minHeight="36dp"
-            android:text="@string/minab_backup_configs"
-            android:textSize="12sp" />
+            <Button
+                android:id="@+id/minab_configs_credentials_smart"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_minab_key_small"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/minab_teal"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_configs_login_short"
+                android:textSize="10.5sp" />
 
-        <Button
-            android:id="@+id/minab_configs_share"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:minHeight="36dp"
-            android:text="@string/minab_share_zip"
-            android:textSize="12sp" />
-    </LinearLayout>
+            <Button
+                android:id="@+id/minab_configs_backup"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_minab_backup_small"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/minab_teal"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_configs_backup_short"
+                android:textSize="10.5sp" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_configs_test_title"
-        android:textColor="@color/minab_text_primary"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+            <Button
+                android:id="@+id/minab_configs_share"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_minab_share_small"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/minab_teal"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_configs_share_short"
+                android:textSize="10.5sp" />
+        </LinearLayout>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_tests_explained"
-        android:textColor="@color/minab_text_secondary"
-        android:textSize="11sp" />
+        <!-- Row 3: Quick utilities (Select all, Re-detect IP, Clean up) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
+            <Button
+                android:id="@+id/minab_configs_select_all"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_select_all"
+                android:textSize="10sp" />
 
-        <Button
-            android:id="@+id/minab_configs_test_ping"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:minHeight="36dp"
-            android:singleLine="true"
-            android:text="@string/minab_test_ping"
-            android:textSize="11sp" />
+            <Button
+                android:id="@+id/minab_configs_redetect_ip"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_minab_globe_refresh"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/minab_teal"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_redetect_btn"
+                android:textSize="10sp" />
 
-        <Button
-            android:id="@+id/minab_configs_test_real"
-            style="@style/Minab.PrimaryButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:minHeight="36dp"
-            android:singleLine="true"
-            android:text="@string/minab_real_test"
-            android:textSize="11sp" />
-
-        <ImageButton
-            android:id="@+id/minab_configs_btn_real_test_settings"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="2dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/minab_real_settings_desc"
-            android:src="@drawable/ic_minab_settings"
-            android:tint="@color/minab_teal" />
-
-        <ImageButton
-            android:id="@+id/minab_configs_btn_test_history"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="2dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/minab_history_desc"
-            android:src="@drawable/ic_minab_history"
-            android:tint="@color/minab_teal" />
+            <Button
+                android:id="@+id/minab_configs_dedup"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_minab_tools"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/minab_teal"
+                android:ellipsize="end"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_configs_cleanup_short"
+                android:textSize="10sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Inline Real test settings panel -->
@@ -191,126 +210,114 @@
     <!-- Dedicated test progress box -->
     <include layout="@layout/minab_test_progress_panel" />
 
-    <!-- Quick management utilities (Select All, Re-detect IP, Clean up) -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/minab_configs_select_all"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:minHeight="34dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:singleLine="true"
-            android:text="@string/minab_select_all"
-            android:textSize="10sp" />
-
-        <Button
-            android:id="@+id/minab_configs_redetect_ip"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:drawableStart="@drawable/ic_minab_globe_refresh"
-            android:drawablePadding="4dp"
-            android:drawableTint="@color/minab_teal"
-            android:ellipsize="end"
-            android:minHeight="34dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:singleLine="true"
-            android:text="@string/minab_redetect_btn"
-            android:textSize="10sp" />
-
-        <Button
-            android:id="@+id/minab_configs_dedup"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:drawableStart="@drawable/ic_minab_dedup"
-            android:drawablePadding="4dp"
-            android:drawableTint="@color/minab_teal"
-            android:ellipsize="end"
-            android:minHeight="34dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:singleLine="true"
-            android:text="@string/minab_remove_duplicates"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <!-- Selection action bar -->
+    <!-- Selection action bar (visible only while one or more configs are ticked) -->
     <LinearLayout
         android:id="@+id/minab_configs_selection_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:orientation="horizontal"
+        android:background="@drawable/minab_test_panel_bg_ping"
+        android:orientation="vertical"
+        android:padding="8dp"
         android:visibility="gone">
 
-        <Button
-            android:id="@+id/minab_configs_delete_selected"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:minHeight="40dp"
-            android:singleLine="true"
-            android:text="@string/minab_delete_short"
-            android:textColor="@color/minab_busy"
-            android:textSize="11sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/minab_configs_copy_selected"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:minHeight="40dp"
-            android:singleLine="true"
-            android:text="@string/minab_copy_selected"
-            android:textSize="11sp" />
+            <TextView
+                android:id="@+id/minab_configs_selection_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/vazirmatn"
+                android:textColor="@color/minab_teal_dark"
+                android:textSize="11.5sp"
+                android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/minab_configs_move_selected"
-            style="@style/Minab.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:minHeight="40dp"
-            android:singleLine="true"
-            android:text="@string/minab_move_selected"
-            android:textSize="11sp" />
+            <ImageButton
+                android:id="@+id/minab_configs_clear_selection"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/minab_deselect_all"
+                android:src="@drawable/ic_minab_clear_small"
+                android:tint="@color/minab_text_secondary" />
+        </LinearLayout>
 
-        <Button
-            android:id="@+id/minab_configs_share_selected"
-            style="@style/Minab.PrimaryButton"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:minHeight="40dp"
-            android:singleLine="true"
-            android:text="@string/minab_share_zip"
-            android:textSize="11sp" />
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/minab_configs_delete_selected"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_delete_short"
+                android:textColor="@color/minab_danger"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/minab_configs_copy_selected"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_copy_selected"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/minab_configs_move_selected"
+                style="@style/Minab.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:minHeight="34dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:singleLine="true"
+                android:text="@string/minab_move_selected"
+                android:textSize="11sp" />
+        </LinearLayout>
     </LinearLayout>
+
+    <!-- Category chips positioned directly above Search & list (matching Home) -->
+    <HorizontalScrollView
+        android:id="@+id/minab_configs_chips_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/minab_configs_chips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -324,16 +331,17 @@
                 android:layout_width="match_parent"
                 android:layout_height="38dp"
                 android:background="@drawable/minab_input_bg"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
                 android:hint="@string/minab_search_hint"
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:paddingStart="10dp"
-                android:paddingEnd="34dp"
+                android:paddingEnd="28dp"
                 android:singleLine="true"
                 android:textColor="@color/minab_text_primary"
                 android:textColorHint="@color/minab_text_secondary"
-                android:textSize="12sp" />
+                android:textSize="11.5sp" />
 
             <ImageButton
                 android:id="@+id/minab_configs_search_clear"

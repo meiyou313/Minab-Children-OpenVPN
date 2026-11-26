@@ -221,6 +221,7 @@
         android:visibility="gone">
 
         <ImageView
+            android:id="@+id/minab_test_compact_icon"
             android:layout_width="18dp"
             android:layout_height="18dp"
             android:layout_marginEnd="8dp"

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/minab_dialog_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_baseline_folder_24"
+            android:tint="@color/minab_teal" />
+
+        <TextView
+            android:id="@+id/minab_cat_dialog_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:text="@string/minab_manage_categories"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/minab_cat_dialog_close"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/minab_test_dismiss_btn"
+            android:padding="5dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_baseline_close_24"
+            android:tint="@color/minab_text_secondary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/minab_cat_dialog_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center"
+        android:paddingTop="14dp"
+        android:paddingBottom="18dp"
+        android:text="@string/minab_no_profiles_yet"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:id="@+id/minab_cat_dialog_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:overScrollMode="ifContentScrolls">
+
+        <LinearLayout
+            android:id="@+id/minab_cat_dialog_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/minab_cat_btn_redetect"
+            style="@style/Minab.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:drawableStart="@drawable/ic_minab_globe_refresh"
+            android:drawablePadding="5dp"
+            android:drawableTint="@color/minab_teal"
+            android:ellipsize="end"
+            android:minHeight="36dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:text="@string/minab_redetect_btn"
+            android:textSize="11.5sp" />
+
+        <Button
+            android:id="@+id/minab_cat_btn_new"
+            style="@style/Minab.PrimaryButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:drawableStart="@drawable/ic_baseline_add_circle_outline_24"
+            android:drawablePadding="5dp"
+            android:drawableTint="@android:color/white"
+            android:ellipsize="end"
+            android:minHeight="36dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:text="@string/minab_new_category"
+            android:textSize="11.5sp" />
+    </LinearLayout>
+</LinearLayout>

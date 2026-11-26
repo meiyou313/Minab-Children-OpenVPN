@@ -12,7 +12,7 @@
     <string name="minab_test_ping">Ping testi</string>
     <string name="minab_real_test">Gerçek test</string>
     <string name="minab_best_server">En iyi sunucuya bağlan</string>
-    <string name="minab_search_hint">Sunucu veya ülke ara…</string>
+    <string name="minab_search_hint">Sunucu ara…</string>
     <string name="minab_favorites_tab">favoriler</string>
     <string name="minab_all_tab">tümü</string>
     <string name="minab_active_tab">Aktif</string>
@@ -74,4 +74,27 @@
     <string name="minab_credentials_for_scope">%1$s için ayarla</string>
     <string name="minab_test_compact_ping_done">Ping bitti · %1$d / %2$d yanıtladı</string>
     <string name="minab_test_compact_real_done">Gerçek test bitti · %1$d / %2$d aktif</string>
+    <string name="minab_theme_auto_short">Otomatik</string>
+    <string name="minab_theme_light_short">Açık</string>
+    <string name="minab_theme_dark_short">Koyu</string>
+    <string name="minab_settings_cat_connection">Bağlantı ve Akıllı VPN</string>
+    <string name="minab_settings_cat_privacy">Ağ ve Gizlilik</string>
+    <string name="minab_settings_cat_advanced">Gelişmiş</string>
+    <string name="minab_settings_cat_advanced_hint">OpenVPN çekirdeği, günlükler ve araçlar</string>
+    <string name="minab_settings_cat_help">Yardım ve Tanılama</string>
+    <string name="minab_settings_failover_short">Otomatik sunucu geçişi</string>
+    <string name="minab_settings_default_vpn_none">Ayarlanmadı (dokunun)</string>
+    <string name="minab_settings_screenoff_short">Ekran kapalı ve 60 sn boşta iken VPN\'i duraklat</string>
+    <string name="minab_settings_none_option">Yok</string>
+    <string name="minab_configs_login_short">Giriş</string>
+    <string name="minab_configs_backup_short">Yedekle</string>
+    <string name="minab_configs_share_short">Paylaş</string>
+    <string name="minab_configs_cleanup_short">Temizle</string>
+    <string name="minab_configs_selected_count">%1$d seçildi</string>
+    <string name="minab_configs_backup_scope_title">Yapılandırmaları yedekle</string>
+    <string name="minab_configs_backup_scope_selected">Seçilenler (%1$d)</string>
+    <string name="minab_configs_backup_scope_group">Geçerli grup: %1$s (%2$d)</string>
+    <string name="minab_configs_backup_scope_all">Tam yedek · Tümü (%1$d)</string>
+    <string name="minab_configs_cleanup_scope_title">Temizle · %1$s</string>
+    <string name="minab_connect_server">Bağlan</string>
 </resources>
