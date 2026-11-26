@@ -53,4 +53,25 @@
     <string name="minab_widget_label_compact">Minab · Быстрое включение (2×1)</string>
     <string name="minab_widget_label_mini">Minab · Кнопка питания (1×1)</string>
     <string name="minab_widget_label_large">Minab · Статус и скорость (4×2)</string>
+    <string name="minab_restore_backup">Восстановить</string>
+    <string name="minab_real_settings_wait_hint">Рекомендуется: 20 секунд</string>
+    <string name="minab_real_settings_max_hint">Рекомендуется: 10</string>
+    <string name="minab_real_settings_url">Целевой сайт теста</string>
+    <string name="minab_sort_title">Сортировка серверов</string>
+    <string name="minab_sort_best_badge">ЛУЧШЕЕ · РЕКОМЕНД.</string>
+    <string name="minab_sort_short_real">Реал</string>
+    <string name="minab_sort_short_ping">Пинг</string>
+    <string name="minab_sort_short_country">Группа</string>
+    <string name="minab_sort_short_name">А–Я</string>
+    <string name="minab_sort_short_lru">Недавние</string>
+    <string name="minab_history_title">История тестов</string>
+    <string name="minab_redetect_btn">Страна по IP</string>
+    <string name="minab_remove_duplicates">Удалить дубли</string>
+    <string name="minab_remove_inactive">Удалить неактивные</string>
+    <string name="minab_select_all">Выбрать все</string>
+    <string name="minab_deselect_all">Снять выбор</string>
+    <string name="minab_credentials_for_selected">Для выбранных (%1$d)</string>
+    <string name="minab_credentials_for_scope">Для %1$s</string>
+    <string name="minab_test_compact_ping_done">Пинг готов · %1$d из %2$d</string>
+    <string name="minab_test_compact_real_done">Реал-тест готов · %1$d из %2$d</string>
 </resources>

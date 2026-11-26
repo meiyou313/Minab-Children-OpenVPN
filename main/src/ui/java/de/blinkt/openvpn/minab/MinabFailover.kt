@@ -117,6 +117,10 @@ object MinabFailover {
     fun noteUserDisconnect() {
         userDisconnectAt = SystemClock.elapsedRealtime()
         userDisconnectPending = true
+        lastConnectedUuid = null
+        droppedUuid = null
+        failoverAttempts = 0
+        triedUuids.clear()
         handler.removeCallbacks(failoverRunnable)
         failoverPending = false
     }
@@ -146,16 +150,22 @@ object MinabFailover {
         // Not connected. Only a drop counts: we must have been
         // connected in this session, and the drop must not be the
         // user's own disconnect.
-        val wasConnectedUuid = lastConnectedUuid ?: return
-        if (RealTester.isRunning()) return
         val now = SystemClock.elapsedRealtime()
         if (userDisconnectPending) {
             val age = now - userDisconnectAt
-            userDisconnectPending = false
+            lastConnectedUuid = null
+            droppedUuid = null
+            handler.removeCallbacks(failoverRunnable)
+            failoverPending = false
+            // Consume on terminal disconnected states (or after stale window);
+            // ignore intermediate EXITING/NOPROCESS transitions from user disconnect.
+            if (level == ConnectionStatus.LEVEL_NOTCONNECTED || age >= USER_DISCONNECT_STALE_MS) {
+                userDisconnectPending = false
+            }
             if (age < USER_DISCONNECT_STALE_MS) return
-            // A stale note (the disconnect never happened): fall
-            // through and treat this drop as genuine.
         }
+        val wasConnectedUuid = lastConnectedUuid ?: return
+        if (RealTester.isRunning()) return
         if (failoverPending) return
         droppedUuid = wasConnectedUuid
         triedUuids.add(wasConnectedUuid)

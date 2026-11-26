@@ -442,12 +442,22 @@
 
         <ImageButton
             android:id="@+id/minab_btn_real_test_settings"
-            android:layout_width="40dp"
+            android:layout_width="36dp"
             android:layout_height="36dp"
-            android:layout_marginStart="4dp"
+            android:layout_marginStart="2dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/minab_real_settings_desc"
             android:src="@drawable/ic_minab_settings"
+            android:tint="@color/minab_teal" />
+
+        <ImageButton
+            android:id="@+id/minab_btn_test_history"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="2dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/minab_history_desc"
+            android:src="@drawable/ic_minab_history"
             android:tint="@color/minab_teal" />
     </LinearLayout>
 
@@ -499,20 +509,75 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
-    <EditText
-        android:id="@+id/minab_search"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:background="@drawable/minab_input_bg"
-        android:fontFamily="@font/vazirmatn"
-        android:hint="@string/minab_search_hint"
-        android:imeOptions="actionSearch"
-        android:inputType="text"
-        android:padding="10dp"
-        android:singleLine="true"
-        android:textColor="@color/minab_text_primary"
-        android:textColorHint="@color/minab_text_secondary"
-        android:textSize="12sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <EditText
+                android:id="@+id/minab_search"
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:background="@drawable/minab_input_bg"
+                android:fontFamily="@font/vazirmatn"
+                android:hint="@string/minab_search_hint"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:paddingStart="10dp"
+                android:paddingEnd="34dp"
+                android:singleLine="true"
+                android:textColor="@color/minab_text_primary"
+                android:textColorHint="@color/minab_text_secondary"
+                android:textSize="12sp" />
+
+            <ImageButton
+                android:id="@+id/minab_search_clear"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="4dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/minab_clear_search_desc"
+                android:padding="6dp"
+                android:src="@drawable/ic_minab_clear_small"
+                android:tint="@color/minab_text_secondary"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <Button
+            android:id="@+id/minab_btn_sort"
+            style="@style/Minab.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:layout_marginStart="6dp"
+            android:drawableStart="@drawable/ic_minab_sort"
+            android:drawablePadding="4dp"
+            android:drawableTint="@color/minab_teal"
+            android:minWidth="0dp"
+            android:minHeight="38dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:text="@string/minab_sort_short_real"
+            android:textSize="11sp" />
+
+        <ImageButton
+            android:id="@+id/minab_btn_tools"
+            android:layout_width="36dp"
+            android:layout_height="38dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/minab_input_bg"
+            android:contentDescription="@string/minab_tools_menu_title"
+            android:padding="8dp"
+            android:src="@drawable/ic_minab_dedup"
+            android:tint="@color/minab_teal" />
+    </LinearLayout>
 
 </LinearLayout>

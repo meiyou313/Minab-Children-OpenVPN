@@ -62,6 +62,7 @@ import de.blinkt.openvpn.core.VpnStatus;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -678,47 +679,37 @@ public class RealTester implements VpnStatus.StateListener {
         }
     }
 
-    /** Fetch the Telegram web client through the tunnel. Returns the
-        milliseconds until the response arrived, or -1 when the fetch
-        failed (blocked / timeout / no route). Only a small prefix of
-        the body is read; the point is reachability, not content.
-        Minab v0.9.1: 10 s timeouts (6 s was too tight on a slow
-        mobile link, and a slow fetch is not a blocked server) and
-        one retry — a single failed fetch must not mark a working
-        server Blocked. */
+    /** Fetch the user-selected Real Test target URL through the tunnel
+        (defaults to https://api.telegram.org/). Returns the round-trip ms,
+        or -1 when blocked / timed out / unreachable. */
     private long testTelegram() {
-        long ms = fetchTelegramOnce();
-        if (ms < 0) ms = fetchTelegramOnce();
+        String targetUrl = MinabRealTestSettings.getTestUrl(appContext);
+        long ms = fetchUrlOnce(targetUrl);
+        if (ms < 0) ms = fetchUrlOnce(targetUrl);
         return ms;
     }
 
-    private long fetchTelegramOnce() {
+    private long fetchUrlOnce(String targetUrl) {
         long start = SystemClock.elapsedRealtime();
-        HttpsURLConnection conn = null;
+        HttpURLConnection conn = null;
         try {
-            conn = (HttpsURLConnection) new URL("https://web.telegram.org/").openConnection();
+            conn = (HttpURLConnection) new URL(targetUrl).openConnection();
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", "Minab");
             conn.setInstanceFollowRedirects(true);
             int code = conn.getResponseCode();
-            if (code >= 200 && code < 400) {
+            // Any genuine HTTP/TLS response from the target server (200..404,
+            // e.g. 204 for generate_204, 200/302/404 for api.telegram.org)
+            // proves traffic reached the destination through the tunnel.
+            if (code >= 200 && code <= 404) {
                 try {
                     byte[] buf = new byte[512];
                     conn.getInputStream().read(buf);
                 } catch (Exception ignored) {
-                    // Body unreadable after a good status: still
-                    // counts — the tunnel carried the response.
                 }
                 long ms = SystemClock.elapsedRealtime() - start;
-                // Minab v0.7: a real HTTPS fetch through a VPN tunnel
-                // needs several round trips (TCP + TLS handshake +
-                // HTTP request/response), so it can never complete in
-                // a few milliseconds. A value under 50 ms means the
-                // measurement is bogus (e.g. served without any
-                // network round trip), not a real pass — return -1
-                // (Blocked) instead of a "0 ms" success.
                 if (ms < 50) return -1;
                 return ms;
             }

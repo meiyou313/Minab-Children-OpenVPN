@@ -3,10 +3,8 @@
  * Copyright (c) 2026 Minab contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * MinabTestProgressPanel: shared controller for the dedicated test progress
- * card (minab_test_progress_panel.xml) on both Home and Configs tabs.
- * Shows live progress %, progress bar, tested/remaining/found counters,
- * current server & ETA, and a prominent Cancel (or Close when done) action.
+ * MinabTestProgressPanel (v0.9.7.1): shows full live metrics card during a test,
+ * then automatically collapses into a crisp 1-line summary banner on finish.
  */
 
 package de.blinkt.openvpn.minab
@@ -15,6 +13,7 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -25,6 +24,10 @@ class MinabTestProgressPanel(
     private val root: View,
     onCancel: () -> Unit
 ) {
+    private val expandedBody: View = root.findViewById(R.id.minab_test_expanded_body)
+    private val compactBar: View = root.findViewById(R.id.minab_test_compact_bar)
+    private val compactSummary: TextView = root.findViewById(R.id.minab_test_compact_summary)
+
     private val spinner: ProgressBar = root.findViewById(R.id.minab_test_spinner)
     private val titleView: TextView = root.findViewById(R.id.minab_test_title)
     private val percentView: TextView = root.findViewById(R.id.minab_test_percent)
@@ -35,14 +38,16 @@ class MinabTestProgressPanel(
     private val statFoundLabelView: TextView = root.findViewById(R.id.minab_test_stat_found_label)
     private val detailView: TextView = root.findViewById(R.id.minab_test_detail)
     private val cancelBtn: Button = root.findViewById(R.id.minab_test_cancel)
-    private val dismissBtn: Button = root.findViewById(R.id.minab_test_dismiss)
+    private val dismissBtn: ImageButton = root.findViewById(R.id.minab_test_dismiss)
 
     init {
         cancelBtn.setOnClickListener { onCancel() }
         dismissBtn.setOnClickListener { hide() }
     }
 
-    private fun ensureVisible() {
+    private fun ensureExpandedVisible() {
+        expandedBody.visibility = View.VISIBLE
+        compactBar.visibility = View.GONE
         if (root.visibility != View.VISIBLE) {
             root.alpha = 0f
             root.visibility = View.VISIBLE
@@ -65,11 +70,10 @@ class MinabTestProgressPanel(
     }
 
     fun showPingProgress(done: Int, total: Int, okCount: Int, latestName: String?) {
-        ensureVisible()
+        ensureExpandedVisible()
         applyAccent(isReal = false)
         spinner.visibility = View.VISIBLE
         cancelBtn.visibility = View.VISIBLE
-        dismissBtn.visibility = View.GONE
 
         val safeTotal = total.coerceAtLeast(0)
         val safeDone = done.coerceIn(0, safeTotal)
@@ -91,11 +95,10 @@ class MinabTestProgressPanel(
     }
 
     fun showRealPingPhase(done: Int, total: Int, okCount: Int) {
-        ensureVisible()
+        ensureExpandedVisible()
         applyAccent(isReal = true)
         spinner.visibility = View.VISIBLE
         cancelBtn.visibility = View.VISIBLE
-        dismissBtn.visibility = View.GONE
 
         val safeTotal = total.coerceAtLeast(0)
         val safeDone = done.coerceIn(0, safeTotal)
@@ -120,11 +123,10 @@ class MinabTestProgressPanel(
         currentName: String?,
         totalSecondsLeft: Int
     ) {
-        ensureVisible()
+        ensureExpandedVisible()
         applyAccent(isReal = true)
         spinner.visibility = View.VISIBLE
         cancelBtn.visibility = View.VISIBLE
-        dismissBtn.visibility = View.GONE
 
         val safeTotal = total.coerceAtLeast(0)
         val safeDone = done.coerceIn(0, safeTotal)
@@ -152,6 +154,7 @@ class MinabTestProgressPanel(
         }
     }
 
+    /** Automatically collapses the detailed panel into a sleek 1-line summary bar. */
     fun showFinished(
         isReal: Boolean,
         summaryText: String,
@@ -159,36 +162,17 @@ class MinabTestProgressPanel(
         total: Int,
         found: Int
     ) {
-        ensureVisible()
-        root.setBackgroundResource(R.drawable.minab_card_bg)
-        val accent = ContextCompat.getColor(
-            context,
-            if (isReal) R.color.minab_connected else R.color.minab_teal
+        root.visibility = View.VISIBLE
+        expandedBody.visibility = View.GONE
+        compactBar.visibility = View.VISIBLE
+        root.setBackgroundResource(
+            if (found > 0) R.drawable.minab_row_halo_connected else R.drawable.minab_card_bg
         )
-        progressBar.progressTintList = ColorStateList.valueOf(accent)
-        percentView.setTextColor(accent)
-
-        spinner.visibility = View.GONE
-        cancelBtn.visibility = View.GONE
-        dismissBtn.visibility = View.VISIBLE
-
-        val safeTotal = total.coerceAtLeast(tested)
-        val remaining = (safeTotal - tested).coerceAtLeast(0)
-
-        titleView.text = context.getString(
-            if (isReal) R.string.minab_test_panel_real_done_title
-            else R.string.minab_test_panel_ping_done_title
-        )
-        percentView.text = context.getString(R.string.minab_test_percent, 100)
-        progressBar.progress = 100
-        statDoneView.text = tested.toString()
-        statRemainingView.text = remaining.toString()
-        statFoundView.text = found.toString()
-        statFoundLabelView.text = context.getString(
-            if (isReal) R.string.minab_test_stat_working
-            else R.string.minab_test_stat_responded
-        )
-        detailView.text = summaryText
+        compactSummary.text = if (isReal) {
+            context.getString(R.string.minab_test_compact_real_done, found, tested)
+        } else {
+            context.getString(R.string.minab_test_compact_ping_done, found, total.coerceAtLeast(tested))
+        }
     }
 
     fun hide() {

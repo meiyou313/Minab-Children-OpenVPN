@@ -2,6 +2,17 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.7.1 — UI refinement, instant halos, sorting, IP re-detection, scoped login, and network Test History:
+- Fixed disconnect auto-reconnect loop where tapping Disconnect restarted a connection attempt after a few seconds.
+- Zero-lag connecting & connected luminous row halos on both Home and Configs tabs.
+- Fixed sequential row numbers (1..N) pinned to the left of each server row in Home and Configs regardless of sorting.
+- Compact 48dp bottom navigation bar, single-screen About layout with aligned GitHub / Releases buttons and refined formal Features summary, and a clean 2-row pill tab bar in Edit Configs.
+- Modern shared Sort picker (Real Test speed marked "Best · Recommended" as default, plus Ping, Group/Country, A–Z, and Recently Used), live counts tab (N) on category chips, search clear (×) button, duplicate & failed-server cleanup, single-server Real Test, and live cross-tab synchronization (MinabProfileBus).
+- Auto-collapsing test progress banner that turns into a compact summary on finish while highlighting the "Connect to best server" button; Real Test target URL selector (10 curated presets including https://api.telegram.org/ default + Custom URL) with updated defaults (20s wait, 10 healthy servers) and bordered Reset button.
+- Network-aware Test History browser (zero Location permission): saves Ping/Real test snapshots tagged with Wi-Fi / Mobile transport, ISP, user-editable network labels, target URL, and working servers for 1-tap connect or re-apply.
+- Re-detect IP countries tool in both Configs toolbar and Manage Categories (supporting Selected, Current Group, Uncategorized, or All scopes) plus accurate batch HTTPS GeoIP detection and 141 bundled crisp vector country flags.
+- Compact single-screen Bulk Import with prominent "Done · Back to menu", concise "Restore backup" button, always-blank credentials prompt flow with optional 1-tap saved fill, Scoped Shared Login card (Last imported / Group / Pick / All), and context-aware Configs credentials button.
+
 New in v0.9.7 — major UI/UX overhaul, dynamic IP country grouping, multi-language & Day/Night theme, ladybug debug log, dynamic GitHub asset updates, new status-bar icon, and 3 home-screen widgets:
 - Home live connection bar: displays live download/upload speeds, session duration (HH:MM:SS), and session data used inside the Connect Card while connected, plus subtle haptic feedback on connect/disconnect actions.
 - Bottom tab bar icons: crisp custom vector icons paired with labels across Home, Configs, Graph, Settings, and About.

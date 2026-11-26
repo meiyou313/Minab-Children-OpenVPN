@@ -32,6 +32,17 @@
             android:buttonTint="@color/minab_teal"
             android:focusable="false" />
 
+        <TextView
+            android:id="@+id/minab_config_index"
+            android:layout_width="22dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:singleLine="true"
+            android:textColor="@color/minab_text_secondary"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
         <ImageView
             android:id="@+id/minab_config_flag"
             android:layout_width="22dp"

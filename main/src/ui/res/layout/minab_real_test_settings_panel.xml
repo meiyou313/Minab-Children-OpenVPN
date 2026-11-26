@@ -1,27 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-  ~ Minab Beta v0.9.6.2 (fixes #1, #6) — the Real test settings
-  ~ panel: an inline card that opens directly UNDER the Real test
-  ~ button (in the Home header and in the Configs header), instead
-  ~ of the ugly 0.9.6.1 AlertDialog. Same three settings with
-  ~ "Recommended: …" hints and a "Reset to recommended" action.
-  ~ Shared by Home and Configs through MinabRealTestSettingsPanel,
-  ~ so both tabs behave exactly the same. Hidden by default; the
-  ~ gear icon is green while it is open, blue while closed.
-  ~ Minab Beta v0.9.6.3 (fix #2) — smaller and more minimal:
-  ~ tighter padding/margins, smaller fonts and steppers, so the
-  ~ panel no longer takes half the screen.
-  ~ Minab Beta v0.9.6.4 (fix #7) — smaller STILL: the 0.9.6.3
-  ~ panel was still big and full of empty space. Padding 6dp,
-  ~ 4dp between sections, 10sp labels, 9sp hints, 28dp steppers —
-  ~ about a third shorter, nothing removed.
-  ~ Minab Beta v0.9.6.5 (fix #1) — the value + steppers sit IN
-  ~ the same row as the title now (label + hint on the left, the
-  ~ stepper on the right), so each setting takes one row instead
-  ~ of three and the panel is shorter still. And the steppers are
-  ~ ImageButtons with explicit plus/minus vectors in bordered
-  ~ buttons: the old text Buttons ("+"/"−") rendered INVISIBLY
-  ~ on the phone in 0.9.6.4, so the user could not see any way
-  ~ to change the numbers at all.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minab Beta v0.9.7.1 — Real test settings panel shared between Home and Configs:
+  - Bordered pill around "Reset to recommended"
+  - 20s wait, 10 healthy servers defaults
+  - 10 curated target URLs + Custom URL picker
   -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/minab_real_settings_panel"
@@ -30,7 +12,7 @@
     android:layout_marginTop="4dp"
     android:background="@drawable/minab_card_bg"
     android:orientation="vertical"
-    android:padding="6dp"
+    android:padding="8dp"
     android:visibility="gone">
 
     <LinearLayout
@@ -53,17 +35,21 @@
             android:id="@+id/minab_real_settings_reset"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="@drawable/minab_btn_outline"
             android:clickable="true"
             android:focusable="true"
             android:fontFamily="@font/vazirmatn"
-            android:padding="4dp"
+            android:paddingStart="9dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="3dp"
             android:text="@string/minab_real_settings_reset"
             android:textColor="@color/minab_teal"
-            android:textSize="11sp" />
+            android:textSize="10sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Wait per server: label + hint on the left, stepper on the
-         right, all in one row. -->
+    <!-- Wait per server -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -97,8 +83,8 @@
 
         <ImageButton
             android:id="@+id/minab_real_settings_wait_minus"
-            android:layout_width="32dp"
-            android:layout_height="28dp"
+            android:layout_width="30dp"
+            android:layout_height="26dp"
             android:background="@drawable/minab_btn_outline"
             android:contentDescription="@string/minab_real_settings_wait_minus_desc"
             android:scaleType="center"
@@ -106,24 +92,24 @@
 
         <TextView
             android:id="@+id/minab_real_settings_wait_value"
-            android:layout_width="48dp"
+            android:layout_width="44dp"
             android:layout_height="wrap_content"
             android:fontFamily="@font/vazirmatn"
             android:gravity="center"
             android:textColor="@color/minab_text_primary"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <ImageButton
             android:id="@+id/minab_real_settings_wait_plus"
-            android:layout_width="32dp"
-            android:layout_height="28dp"
+            android:layout_width="30dp"
+            android:layout_height="26dp"
             android:background="@drawable/minab_btn_outline"
             android:contentDescription="@string/minab_real_settings_wait_plus_desc"
             android:scaleType="center"
             android:src="@drawable/minab_ic_plus" />
     </LinearLayout>
 
-    <!-- Healthy servers to find: same one-row pattern. -->
+    <!-- Healthy servers to find -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -157,8 +143,8 @@
 
         <ImageButton
             android:id="@+id/minab_real_settings_max_minus"
-            android:layout_width="32dp"
-            android:layout_height="28dp"
+            android:layout_width="30dp"
+            android:layout_height="26dp"
             android:background="@drawable/minab_btn_outline"
             android:contentDescription="@string/minab_real_settings_max_minus_desc"
             android:scaleType="center"
@@ -166,23 +152,76 @@
 
         <TextView
             android:id="@+id/minab_real_settings_max_value"
-            android:layout_width="48dp"
+            android:layout_width="44dp"
             android:layout_height="wrap_content"
             android:fontFamily="@font/vazirmatn"
             android:gravity="center"
             android:textColor="@color/minab_text_primary"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <ImageButton
             android:id="@+id/minab_real_settings_max_plus"
-            android:layout_width="32dp"
-            android:layout_height="28dp"
+            android:layout_width="30dp"
+            android:layout_height="26dp"
             android:background="@drawable/minab_btn_outline"
             android:contentDescription="@string/minab_real_settings_max_plus_desc"
             android:scaleType="center"
             android:src="@drawable/minab_ic_plus" />
     </LinearLayout>
 
+    <!-- Target server URL selector -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_real_settings_url"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_real_settings_url_hint"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/minab_real_settings_url_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:background="@drawable/minab_chip_bg_selected"
+            android:clickable="true"
+            android:ellipsize="end"
+            android:focusable="true"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:maxWidth="156dp"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="api.telegram.org"
+            android:textColor="@color/minab_teal_dark"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Test unpinged toggle -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -190,29 +229,35 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="@font/vazirmatn"
-            android:text="@string/minab_real_settings_unpinged"
-            android:textColor="@color/minab_text_primary"
-            android:textSize="10sp" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_real_settings_unpinged"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/minab_real_settings_unpinged_hint"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="9sp" />
+        </LinearLayout>
 
         <CheckBox
             android:id="@+id/minab_real_settings_unpinged_check"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:buttonTint="@color/minab_teal"
             android:contentDescription="@string/minab_real_settings_unpinged" />
     </LinearLayout>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:fontFamily="@font/vazirmatn"
-        android:text="@string/minab_real_settings_unpinged_hint"
-        android:textColor="@color/minab_text_secondary"
-        android:textSize="9sp" />
 
 </LinearLayout>

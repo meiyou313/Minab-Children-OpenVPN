@@ -38,11 +38,24 @@
         android:gravity="center_vertical"
         android:minHeight="48dp">
 
+        <TextView
+            android:id="@+id/minab_row_index"
+            android:layout_width="24dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:singleLine="true"
+            android:textColor="@color/minab_text_secondary"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            tools:text="1" />
+
         <ImageView
             android:id="@+id/minab_flag"
             android:layout_width="24dp"
             android:layout_height="18dp"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="4dp"
             android:layout_marginEnd="6dp"
             android:contentDescription="@string/minab_flag_description"
             android:visibility="gone" />

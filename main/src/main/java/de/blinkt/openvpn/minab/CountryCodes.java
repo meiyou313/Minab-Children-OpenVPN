@@ -35,6 +35,7 @@ public final class CountryCodes {
         m.put("ca", "Canada");
         m.put("au", "Australia");
         m.put("jp", "Japan");
+        m.put("cn", "China");
         m.put("kr", "South Korea");
         m.put("sg", "Singapore");
         m.put("in", "India");

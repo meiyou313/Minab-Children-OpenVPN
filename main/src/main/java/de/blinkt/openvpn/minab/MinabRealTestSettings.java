@@ -3,37 +3,19 @@
  * Copyright (c) 2026 Minab contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * MinabRealTestSettings (v0.9.6.1, fix #11; v0.9.6.2, fix #1):
- * the Real test has a settings gear next to its button on Home
- * and on Configs. Three options, each with the app's recommended
- * value shown next to it in an inline panel under the button —
- * v0.9.6.2 replaced the 0.9.6.1 dialog with the panel, because
- * the dialog was ugly AND its changes only saved on OK (closing
- * it any other way silently lost them — see RealTester for why
- * that looked like the "test unpinged" setting being ignored).
- * The panel saves every change at once:
- *   - wait seconds per server (5–30, recommended 12 — the old
- *     Home wait; Configs used to wait 20 s, now both use this);
- *   - how many servers must PASS the real test before the run
- *     stops (3–30, recommended 5 since v0.9.6.2, was 10 — the
- *     number counts successes, not candidates: the run keeps
- *     going through the ranked list until that many pass, it does
- *     not stop after testing that many);
- *   - whether servers that did NOT answer the ping are tested too
- *     (recommended: no since v0.9.6.2, was yes — they can still
- *     work, e.g. UDP servers with ICMP blocked, so the user can
- *     turn it back on).
- * The settings live in one SharedPreferences file and apply to
- * the real test wherever it is started (Home or Configs).
- * applyCandidateFilter() runs on the ranked list AFTER the ping
- * phase (RealTester.run), so a server whose ping result is only
- * refreshed by that phase is judged on the fresh result.
+ * MinabRealTestSettings (v0.9.7.1):
+ *   - Wait per server: 5–45 s, recommended 20 s
+ *   - Healthy servers to find: 3–30, recommended 10
+ *   - Test unpinged servers: recommended off
+ *   - Target URL to test reachability through tunnel (10 curated presets +
+ *     custom URL; recommended: https://api.telegram.org/).
  */
 
 package de.blinkt.openvpn.minab;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.TextUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,27 +28,72 @@ public final class MinabRealTestSettings {
     private static final String KEY_WAIT_SECONDS = "wait_seconds";
     private static final String KEY_MAX_SERVERS = "max_servers";
     private static final String KEY_TEST_UNPINGED = "test_unpinged";
+    private static final String KEY_TEST_URL = "test_url";
+    private static final String KEY_DEFAULTS_V2 = "defaults_v0971_migrated";
 
     /** Recommended wait per server (seconds). */
-    public static final int RECOMMENDED_WAIT_SECONDS = 12;
+    public static final int RECOMMENDED_WAIT_SECONDS = 20;
     public static final int MIN_WAIT_SECONDS = 5;
-    public static final int MAX_WAIT_SECONDS = 30;
+    public static final int MAX_WAIT_SECONDS = 45;
 
-    /** Recommended number of ping-answering servers to test.
-        Minab Beta v0.9.6.2 (fix #1): 5, was 10. */
-    public static final int RECOMMENDED_MAX_SERVERS = 5;
+    /** Recommended number of healthy servers to find before stopping. */
+    public static final int RECOMMENDED_MAX_SERVERS = 10;
     public static final int MIN_MAX_SERVERS = 3;
     public static final int MAX_MAX_SERVERS = 30;
 
-    /** Recommended: also test servers that did not answer ping.
-        Minab Beta v0.9.6.2 (fix #1): no, was yes. */
+    /** Recommended: also test servers that did not answer ping. */
     public static final boolean RECOMMENDED_TEST_UNPINGED = false;
+
+    /** Recommended Real-Test reachability endpoint (fast, lightweight, filtered-sensitive). */
+    public static final String RECOMMENDED_TEST_URL = "https://api.telegram.org/";
+
+    /** 10 curated endpoints users can pick from in Real Test Settings (+ Custom URL). */
+    public static final String[] PRESET_URLS = {
+            "https://api.telegram.org/",
+            "https://web.telegram.org/",
+            "https://www.google.com/generate_204",
+            "https://www.youtube.com/generate_204",
+            "https://www.instagram.com/",
+            "https://x.com/",
+            "https://api.github.com/",
+            "https://www.cloudflare.com/cdn-cgi/trace",
+            "https://cp.cloudflare.com/generate_204",
+            "https://1.1.1.1/"
+    };
+
+    public static final String[] PRESET_LABELS = {
+            "api.telegram.org (Telegram API)",
+            "web.telegram.org (Telegram Web)",
+            "google.com (Google 204)",
+            "youtube.com (YouTube)",
+            "instagram.com (Instagram)",
+            "x.com (X / Twitter)",
+            "api.github.com (GitHub API)",
+            "cloudflare.com (Trace)",
+            "cp.cloudflare.com (Cloudflare 204)",
+            "1.1.1.1 (Cloudflare DNS)"
+    };
 
     private MinabRealTestSettings() {
     }
 
     private static SharedPreferences prefs(Context context) {
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        if (!p.getBoolean(KEY_DEFAULTS_V2, false)) {
+            SharedPreferences.Editor ed = p.edit().putBoolean(KEY_DEFAULTS_V2, true);
+            // Upgrade old v0.9.6.x defaults cleanly to 20s / 10 servers / api.telegram.org
+            if (!p.contains(KEY_WAIT_SECONDS) || p.getInt(KEY_WAIT_SECONDS, 12) == 12) {
+                ed.putInt(KEY_WAIT_SECONDS, RECOMMENDED_WAIT_SECONDS);
+            }
+            if (!p.contains(KEY_MAX_SERVERS) || p.getInt(KEY_MAX_SERVERS, 5) == 5) {
+                ed.putInt(KEY_MAX_SERVERS, RECOMMENDED_MAX_SERVERS);
+            }
+            if (!p.contains(KEY_TEST_URL)) {
+                ed.putString(KEY_TEST_URL, RECOMMENDED_TEST_URL);
+            }
+            ed.apply();
+        }
+        return p;
     }
 
     public static int getWaitSeconds(Context context) {
@@ -91,6 +118,45 @@ public final class MinabRealTestSettings {
         return prefs(context).getBoolean(KEY_TEST_UNPINGED, RECOMMENDED_TEST_UNPINGED);
     }
 
+    public static String getTestUrl(Context context) {
+        String raw = prefs(context).getString(KEY_TEST_URL, RECOMMENDED_TEST_URL);
+        if (TextUtils.isEmpty(raw)) return RECOMMENDED_TEST_URL;
+        String trimmed = raw.trim();
+        if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) {
+            return RECOMMENDED_TEST_URL;
+        }
+        return trimmed;
+    }
+
+    public static void setTestUrl(Context context, String url) {
+        String clean = normaliseUrl(url);
+        prefs(context).edit()
+                .putString(KEY_TEST_URL, clean)
+                .apply();
+    }
+
+    public static String normaliseUrl(String url) {
+        if (TextUtils.isEmpty(url)) return RECOMMENDED_TEST_URL;
+        String trimmed = url.trim();
+        if (!trimmed.contains("://")) {
+            trimmed = "https://" + trimmed;
+        }
+        if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) {
+            return RECOMMENDED_TEST_URL;
+        }
+        return trimmed;
+    }
+
+    public static String getShortHostLabel(Context context) {
+        String url = getTestUrl(context);
+        try {
+            String host = new java.net.URL(url).getHost();
+            return TextUtils.isEmpty(host) ? url : host;
+        } catch (Exception ignored) {
+            return url;
+        }
+    }
+
     public static void save(Context context, int waitSeconds, int maxServers,
                             boolean testUnpinged) {
         if (waitSeconds < MIN_WAIT_SECONDS) waitSeconds = MIN_WAIT_SECONDS;
@@ -107,23 +173,9 @@ public final class MinabRealTestSettings {
     public static void resetToRecommended(Context context) {
         save(context, RECOMMENDED_WAIT_SECONDS, RECOMMENDED_MAX_SERVERS,
                 RECOMMENDED_TEST_UNPINGED);
+        setTestUrl(context, RECOMMENDED_TEST_URL);
     }
 
-    /**
-     * Filter a ranked list (ping-OK first by ms, then never-tested,
-     * then Failed — see RealTester.rankProfilesForRealTest) to what
-     * the settings allow. Minab Beta v0.9.6.2 (fix #4): the number
-     * setting does NOT cap this list — it counts SUCCESSES (the
-     * runner stops after that many servers pass), so every
-     * ping-answering server stays a candidate and the run keeps
-     * going past the first N when they fail. The 0.9.6.1 cap
-     * ("test only the N lowest-ping servers") stopped the run even
-     * when all N failed. Servers that did not answer ping are in
-     * only when testUnpinged is on. A 0 ms value is not a
-     * measurement (see VpnProfile's migration guard), so ping-OK
-     * needs mLastPingMs > 0. Returns a new list; the input is
-     * untouched.
-     */
     public static List<VpnProfile> applyCandidateFilter(
             List<VpnProfile> ranked, Context context) {
         boolean testUnpinged = getTestUnpinged(context);

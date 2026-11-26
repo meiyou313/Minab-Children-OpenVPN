@@ -585,10 +585,10 @@
     <string name="minab_real_settings_desc">Real test settings</string>
     <string name="minab_real_settings_title">Real test settings</string>
     <string name="minab_real_settings_wait">Wait per server</string>
-    <string name="minab_real_settings_wait_hint">Recommended: 12 seconds</string>
+    <string name="minab_real_settings_wait_hint">Recommended: 20 seconds</string>
     <string name="minab_real_settings_wait_value">%1$d s</string>
     <string name="minab_real_settings_max">Healthy servers to find</string>
-    <string name="minab_real_settings_max_hint">Recommended: 5</string>
+    <string name="minab_real_settings_max_hint">Recommended: 10</string>
     <string name="minab_real_settings_unpinged">Also test servers that did not answer ping</string>
     <string name="minab_real_settings_unpinged_hint">Recommended: off</string>
     <string name="minab_real_settings_reset">Reset to recommended</string>
@@ -618,8 +618,8 @@
     <string name="minab_import_progress">Imported %1$d of %2$d…</string>
     <string name="minab_import_categorising">Detecting countries… %1$d of %2$d</string>
     <string name="minab_last_import">Last import: %1$s</string>
-    <string name="minab_shared_credentials_hint">One username and password for every config that needs a login — saved, and applied to configs you import later.</string>
-    <string name="minab_apply_credentials">Apply to all profiles</string>
+    <string name="minab_shared_credentials_hint">One username and password for the selected configs or group.</string>
+    <string name="minab_apply_credentials">Apply login</string>
     <string name="minab_credentials_empty">Enter a username and password first.</string>
     <string name="minab_credentials_applied">Applied to %1$d profile(s). New imports will use these credentials too.</string>
     <string name="minab_credentials_none_applied">No profile needs a username/password, so nothing was changed. The credentials are still saved for future imports.</string>
@@ -754,7 +754,7 @@
     <string name="minab_import_url_hint">Paste a link to a .ovpn file or a .zip of .ovpn files</string>
     <string name="minab_fetch_url">Download &amp; import</string>
     <string name="minab_link_failed">Could not download that link.</string>
-    <string name="minab_restore_backup">Restore a Minab backup</string>
+    <string name="minab_restore_backup">Restore backup</string>
     <string name="minab_restore_done">Backup restored: %1$d config(s), groups and settings put back.</string>
     <string name="minab_restore_failed">Could not restore that backup.</string>
     <!-- Minab Beta v0.9 — shown by the Restore button only: that
@@ -863,7 +863,7 @@
     <string name="minab_about_update_ready">New version %1$s is available to download.</string>
     <string name="minab_about_up_to_date">You are up to date (%1$s).</string>
     <string name="minab_about_highlights_title">Features</string>
-    <string name="minab_about_highlights_body">Bulk .ovpn &amp; .zip import · IP-based country groups · Ping &amp; Real tests · Active/Inactive filters · Live speed &amp; data usage charts · Auto-failover · Per-app VPN · Full backup · Home-screen widgets</string>
+    <string name="minab_about_highlights_body">Built for streamlined multi-server management: batch .ovpn &amp; .zip import with IP country detection, live Ping &amp; Real reachability diagnostics with selectable target URL, network-aware test history, real-time speed analytics, auto-failover, per-app split tunneling, encrypted full backups, and home-screen widgets.</string>
     <string name="minab_about_links_title">Project &amp; Source</string>
     <string name="minab_about_open_github">GitHub Repository</string>
     <string name="minab_about_open_releases">Releases &amp; Downloads</string>
@@ -885,5 +885,65 @@
     <string name="minab_widget_best_short">Best</string>
     <string name="minab_widget_ready">Ready to connect</string>
     <string name="minab_widget_no_server">Tap to open Minab</string>
+
+    <!-- Minab Beta v0.9.7.1 strings -->
+    <string name="minab_real_settings_url">Target test URL</string>
+    <string name="minab_real_settings_url_hint">Checked over VPN to verify real connectivity</string>
+    <string name="minab_real_settings_url_dialog_title">Choose Real Test target</string>
+    <string name="minab_real_url_custom">Custom URL…</string>
+    <string name="minab_test_compact_ping_done">Ping done · %1$d of %2$d responded</string>
+    <string name="minab_test_compact_real_done">Real test done · %1$d of %2$d working</string>
+    <string name="minab_sort_title">Sort servers</string>
+    <string name="minab_sort_best_badge">BEST · RECOMMENDED</string>
+    <string name="minab_sort_opt_real">Real Test Speed</string>
+    <string name="minab_sort_opt_ping">Ping Speed</string>
+    <string name="minab_sort_opt_country">Country / Group</string>
+    <string name="minab_sort_opt_name">Name (A–Z)</string>
+    <string name="minab_sort_opt_lru">Recently Used</string>
+    <string name="minab_sort_short_real">Real</string>
+    <string name="minab_sort_short_ping">Ping</string>
+    <string name="minab_sort_short_country">Group</string>
+    <string name="minab_sort_short_name">A–Z</string>
+    <string name="minab_sort_short_lru">Recent</string>
+    <string name="minab_clear_search_desc">Clear search</string>
+    <string name="minab_tools_menu_title">Server tools</string>
+    <string name="minab_remove_duplicates">Remove duplicates</string>
+    <string name="minab_remove_duplicates_confirm">Remove %1$d duplicate config(s) sharing identical host, port, and protocol? The fastest or starred copy of each is kept.</string>
+    <string name="minab_no_duplicates">No duplicate servers found.</string>
+    <string name="minab_duplicates_removed">Removed %1$d duplicate config(s).</string>
+    <string name="minab_remove_inactive">Delete inactive</string>
+    <string name="minab_remove_inactive_confirm">Delete %1$d inactive or failed server(s)?</string>
+    <string name="minab_no_inactive_to_remove">No inactive or failed servers to remove.</string>
+    <string name="minab_inactive_removed">Deleted %1$d failed/inactive server(s).</string>
+    <string name="minab_real_test_one">Real test this server</string>
+    <string name="minab_select_all">Select all</string>
+    <string name="minab_deselect_all">Deselect</string>
+    <string name="minab_credentials_for_selected">Set for selected (%1$d)</string>
+    <string name="minab_credentials_for_scope">Set for %1$s</string>
+    <string name="minab_redetect_btn">Re-detect IP</string>
+    <string name="minab_redetect_title">Re-detect IP countries</string>
+    <string name="minab_redetect_scope_selected">Selected configs (%1$d)</string>
+    <string name="minab_redetect_scope_group">Current group: %1$s (%2$d)</string>
+    <string name="minab_redetect_scope_uncat">Uncategorized only (%1$d)</string>
+    <string name="minab_redetect_scope_all">All configs (%1$d)</string>
+    <string name="minab_redetect_done">Updated countries for %1$d of %2$d servers.</string>
+    <string name="minab_history_title">Test History</string>
+    <string name="minab_history_desc">Test history</string>
+    <string name="minab_history_empty">No test history yet — run a Ping test or Real test to save network snapshots.</string>
+    <string name="minab_history_apply">Apply to list</string>
+    <string name="minab_history_servers_btn">Servers</string>
+    <string name="minab_history_connect_best">Connect best</string>
+    <string name="minab_history_summary_fmt">%1$d working of %2$d tested</string>
+    <string name="minab_history_none_working">No working servers in this test run.</string>
+    <string name="minab_history_applied">Applied %1$d server results from history.</string>
+    <string name="minab_history_rename_network">Name this network</string>
+    <string name="minab_history_label_hint">e.g. Home Wi-Fi, University, Work</string>
+    <string name="minab_fill_saved_login">Use saved: %1$s</string>
+    <string name="minab_bulk_login_scope_last">Last imported</string>
+    <string name="minab_bulk_login_scope_group">Specific group…</string>
+    <string name="minab_bulk_login_scope_pick">Pick configs…</string>
+    <string name="minab_bulk_login_scope_all">All configs</string>
+    <string name="minab_bulk_no_last_import">No recently imported configs found. Pick another scope.</string>
+    <string name="minab_bulk_pick_configs_title">Select configs to apply login</string>
 
 </resources>

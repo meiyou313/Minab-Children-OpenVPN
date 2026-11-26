@@ -58,10 +58,15 @@ import de.blinkt.openvpn.minab.MinabBackup
 import de.blinkt.openvpn.minab.MinabCategoryReorder
 import de.blinkt.openvpn.minab.MinabConnectState
 import de.blinkt.openvpn.minab.MinabFavorites
+import de.blinkt.openvpn.minab.MinabProfileBus
 import de.blinkt.openvpn.minab.MinabRealTestSettings
 import de.blinkt.openvpn.minab.MinabRealTestSettingsPanel
+import de.blinkt.openvpn.minab.MinabRedetectIpDialog
 import de.blinkt.openvpn.minab.MinabServerCountry
+import de.blinkt.openvpn.minab.MinabSortDialog
 import de.blinkt.openvpn.minab.MinabTestCoordinator
+import de.blinkt.openvpn.minab.MinabTestHistory
+import de.blinkt.openvpn.minab.MinabTestHistoryDialog
 import de.blinkt.openvpn.minab.MinabTestProgressPanel
 import de.blinkt.openvpn.minab.MinabVpnControl
 import de.blinkt.openvpn.minab.PingTester
@@ -76,6 +81,8 @@ import kotlin.math.min
 class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     private var selectedCategory: String? = null
     private var lastLevel: ConnectionStatus? = null
+    private var lastObservedActive: Boolean = false
+    private var lastObservedUuid: String? = null
 
     private var recyclerView: RecyclerView? = null
     private var headerView: View? = null
@@ -95,6 +102,11 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
 
     private val selectedUuids = mutableSetOf<String>()
     private var selectionRow: View? = null
+    private var credentialsSmartButton: Button? = null
+    private var selectAllButton: Button? = null
+    private var sortButton: Button? = null
+    private var searchEdit: EditText? = null
+    private var searchClearBtn: ImageButton? = null
     private var shareButton: Button? = null
     private var shareSelectedButton: Button? = null
 
@@ -113,8 +125,25 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     private var realPingPhaseActive: Boolean = false
     private var realPingOkCount: Int = 0
     private var realTestSettingsPanel: MinabRealTestSettingsPanel? = null
-    private var sortMode: Int = SORT_NONE
+    private var sortMode: Int = MinabProfileBus.SORT_REAL
+    private var currentTestNetSnapshot: MinabTestHistory.NetworkSnapshot? = null
     private var realTestRunId = 0
+
+    private val busListener = MinabProfileBus.Listener {
+        if (isAdded) {
+            refreshFromBus()
+        }
+    }
+
+    private fun refreshFromBus() {
+        if (!isAdded) return
+        sortMode = MinabProfileBus.getSortMode(requireContext())
+        updateSortButtonUi()
+        realTestSettingsPanel?.refreshIfVisible()
+        lastListSignature = null
+        chipsSignature = null
+        refreshList()
+    }
 
     private val realCountdownHandler = Handler(Looper.getMainLooper())
     private var realCountdownSeconds: Int = 0
@@ -157,12 +186,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            sortMode = requireContext().getSharedPreferences("MinabPrefs", Context.MODE_PRIVATE)
-                .getInt(PREF_SORT_MODE, SORT_NONE)
-        } catch (_: Exception) {
-            sortMode = SORT_NONE
-        }
+        sortMode = MinabProfileBus.getSortMode(requireContext())
         backupLauncher = registerForActivityResult(
             ActivityResultContracts.CreateDocument("application/zip")
         ) { uri: Uri? ->
@@ -193,11 +217,14 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             emptyView = empty
 
             chipsContainer = header.findViewById(R.id.minab_configs_chips)
-            header.findViewById<Button>(R.id.minab_configs_credentials_group)?.setOnClickListener {
-                showCredentialsDialog(selectedCategory)
-            }
-            header.findViewById<Button>(R.id.minab_configs_credentials_all)?.setOnClickListener {
-                showCredentialsDialog(null)
+            credentialsSmartButton = header.findViewById(R.id.minab_configs_credentials_smart)
+            credentialsSmartButton?.setOnClickListener {
+                when {
+                    selectedUuids.isNotEmpty() -> showCredentialsForSelectionDialog(selectedProfiles())
+                    selectedCategory != null && !CategoryStore.isPseudoTab(selectedCategory) ->
+                        showCredentialsDialog(selectedCategory)
+                    else -> showCredentialsDialog(null)
+                }
             }
             header.findViewById<Button>(R.id.minab_configs_backup)?.setOnClickListener {
                 val profiles = ProfileManager.getInstance(requireContext()).getProfiles()
@@ -209,6 +236,15 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             }
             shareButton = header.findViewById(R.id.minab_configs_share)
             shareButton?.setOnClickListener { shareCurrentScope() }
+            selectAllButton = header.findViewById(R.id.minab_configs_select_all)
+            selectAllButton?.setOnClickListener { toggleSelectAllDisplayed() }
+            header.findViewById<Button>(R.id.minab_configs_redetect_ip)?.setOnClickListener {
+                val all = ProfileManager.getInstance(requireContext()).getProfiles().toList()
+                MinabRedetectIpDialog.show(requireContext(), all, selectedProfiles(), selectedCategory)
+            }
+            header.findViewById<Button>(R.id.minab_configs_dedup)?.setOnClickListener {
+                showCleanupMenuDialog()
+            }
             selectionRow = header.findViewById(R.id.minab_configs_selection_row)
             shareSelectedButton = header.findViewById(R.id.minab_configs_share_selected)
             header.findViewById<Button>(R.id.minab_configs_delete_selected)?.setOnClickListener {
@@ -240,6 +276,12 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 )
             }
 
+            header.findViewById<ImageButton>(R.id.minab_configs_btn_test_history)?.setOnClickListener {
+                MinabTestHistoryDialog.show(requireContext()) { chosen ->
+                    startVPN(chosen)
+                }
+            }
+
             val testPanelRoot = header.findViewById<View>(R.id.minab_test_panel)
             if (testPanelRoot != null) {
                 testProgressPanel = MinabTestProgressPanel(requireContext(), testPanelRoot) {
@@ -253,15 +295,34 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 }
             }
 
-            header.findViewById<EditText>(R.id.minab_configs_search)?.addTextChangedListener(object : TextWatcher {
+            sortButton = header.findViewById(R.id.minab_configs_btn_sort)
+            sortButton?.setOnClickListener {
+                MinabSortDialog.show(requireContext(), sortMode) { picked ->
+                    sortMode = picked
+                    updateSortButtonUi()
+                    lastListSignature = null
+                    refreshList()
+                }
+            }
+            updateSortButtonUi()
+
+            searchEdit = header.findViewById(R.id.minab_configs_search)
+            searchClearBtn = header.findViewById(R.id.minab_configs_search_clear)
+            searchClearBtn?.setOnClickListener {
+                searchEdit?.setText("")
+            }
+            searchEdit?.addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
                 override fun afterTextChanged(s: Editable?) {
                     searchQuery = s?.toString()?.trim() ?: ""
+                    searchClearBtn?.visibility = if (searchQuery.isEmpty()) View.GONE else View.VISIBLE
                     searchDebounceHandler.removeCallbacks(searchDebounceRunnable)
-                    searchDebounceHandler.postDelayed(searchDebounceRunnable, 250)
+                    searchDebounceHandler.postDelayed(searchDebounceRunnable, 180)
                 }
             })
+
+            MinabProfileBus.addListener(busListener)
 
             configsAdapter = ConfigsRecyclerAdapter(header, empty)
             rv.adapter = configsAdapter
@@ -281,6 +342,11 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         super.onResume()
         VpnStatus.addStateListener(this)
         testPauseHandler.removeCallbacks(testPauseStop)
+        sortMode = MinabProfileBus.getSortMode(requireContext())
+        updateSortButtonUi()
+        realTestSettingsPanel?.refreshIfVisible()
+        lastListSignature = null
+        chipsSignature = null
         refreshList()
     }
 
@@ -291,10 +357,19 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         level: ConnectionStatus?,
         intent: Intent?
     ) {
-        if (level == lastLevel) return
+        val activeNow = VpnStatus.isVPNActive()
+        val uuidNow = VpnStatus.getLastConnectedVPNProfile()
+        if (level == lastLevel && activeNow == lastObservedActive && uuidNow == lastObservedUuid) return
         lastLevel = level
+        lastObservedActive = activeNow
+        lastObservedUuid = uuidNow
+        if (level == ConnectionStatus.LEVEL_CONNECTED ||
+            level == ConnectionStatus.LEVEL_NOTCONNECTED
+        ) {
+            MinabConnectState.clearPendingConnect()
+        }
         activity?.runOnUiThread {
-            if (isAdded) requestListRefresh()
+            if (isAdded) configsAdapter?.notifyRowsUpdated()
         }
     }
 
@@ -309,6 +384,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     }
 
     override fun onDestroyView() {
+        MinabProfileBus.removeListener(busListener)
         listRefreshHandler.removeCallbacks(listRefreshRunnable)
         listRefreshPending = false
         recyclerView?.adapter = null
@@ -318,6 +394,11 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         configsAdapter = null
         chipsContainer = null
         selectionRow = null
+        credentialsSmartButton = null
+        selectAllButton = null
+        sortButton = null
+        searchEdit = null
+        searchClearBtn = null
         shareButton = null
         shareSelectedButton = null
         testProgressPanel = null
@@ -369,37 +450,24 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
 
     private fun setSortMode(mode: Int) {
         sortMode = mode
-        try {
-            requireContext().getSharedPreferences("MinabPrefs", Context.MODE_PRIVATE)
-                .edit().putInt(PREF_SORT_MODE, mode).apply()
-        } catch (_: Exception) {
+        if (isAdded) {
+            MinabProfileBus.setSortMode(requireContext(), mode)
+            updateSortButtonUi()
         }
     }
 
-    private fun pingGroupOrder(context: Context): List<String> {
-        return try {
-            val ordered = CategoryStore.getOrderedCategories(context)
-            ordered.filter { it != CategoryStore.DEFAULT_CATEGORY } + CategoryStore.DEFAULT_CATEGORY
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
-
-    private fun pingComparator(groupOrder: List<String>): Comparator<VpnProfile> {
-        val groupIndex = groupOrder.withIndex().associate { it.value to it.index }
-        return compareBy<VpnProfile> { groupIndex[it.getCategory()] ?: Int.MAX_VALUE }
-            .thenBy { if (it.mLastPingMs > 0) it.mLastPingMs else Long.MAX_VALUE }
-            .thenBy { it.mName ?: "" }
+    private fun updateSortButtonUi() {
+        val ctx = context ?: return
+        sortButton?.text = MinabSortDialog.shortLabel(ctx, sortMode)
     }
 
     private fun resortConfigsAdapter() {
         if (displayedProfiles.isEmpty()) return
-        val groupOrder = try {
-            pingGroupOrder(requireContext())
-        } catch (_: Exception) {
-            return
-        }
-        displayedProfiles = displayedProfiles.sortedWith(pingComparator(groupOrder)).toMutableList()
+        val favorites = MinabFavorites.getAll(requireContext())
+        cachedFavorites = favorites
+        displayedProfiles = MinabProfileBus.sortProfiles(
+            displayedProfiles, sortMode, favorites, true
+        ).toMutableList()
         lastListSignature = null
         requestListRefresh()
     }
@@ -426,11 +494,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             val category = profile.getCategory()?.lowercase() ?: ""
             name.contains(query) || category.contains(query)
         }
-        val sorted: List<VpnProfile> = if (sortMode == SORT_PING) {
-            searched.sortedWith(pingComparator(pingGroupOrder(context)))
-        } else {
-            searched.sortedWith(compareBy { it.mName ?: "" })
-        }
+        val sorted: List<VpnProfile> = MinabProfileBus.sortProfiles(searched, sortMode, favorites, true)
 
         val signature = listSignature(sorted, favorites)
         if (signature == lastListSignature) {
@@ -501,6 +565,19 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         updateSelectionBar()
     }
 
+    private fun toggleSelectAllDisplayed() {
+        if (displayedProfiles.isEmpty()) return
+        val allSelected = displayedProfiles.all { selectedUuids.contains(it.getUUIDString()) }
+        if (allSelected) {
+            for (p in displayedProfiles) selectedUuids.remove(p.getUUIDString())
+        } else {
+            for (p in displayedProfiles) selectedUuids.add(p.getUUIDString())
+        }
+        lastListSignature = null
+        configsAdapter?.notifyRowsUpdated()
+        updateSelectionBar()
+    }
+
     private fun updateSelectionBar() {
         if (!isAdded) return
         val count = selectedUuids.size
@@ -513,6 +590,72 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             selectedCategory != null -> getString(R.string.minab_share_group)
             else -> getString(R.string.minab_share_all)
         }
+        val allShownSelected = displayedProfiles.isNotEmpty() &&
+            displayedProfiles.all { selectedUuids.contains(it.getUUIDString()) }
+        selectAllButton?.setText(
+            if (allShownSelected) R.string.minab_deselect_all else R.string.minab_select_all
+        )
+        credentialsSmartButton?.text = when {
+            count > 0 -> getString(R.string.minab_credentials_for_selected, count)
+            selectedCategory != null && !CategoryStore.isPseudoTab(selectedCategory) ->
+                getString(R.string.minab_credentials_for_scope, selectedCategory!!)
+            else -> getString(R.string.minab_credentials_for_all)
+        }
+    }
+
+    private fun showCleanupMenuDialog() {
+        val ctx = requireContext()
+        val pm = ProfileManager.getInstance(ctx)
+        val all = pm.getProfiles().toList()
+        val dups = MinabProfileBus.findDuplicates(all, MinabFavorites.getAll(ctx))
+        val inactive = MinabProfileBus.findInactiveProfiles(all)
+        val items = arrayOf(
+            "${getString(R.string.minab_remove_duplicates)} (${dups.size})",
+            "${getString(R.string.minab_remove_inactive)} (${inactive.size})"
+        )
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.minab_tools_menu_title)
+            .setItems(items) { _, which ->
+                if (which == 0) {
+                    if (dups.isEmpty()) {
+                        Toast.makeText(ctx, R.string.minab_no_duplicates, Toast.LENGTH_SHORT).show()
+                    } else {
+                        AlertDialog.Builder(ctx)
+                            .setTitle(R.string.minab_remove_duplicates)
+                            .setMessage(getString(R.string.minab_remove_duplicates_confirm, dups.size))
+                            .setPositiveButton(android.R.string.ok) { _, _ ->
+                                for (p in dups) pm.removeProfile(ctx, p)
+                                Toast.makeText(ctx, getString(R.string.minab_duplicates_removed, dups.size), Toast.LENGTH_SHORT).show()
+                                lastListSignature = null
+                                chipsSignature = null
+                                refreshList()
+                                MinabProfileBus.notifyChanged()
+                            }
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show()
+                    }
+                } else {
+                    if (inactive.isEmpty()) {
+                        Toast.makeText(ctx, R.string.minab_no_inactive_to_remove, Toast.LENGTH_SHORT).show()
+                    } else {
+                        AlertDialog.Builder(ctx)
+                            .setTitle(R.string.minab_remove_inactive)
+                            .setMessage(getString(R.string.minab_remove_inactive_confirm, inactive.size))
+                            .setPositiveButton(android.R.string.ok) { _, _ ->
+                                for (p in inactive) pm.removeProfile(ctx, p)
+                                Toast.makeText(ctx, getString(R.string.minab_inactive_removed, inactive.size), Toast.LENGTH_SHORT).show()
+                                lastListSignature = null
+                                chipsSignature = null
+                                refreshList()
+                                MinabProfileBus.notifyChanged()
+                            }
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun showDeleteSelectedDialog() {
@@ -534,7 +677,9 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                     getString(R.string.minab_configs_deleted, deleted),
                     Toast.LENGTH_SHORT
                 ).show()
+                chipsSignature = null
                 refreshList()
+                MinabProfileBus.notifyChanged()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -587,7 +732,9 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             ),
             Toast.LENGTH_SHORT
         ).show()
+        chipsSignature = null
         refreshList()
+        MinabProfileBus.notifyChanged()
     }
 
     // --- Share configs as zip ---
@@ -663,20 +810,36 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         ) {
             selectedCategory = null
         }
-        val signature = (selectedCategory ?: "all") + "|" + ordered.joinToString(",")
+        val favorites = MinabFavorites.getAll(context)
+        val allCount = allProfiles.size
+        val favCount = allProfiles.count { favorites.contains(it.getUUIDString()) }
+        val activeCount = allProfiles.count { MinabVpnControl.isHealthy(it) }
+        val inactiveCount = (allCount - activeCount).coerceAtLeast(0)
+        val groupCounts = HashMap<String, Int>()
+        for (p in allProfiles) {
+            val cat = CategoryStore.normalise(p.getCategory())
+            groupCounts[cat] = (groupCounts[cat] ?: 0) + 1
+        }
+        val signature = (selectedCategory ?: "all") + "|" +
+            "$allCount,$favCount,$activeCount,$inactiveCount|" +
+            ordered.joinToString(",") { "$it:${groupCounts[it] ?: 0}" }
         if (signature == chipsSignature && container.childCount > 0) return
         chipsSignature = signature
         container.removeAllViews()
-        addFavoritesTab(container)
-        addSimpleChip(container, null)
-        addStatusFilterTab(container, CategoryStore.ACTIVE_TAB, R.string.minab_active_tab, R.color.minab_connected)
-        addStatusFilterTab(container, CategoryStore.INACTIVE_TAB, R.string.minab_inactive_tab, R.color.minab_ping_fail)
+        addFavoritesTab(container, favCount)
+        addSimpleChip(container, null, allCount)
+        addStatusFilterTab(
+            container, CategoryStore.ACTIVE_TAB, R.string.minab_active_tab, R.color.minab_connected, activeCount
+        )
+        addStatusFilterTab(
+            container, CategoryStore.INACTIVE_TAB, R.string.minab_inactive_tab, R.color.minab_ping_fail, inactiveCount
+        )
         for (category in ordered) {
             if (category == CategoryStore.DEFAULT_CATEGORY) continue
-            addSimpleChip(container, category)
+            addSimpleChip(container, category, groupCounts[category] ?: 0)
         }
         if (ordered.contains(CategoryStore.DEFAULT_CATEGORY)) {
-            addSimpleChip(container, CategoryStore.DEFAULT_CATEGORY)
+            addSimpleChip(container, CategoryStore.DEFAULT_CATEGORY, groupCounts[CategoryStore.DEFAULT_CATEGORY] ?: 0)
         }
 
         val manage = TextView(context).apply {
@@ -723,6 +886,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                         chipsSignature = null
                         rebuildChips()
                         refreshList()
+                        MinabProfileBus.notifyChanged()
                     }
                 }
             }
@@ -734,9 +898,9 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         container.addView(peek)
     }
 
-    private fun addSimpleChip(container: LinearLayout, category: String?) {
+    private fun addSimpleChip(container: LinearLayout, category: String?, count: Int) {
         val context = requireContext()
-        val label = category ?: getString(R.string.minab_all_tab)
+        val label = "${category ?: getString(R.string.minab_all_tab)} ($count)"
         val selected = category == selectedCategory
         val chip = TextView(context).apply {
             text = label
@@ -768,7 +932,8 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         container: LinearLayout,
         tabKey: String,
         labelRes: Int,
-        dotColorRes: Int
+        dotColorRes: Int,
+        count: Int
     ) {
         val context = requireContext()
         val selected = selectedCategory == tabKey
@@ -794,7 +959,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         }
         tab.addView(dot)
         val label = TextView(context).apply {
-            text = getString(labelRes)
+            text = "${getString(labelRes)} ($count)"
             textSize = 11f
             setTextColor(
                 ContextCompat.getColor(
@@ -812,7 +977,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         container.addView(tab)
     }
 
-    private fun addFavoritesTab(container: LinearLayout) {
+    private fun addFavoritesTab(container: LinearLayout, count: Int) {
         val context = requireContext()
         val selected = selectedCategory == CategoryStore.FAVORITES_TAB
         val tab = LinearLayout(context).apply {
@@ -833,7 +998,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         }
         tab.addView(star)
         val label = TextView(context).apply {
-            text = getString(R.string.minab_favorites_tab)
+            text = "${getString(R.string.minab_favorites_tab)} ($count)"
             textSize = 11f
             setTextColor(
                 ContextCompat.getColor(
@@ -857,14 +1022,22 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     private fun showManageCategoriesDialog() {
         val categories = CategoryStore.getOrderedCategories(requireContext())
             .filter { it != CategoryStore.DEFAULT_CATEGORY }
-        if (categories.isEmpty()) {
-            Toast.makeText(requireContext(), R.string.minab_new_category, Toast.LENGTH_SHORT).show()
-            showNewCategoryDialog { refreshList() }
-            return
-        }
-        AlertDialog.Builder(requireContext())
+        val builder = AlertDialog.Builder(requireContext())
             .setTitle(R.string.minab_manage_categories)
-            .setItems(categories.toTypedArray()) { _, which ->
+            .setPositiveButton(R.string.minab_redetect_btn) { _, _ ->
+                val all = ProfileManager.getInstance(requireContext()).getProfiles().toList()
+                MinabRedetectIpDialog.show(requireContext(), all, selectedProfiles(), selectedCategory)
+            }
+            .setNeutralButton(R.string.minab_new_category) { _, _ ->
+                showNewCategoryDialog {
+                    chipsSignature = null
+                    refreshList()
+                    MinabProfileBus.notifyChanged()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+        if (categories.isNotEmpty()) {
+            builder.setItems(categories.toTypedArray()) { _, which ->
                 val oldName = categories[which]
                 AlertDialog.Builder(requireContext())
                     .setTitle(oldName)
@@ -888,24 +1061,27 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                                     if (selectedCategory == oldName) {
                                         selectedCategory = CategoryStore.normalise(entry.text.toString())
                                     }
+                                    chipsSignature = null
+                                    lastListSignature = null
                                     refreshList()
+                                    MinabProfileBus.notifyChanged()
                                 }
                                 .setNegativeButton(android.R.string.cancel, null)
                                 .show()
                         } else {
                             CategoryStore.deleteCategory(requireContext(), oldName)
                             if (selectedCategory == oldName) selectedCategory = null
+                            chipsSignature = null
+                            lastListSignature = null
                             refreshList()
+                            MinabProfileBus.notifyChanged()
                         }
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
-            .setNeutralButton(R.string.minab_new_category) { _, _ ->
-                showNewCategoryDialog { refreshList() }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
+        builder.show()
     }
 
     private fun onConfigRowClick(profile: VpnProfile) {
@@ -922,6 +1098,8 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             getString(R.string.minab_change_credentials),
             getString(R.string.minab_assign_category),
             getString(R.string.minab_ping_one),
+            getString(R.string.minab_real_test_one),
+            getString(R.string.minab_redetect_btn),
             getString(R.string.minab_share_config),
             getString(R.string.minab_delete_config)
         )
@@ -933,8 +1111,15 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                     1 -> showProfileCredentialsDialog(profile)
                     2 -> showAssignCategoryDialog(profile)
                     3 -> pingOne(profile)
-                    4 -> shareProfiles(listOf(profile))
-                    5 -> showDeleteDialog(profile)
+                    4 -> startRealTest(listOf(profile))
+                    5 -> MinabRedetectIpDialog.show(
+                        requireContext(),
+                        ProfileManager.getInstance(requireContext()).getProfiles().toList(),
+                        listOf(profile),
+                        selectedCategory
+                    )
+                    6 -> shareProfiles(listOf(profile))
+                    7 -> showDeleteDialog(profile)
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -955,6 +1140,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                     ProfileManager.saveProfile(requireContext(), profile)
                     Toast.makeText(requireContext(), R.string.minab_config_renamed, Toast.LENGTH_SHORT).show()
                     refreshList()
+                    MinabProfileBus.notifyChanged()
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -976,13 +1162,39 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 Toast.LENGTH_SHORT
             ).show()
             refreshList()
+            MinabProfileBus.notifyChanged()
         }
     }
 
+    private fun showCredentialsForSelectionDialog(targets: List<VpnProfile>) {
+        if (targets.isEmpty()) return
+        val title = getString(R.string.minab_credentials_for_selected, targets.size)
+        AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setMessage(R.string.minab_shared_credentials_hint)
+            .setPositiveButton(R.string.minab_apply_credentials) { _, _ ->
+                showCredentialsInputDialog { username, password ->
+                    SharedCredentials.save(requireContext(), username, password)
+                    val updated = SharedCredentials.applyToProfiles(
+                        requireContext(), targets, username, password
+                    )
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.minab_credentials_applied, updated),
+                        Toast.LENGTH_LONG
+                    ).show()
+                    refreshList()
+                    MinabProfileBus.notifyChanged()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun showCredentialsDialog(group: String?) {
-        val effectiveGroup = if (group == CategoryStore.FAVORITES_TAB) null else group
+        val effectiveGroup = if (group == null || CategoryStore.isPseudoTab(group)) null else group
         val title = if (effectiveGroup == null) getString(R.string.minab_credentials_for_all)
-        else getString(R.string.minab_credentials_for_group) + " — " + effectiveGroup
+        else getString(R.string.minab_credentials_for_scope, effectiveGroup)
         AlertDialog.Builder(requireContext())
             .setTitle(title)
             .setMessage(R.string.minab_shared_credentials_hint)
@@ -1001,6 +1213,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                         Toast.LENGTH_LONG
                     ).show()
                     refreshList()
+                    MinabProfileBus.notifyChanged()
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -1068,7 +1281,10 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         profile.setCategory(category)
         CategoryStore.addCategory(requireContext(), category)
         ProfileManager.saveProfile(requireContext(), profile)
+        chipsSignature = null
+        lastListSignature = null
         refreshList()
+        MinabProfileBus.notifyChanged()
     }
 
     private fun showDeleteDialog(profile: VpnProfile) {
@@ -1078,7 +1294,10 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 ProfileManager.getInstance(requireContext()).removeProfile(requireContext(), profile)
                 Toast.makeText(requireContext(), R.string.minab_config_deleted, Toast.LENGTH_SHORT).show()
+                chipsSignature = null
+                lastListSignature = null
                 refreshList()
+                MinabProfileBus.notifyChanged()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -1110,6 +1329,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 activity?.runOnUiThread {
                     if (!isAdded) return@runOnUiThread
                     Toast.makeText(requireContext(), R.string.minab_ping_done, Toast.LENGTH_SHORT).show()
+                    MinabProfileBus.notifyChanged()
                 }
             }
         })
@@ -1161,6 +1381,8 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         cancelRealTest()
         cancelPingTest()
         RealTester.cancelCurrent()
+        currentTestNetSnapshot = null
+        MinabTestHistory.captureNetworkAsync(requireContext()) { snap -> currentTestNetSnapshot = snap }
         clearTestResultsAsync(profiles)
         lastListSignature = null
         refreshList()
@@ -1195,7 +1417,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                     if (ok) pingOkCount++
                     pingLatestName = result.profile.mName
                     updateTestPingStatus()
-                    if (sortMode == SORT_PING) resortConfigsAdapter()
+                    if (sortMode == MinabProfileBus.SORT_PING) resortConfigsAdapter()
                     else requestListRefresh()
                     maybeDetectCountryFromIp(result)
                 }
@@ -1211,9 +1433,20 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                     if (cancelled) {
                         Toast.makeText(requireContext(), R.string.minab_ping_cancelled, Toast.LENGTH_SHORT).show()
                         testProgressPanel?.hide()
+                        MinabProfileBus.notifyChanged()
                     } else {
-                        setSortMode(SORT_PING)
+                        MinabTestHistory.recordRunFromProfiles(
+                            requireContext(),
+                            false,
+                            "TCP/Ping",
+                            currentTestNetSnapshot,
+                            profiles,
+                            pingDoneCount,
+                            pingOkCount
+                        )
+                        setSortMode(MinabProfileBus.SORT_PING)
                         lastListSignature = null
+                        chipsSignature = null
                         refreshList()
                         Toast.makeText(requireContext(), R.string.minab_ping_done, Toast.LENGTH_SHORT).show()
                         testProgressPanel?.showFinished(
@@ -1223,6 +1456,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                             total = pingTotalCount,
                             found = pingOkCount
                         )
+                        MinabProfileBus.notifyChanged()
                     }
                 }
             }
@@ -1240,7 +1474,10 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 val code = AutoCategory.countryCodeForIp(ctx, ip) ?: return@execute
                 MinabServerCountry.put(ctx, profile.getUUIDString(), code)
                 activity?.runOnUiThread {
-                    if (isAdded) requestListRefresh()
+                    if (isAdded) {
+                        requestListRefresh()
+                        MinabProfileBus.notifyChanged()
+                    }
                 }
             } catch (_: Exception) {
             }
@@ -1302,6 +1539,8 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         realPingPhaseActive = true
         realPingOkCount = 0
         realTargetWorking = MinabRealTestSettings.getMaxServers(requireContext())
+        currentTestNetSnapshot = null
+        MinabTestHistory.captureNetworkAsync(requireContext()) { snap -> currentTestNetSnapshot = snap }
         realTestRunId++
         val runId = realTestRunId
 
@@ -1349,7 +1588,8 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                         realPingOkCount++
                         testProgressPanel?.showRealPingPhase(pingDoneCount, pingTotalCount, realPingOkCount)
                     }
-                    requestListRefresh()
+                    if (sortMode == MinabProfileBus.SORT_REAL) resortConfigsAdapter()
+                    else requestListRefresh()
                 }
 
                 override fun onFinished(cancelled: Boolean, working: Int) {
@@ -1362,14 +1602,27 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                     if (!isAdded) return
                     if (cancelled) {
                         testProgressPanel?.hide()
+                        MinabProfileBus.notifyChanged()
                         return
                     }
                     if (realTotalCount == 0) {
                         testProgressPanel?.hide()
                         Toast.makeText(requireContext(), R.string.minab_real_none_to_test, Toast.LENGTH_LONG).show()
+                        MinabProfileBus.notifyChanged()
                         return
                     }
+                    MinabTestHistory.recordRunFromProfiles(
+                        requireContext(),
+                        true,
+                        MinabRealTestSettings.getShortHostLabel(requireContext()),
+                        currentTestNetSnapshot,
+                        profiles,
+                        realCountdownDone,
+                        working
+                    )
+                    setSortMode(MinabProfileBus.SORT_REAL)
                     lastListSignature = null
+                    chipsSignature = null
                     refreshList()
                     Toast.makeText(requireContext(), R.string.minab_real_done, Toast.LENGTH_SHORT).show()
                     testProgressPanel?.showFinished(
@@ -1379,6 +1632,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                         total = realTotalCount,
                         found = working
                     )
+                    MinabProfileBus.notifyChanged()
                 }
 
                 override fun onConnectRequested(profile: VpnProfile) {
@@ -1409,6 +1663,8 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     }
 
     private fun startVPN(profile: VpnProfile) {
+        MinabConnectState.markPendingConnect(profile.getUUIDString())
+        configsAdapter?.notifyRowsUpdated()
         ProfileManager.saveProfile(requireContext(), profile)
         val intent = Intent(requireContext(), LaunchVPN::class.java)
         intent.putExtra(LaunchVPN.EXTRA_KEY, profile.getUUID().toString())
@@ -1452,6 +1708,7 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     private class ConfigRowViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val cardWrapper: View = view.findViewById(R.id.minab_config_card_wrapper)
         val rowContent: View = view.findViewById(R.id.minab_config_row_content)
+        val indexText: TextView = view.findViewById(R.id.minab_config_index)
         val name: TextView = view.findViewById(R.id.minab_config_name)
         val subtitle: TextView = view.findViewById(R.id.minab_config_subtitle)
         val flag: ImageView = view.findViewById(R.id.minab_config_flag)
@@ -1563,14 +1820,23 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
                 }
             )
 
+            holder.indexText.text = (index + 1).toString()
             holder.name.text = profile.mName ?: ""
             holder.subtitle.text = "[" + profile.getCategory() + "]"
             holder.flag.setImageResource(FlagHelper.flagResForProfile(profile, ctx))
             holder.flag.visibility = View.VISIBLE
 
-            if (MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)) {
-                holder.rowContent.setBackgroundResource(R.drawable.minab_halo_green)
+            val activeUuid = VpnStatus.getLastConnectedVPNProfile()
+            val connected = VpnStatus.isVPNActive() &&
+                lastLevel == ConnectionStatus.LEVEL_CONNECTED &&
+                profile.getUUIDString() == activeUuid
+            val connecting = !connected && MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)
+            if (connecting) {
+                holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connecting)
                 holder.connecting.visibility = View.VISIBLE
+            } else if (connected) {
+                holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connected)
+                holder.connecting.visibility = View.GONE
             } else {
                 if (selectableItemBgResId != 0) {
                     holder.rowContent.setBackgroundResource(selectableItemBgResId)
@@ -1594,7 +1860,10 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             )
             holder.star.setOnClickListener {
                 MinabFavorites.toggle(ctx, profile.getUUIDString())
+                lastListSignature = null
+                chipsSignature = null
                 refreshList()
+                MinabProfileBus.notifyChanged()
             }
 
             holder.edit.setOnClickListener { editVPN(profile) }
@@ -1613,10 +1882,6 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     }
 
     companion object {
-        private const val SORT_NONE = 0
-        private const val SORT_PING = 1
-        private const val PREF_SORT_MODE = "minab_configs_sort_mode"
-
         private const val VIEW_TYPE_HEADER = 0
         private const val VIEW_TYPE_ITEM = 1
         private const val VIEW_TYPE_EMPTY = 2

@@ -3,9 +3,14 @@
  * Copyright (c) 2026 Minab Children contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * AutoCategory: IP-based automatic country categorisation for imported VPN
- * profiles, with an offline hostname/filename fallback when offline or DNS
- * fails. Uses HTTPS GeoIP endpoints with 30-day SharedPreferences caching.
+ * AutoCategory (v0.9.7.1): accurate batch IP geolocation with strict offline fallback.
+ *   1. Resolve each profile's remote host to IP in parallel (or use literal IP directly).
+ *   2. Query GeoIP in batches (get.geojs.io supports up to 25 IPs in 1 HTTPS call!)
+ *      with multi-provider per-IP fallbacks (api.country.is, ipwho.is, ipinfo.io).
+ *   3. If offline / rate-limited, offline fallback ONLY accepts flag emojis or full
+ *      country names ("Germany", "Netherlands", "United States", etc.) — NEVER
+ *      ambiguous 2-letter English words like "in", "no", "it", "at", "be", "my",
+ *      so configs are never silently misclassified into wrong countries.
  */
 
 package de.blinkt.openvpn.minab;
@@ -14,6 +19,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -21,32 +27,173 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import de.blinkt.openvpn.VpnProfile;
 
 public final class AutoCategory {
     private static final String GEO_CACHE_PREFS = "MinabGeoCache";
     private static final long CACHE_TTL_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
-    private static final int HTTP_TIMEOUT_MS = 3500;
+    private static final int HTTP_TIMEOUT_MS = 4500;
+    private static final int BATCH_SIZE = 25;
 
-    private static final Pattern CODE_TOKEN =
-            Pattern.compile("(?:^|[^a-z0-9])([a-z]{2})(?:[^a-z]|$)");
-    private static final Pattern TLD =
-            Pattern.compile("\\.([a-z]{2})$");
+    public interface BatchProgressCallback {
+        void onResult(VpnProfile profile, String countryCode, String countryName, int done, int total);
+    }
 
     private AutoCategory() {
     }
 
     /**
-     * IP-first country category detection for a profile.
-     * 1. Resolve remoteHost -> IP -> 30-day cache or HTTPS GeoIP lookup.
-     * 2. Fall back to offline country-code heuristic in profileName / fileName / host.
-     * Safe to call from a background thread only. Never throws.
+     * Resolve and categorise a batch of profiles accurately by IP geolocation.
+     * Returns map of profile UUID -> lower-case 2-letter ISO country code for
+     * every profile whose country was resolved. Must be called from a background thread.
      */
+    public static Map<String, String> detectCategoriesForProfiles(
+            Context context,
+            List<VpnProfile> profiles,
+            boolean forceRefreshCache,
+            BatchProgressCallback callback) {
+        Map<String, String> detectedCodesByUuid = new HashMap<>();
+        if (context == null || profiles == null || profiles.isEmpty()) return detectedCodesByUuid;
+
+        final Context appCtx = context.getApplicationContext();
+        final int total = profiles.size();
+
+        // 1. Resolve profile hosts to IPs in parallel (chunks of 8)
+        Map<String, String> uuidToIp = new HashMap<>();
+        Set<String> uniqueIps = new LinkedHashSet<>();
+        ExecutorService dnsPool = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<String[]>> futures = new ArrayList<>();
+            for (final VpnProfile p : profiles) {
+                futures.add(dnsPool.submit((Callable<String[]>) () -> {
+                    String host = p.getPrimaryRemoteHost();
+                    String ip = TextUtils.isEmpty(host) ? null : resolveIp(host);
+                    return new String[]{p.getUUIDString(), ip};
+                }));
+            }
+            for (Future<String[]> f : futures) {
+                try {
+                    String[] pair = f.get();
+                    if (pair[1] != null) {
+                        uuidToIp.put(pair[0], pair[1]);
+                        uniqueIps.add(pair[1]);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        } finally {
+            dnsPool.shutdown();
+        }
+
+        // 2. Batch-query GeoIP for all resolved IPs
+        Map<String, String> ipToCode = countryCodesForIps(
+                appCtx, new ArrayList<>(uniqueIps), forceRefreshCache);
+
+        // 3. Map each profile to its detected country (and strict offline fallback if needed)
+        int done = 0;
+        for (VpnProfile p : profiles) {
+            done++;
+            String uuid = p.getUUIDString();
+            String ip = uuidToIp.get(uuid);
+            String code = ip == null ? null : ipToCode.get(ip);
+            String countryName = null;
+            if (code != null) {
+                countryName = CountryCodes.nameForCode(code);
+                detectedCodesByUuid.put(uuid, code);
+            } else if (!forceRefreshCache) {
+                countryName = guessOffline(p.mName, null, p.getPrimaryRemoteHost());
+            }
+            if (callback != null) {
+                callback.onResult(p, code, countryName, done, total);
+            }
+        }
+        return detectedCodesByUuid;
+    }
+
+    /**
+     * Batch IP -> 2-letter country code lookup using cache + GeoJS batch API
+     * + individual multi-provider fallback. Background thread only.
+     */
+    public static Map<String, String> countryCodesForIps(
+            Context context, List<String> ips, boolean forceRefresh) {
+        Map<String, String> result = new HashMap<>();
+        if (context == null || ips == null || ips.isEmpty()) return result;
+
+        List<String> uncached = new ArrayList<>();
+        for (String ip : ips) {
+            if (TextUtils.isEmpty(ip)) continue;
+            if (!forceRefresh) {
+                String cached = cachedCountryCode(context, ip);
+                if (cached != null) {
+                    result.put(ip, cached);
+                    continue;
+                }
+            }
+            if (!uncached.contains(ip)) {
+                uncached.add(ip);
+            }
+        }
+
+        // Pass 1: Batch query via get.geojs.io (up to 25 IPs per request)
+        List<String> remaining = new ArrayList<>();
+        for (int i = 0; i < uncached.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, uncached.size());
+            List<String> chunk = uncached.subList(i, end);
+            Map<String, String> batch = queryGeoJsBatch(chunk);
+            for (String ip : chunk) {
+                String code = batch.get(ip);
+                if (code != null) {
+                    cacheCountryCode(context, ip, code);
+                    result.put(ip, code);
+                } else {
+                    remaining.add(ip);
+                }
+            }
+        }
+
+        // Pass 2: Parallel individual fallbacks for any IPs missed by batch
+        if (!remaining.isEmpty()) {
+            ExecutorService pool = Executors.newFixedThreadPool(Math.min(4, remaining.size()));
+            try {
+                List<Future<String[]>> futures = new ArrayList<>();
+                for (final String ip : remaining) {
+                    futures.add(pool.submit((Callable<String[]>) () ->
+                            new String[]{ip, lookupCountryCodeSingle(ip)}));
+                }
+                for (Future<String[]> f : futures) {
+                    try {
+                        String[] pair = f.get();
+                        if (pair[1] != null) {
+                            cacheCountryCode(context, pair[0], pair[1]);
+                            result.put(pair[0], pair[1]);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            } finally {
+                pool.shutdown();
+            }
+        }
+
+        return result;
+    }
+
+    /** Single-profile country guess (IP first, strict offline fallback). */
     public static String guessCategory(Context context, String profileName,
                                        String fileName, String remoteHost) {
-        // 1. IP-based country lookup first (most accurate for real server location).
         if (context != null && !TextUtils.isEmpty(remoteHost)) {
             try {
                 String ip = resolveIp(remoteHost);
@@ -60,22 +207,15 @@ public final class AutoCategory {
             } catch (Exception ignored) {
             }
         }
-
-        // 2. Offline heuristic fallback when offline, DNS failed, or rate-limited.
         return guessOffline(profileName, fileName, remoteHost);
     }
 
-    /**
-     * Resolve country code (lower-case 2-letter ISO) for an IP address,
-     * using the 30-day cache and HTTPS GeoIP fallback chain.
-     * Background thread only.
-     */
     public static String countryCodeForIp(Context context, String ip) {
         if (context == null || TextUtils.isEmpty(ip)) return null;
         try {
             String cached = cachedCountryCode(context, ip);
             if (cached != null) return cached;
-            String fetched = lookupCountryCode(ip);
+            String fetched = lookupCountryCodeSingle(ip);
             if (fetched != null) {
                 cacheCountryCode(context, ip, fetched);
                 return fetched;
@@ -85,31 +225,58 @@ public final class AutoCategory {
         return null;
     }
 
-    /** Offline-only heuristic, usable without network or Context. */
+    /**
+     * Strict offline heuristic: ONLY matches flag emojis or explicit full country
+     * names (e.g. "Germany", "Netherlands", "United States"). Never matches raw
+     * 2-letter words like "in", "no", "it", "at", "be", "my" to prevent wrong
+     * country grouping.
+     */
     public static String guessOffline(String profileName, String fileName, String remoteHost) {
-        String code = codeFromText(profileName);
-        if (code == null) code = codeFromText(fileName);
-        if (code == null) code = codeFromText(remoteHost);
-        if (code == null) code = tldCode(remoteHost);
+        String code = flagEmojiCode(profileName);
+        if (code == null) code = flagEmojiCode(fileName);
+        if (code == null) code = fullCountryCode(profileName);
+        if (code == null) code = fullCountryCode(fileName);
+        if (code == null) code = fullCountryCode(remoteHost);
         return code == null ? null : CountryCodes.nameForCode(code);
     }
 
-    private static String codeFromText(String text) {
+    private static String flagEmojiCode(String text) {
         if (TextUtils.isEmpty(text)) return null;
-        String lower = text.toLowerCase(Locale.US);
-        Matcher m = CODE_TOKEN.matcher(lower);
-        while (m.find()) {
-            String candidate = m.group(1);
-            if (CountryCodes.isKnownCode(candidate)) return candidate;
+        int i = 0;
+        while (i < text.length()) {
+            int cp = Character.codePointAt(text, i);
+            if (cp >= 0x1F1E6 && cp <= 0x1F1FF) {
+                int j = i + Character.charCount(cp);
+                if (j < text.length()) {
+                    int cp2 = Character.codePointAt(text, j);
+                    if (cp2 >= 0x1F1E6 && cp2 <= 0x1F1FF) {
+                        char a = (char) ('a' + (cp - 0x1F1E6));
+                        char b = (char) ('a' + (cp2 - 0x1F1E6));
+                        String code = "" + a + b;
+                        if (CountryCodes.isKnownCode(code)) return code;
+                    }
+                }
+            }
+            i += Character.charCount(cp);
         }
         return null;
     }
 
-    private static String tldCode(String host) {
-        if (TextUtils.isEmpty(host)) return null;
-        Matcher m = TLD.matcher(host.toLowerCase(Locale.US).trim());
-        if (m.find() && CountryCodes.isKnownCode(m.group(1))) return m.group(1);
-        return null;
+    private static String fullCountryCode(String text) {
+        if (TextUtils.isEmpty(text)) return null;
+        String lower = " " + text.toLowerCase(Locale.US).replaceAll("[^a-z]+", " ") + " ";
+        String bestCode = null;
+        int bestLen = 0;
+        for (String code : CountryCodes.knownCodes()) {
+            String name = CountryCodes.nameForCode(code);
+            if (name == null || name.length() <= 3) continue; // skip short acronyms like UAE unless matched cleanly
+            String lowerName = name.toLowerCase(Locale.US);
+            if (lowerName.length() > bestLen && lower.contains(" " + lowerName + " ")) {
+                bestCode = code;
+                bestLen = lowerName.length();
+            }
+        }
+        return bestCode;
     }
 
     private static String resolveIp(String host) {
@@ -146,14 +313,60 @@ public final class AutoCategory {
                 .edit().putString(ip, code + "|" + expiry).apply();
     }
 
-    /**
-     * HTTPS GeoIP lookup chain (no API key, free public endpoints):
-     *   1. ipwho.is (JSON: {"success":true,"country_code":"DE"})
-     *   2. get.geojs.io (JSON: {"country":"DE"})
-     *   3. ipinfo.io (plain text: "DE")
-     */
-    private static String lookupCountryCode(String ip) {
-        String code = queryJsonField("https://ipwho.is/" + ip + "?fields=success,country_code",
+    private static Map<String, String> queryGeoJsBatch(List<String> ips) {
+        if (ips.isEmpty()) return Collections.emptyMap();
+        HttpURLConnection conn = null;
+        Map<String, String> out = new HashMap<>();
+        try {
+            StringBuilder urlBuilder = new StringBuilder("https://get.geojs.io/v1/ip/country.json?ip=");
+            for (int i = 0; i < ips.size(); i++) {
+                if (i > 0) urlBuilder.append(',');
+                urlBuilder.append(ips.get(i));
+            }
+            conn = (HttpURLConnection) new URL(urlBuilder.toString()).openConnection();
+            conn.setConnectTimeout(HTTP_TIMEOUT_MS);
+            conn.setReadTimeout(HTTP_TIMEOUT_MS);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("User-Agent", "Minab");
+            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) return out;
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = r.readLine()) != null) sb.append(line);
+            }
+            String body = sb.toString().trim();
+            if (body.startsWith("[")) {
+                JSONArray arr = new JSONArray(body);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject obj = arr.optJSONObject(i);
+                    parseGeoJsEntry(obj, out);
+                }
+            } else if (body.startsWith("{")) {
+                parseGeoJsEntry(new JSONObject(body), out);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return out;
+    }
+
+    private static void parseGeoJsEntry(JSONObject obj, Map<String, String> out) {
+        if (obj == null) return;
+        String ip = obj.optString("ip", "").trim();
+        String code = obj.optString("country", "").trim().toLowerCase(Locale.US);
+        if (!ip.isEmpty() && CountryCodes.isKnownCode(code)) {
+            out.put(ip, code);
+        }
+    }
+
+    private static String lookupCountryCodeSingle(String ip) {
+        String code = queryJsonField("https://api.country.is/" + ip, null, "country");
+        if (code != null) return code;
+
+        code = queryJsonField("https://ipwho.is/" + ip + "?fields=success,country_code",
                 "success", "country_code");
         if (code != null) return code;
 

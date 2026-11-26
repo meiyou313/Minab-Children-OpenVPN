@@ -53,4 +53,25 @@
     <string name="minab_widget_label_compact">Minab · Accès rapide (2×1)</string>
     <string name="minab_widget_label_mini">Minab · Bouton (1×1)</string>
     <string name="minab_widget_label_large">Minab · Statut et vitesse (4×2)</string>
+    <string name="minab_restore_backup">Restaurer sauvegarde</string>
+    <string name="minab_real_settings_wait_hint">Recommandé : 20 secondes</string>
+    <string name="minab_real_settings_max_hint">Recommandé : 10</string>
+    <string name="minab_real_settings_url">URL cible du test</string>
+    <string name="minab_sort_title">Trier les serveurs</string>
+    <string name="minab_sort_best_badge">MEILLEUR · RECOMMANDÉ</string>
+    <string name="minab_sort_short_real">Réel</string>
+    <string name="minab_sort_short_ping">Ping</string>
+    <string name="minab_sort_short_country">Groupe</string>
+    <string name="minab_sort_short_name">A–Z</string>
+    <string name="minab_sort_short_lru">Récent</string>
+    <string name="minab_history_title">Historique des tests</string>
+    <string name="minab_redetect_btn">Détecter pays IP</string>
+    <string name="minab_remove_duplicates">Supprimer doublons</string>
+    <string name="minab_remove_inactive">Supprimer inactifs</string>
+    <string name="minab_select_all">Tout sélectionner</string>
+    <string name="minab_deselect_all">Désélectionner</string>
+    <string name="minab_credentials_for_selected">Pour sélection (%1$d)</string>
+    <string name="minab_credentials_for_scope">Pour %1$s</string>
+    <string name="minab_test_compact_ping_done">Ping terminé · %1$d sur %2$d</string>
+    <string name="minab_test_compact_real_done">Test réel terminé · %1$d sur %2$d</string>
 </resources>

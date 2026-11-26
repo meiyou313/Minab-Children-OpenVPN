@@ -10,12 +10,17 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.preference.PreferenceActivity
+import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.viewpager2.widget.ViewPager2
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayoutMediator
+import android.graphics.Typeface
+import android.text.TextUtils
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
 import de.blinkt.openvpn.core.ProfileManager
@@ -31,6 +36,7 @@ import de.blinkt.openvpn.fragments.Settings_UserEditable
 import de.blinkt.openvpn.fragments.ShowConfigFragment
 import de.blinkt.openvpn.fragments.VPNProfileList
 import de.blinkt.openvpn.minab.MinabPagerSensitivity
+import de.blinkt.openvpn.minab.MinabProfileBus
 import de.blinkt.openvpn.views.ScreenSlidePagerAdapter
 
 class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
@@ -106,14 +112,15 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
         title = getString(R.string.edit_profile_title, mProfile!!.name)
 
 
-        val rootview = layoutInflater.inflate(R.layout.main_activity, null)
+        val rootview = layoutInflater.inflate(R.layout.vpn_preferences_activity, null)
         setUpEdgeEdgeInsetsListener(rootview, R.id.root_linear_layout)
 
         disableToolbarElevation()
 
         // Instantiate a ViewPager and a PagerAdapter.
         mPager = rootview.findViewById(R.id.pager)
-        val tablayout: TabLayout = rootview.findViewById(R.id.tab_layout)
+        val row1: LinearLayout = rootview.findViewById(R.id.minab_pref_tabs_row1)
+        val row2: LinearLayout = rootview.findViewById(R.id.minab_pref_tabs_row2)
         mPagerAdapter = ScreenSlidePagerAdapter(supportFragmentManager, lifecycle, this)
 
 
@@ -139,17 +146,55 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
 
 
         mPager.setAdapter(mPagerAdapter)
-
-        // Minab Beta v0.8 — tab swiping was too eager; a longer
-        // drag is needed to change pages now (tab taps unaffected).
         MinabPagerSensitivity.reduceSensitivity(mPager)
 
-        //TabBarView tabs = (TabBarView) findViewById(R.id.sliding_tabs);
-        //tabs.setViewPager(mPager);
+        val count = mPagerAdapter.itemCount
+        val split = if (count > 4) (count + 1) / 2 else count
+        val tabPills = mutableListOf<TextView>()
+        val dp4 = (4 * resources.displayMetrics.density).toInt()
+        val dp32 = (30 * resources.displayMetrics.density).toInt()
+        if (count > 4) row2.visibility = View.VISIBLE else row2.visibility = View.GONE
 
-        TabLayoutMediator(tablayout, mPager) { tab, position ->
-            tab.text = mPagerAdapter.getPageTitle(position)
-        }.attach()
+        for (i in 0 until count) {
+            val pill = TextView(this).apply {
+                text = mPagerAdapter.getPageTitle(i)
+                textSize = 10.5f
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                includeFontPadding = false
+                setPadding(dp4, dp4, dp4, dp4)
+                layoutParams = LinearLayout.LayoutParams(0, dp32, 1f).apply {
+                    setMargins(dp4 / 2, 0, dp4 / 2, 0)
+                }
+                setOnClickListener { mPager.setCurrentItem(i, true) }
+            }
+            tabPills.add(pill)
+            if (i < split) row1.addView(pill) else row2.addView(pill)
+        }
+
+        fun updateTabSelection(selected: Int) {
+            for (idx in tabPills.indices) {
+                val active = idx == selected
+                val pill = tabPills[idx]
+                pill.setBackgroundResource(
+                    if (active) R.drawable.minab_chip_bg_selected else R.drawable.minab_chip_bg
+                )
+                pill.setTextColor(
+                    ContextCompat.getColor(
+                        this,
+                        if (active) R.color.minab_teal_dark else R.color.minab_chip_text
+                    )
+                )
+                pill.setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
+            }
+        }
+        updateTabSelection(0)
+        mPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updateTabSelection(position)
+            }
+        })
 
         setContentView(rootview)
     }
@@ -193,6 +238,7 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
 
     protected fun removeProfile(profile: VpnProfile?) {
         ProfileManager.getInstance(this).removeProfile(this, profile)
+        MinabProfileBus.notifyChanged()
         setResult(VPNProfileList.RESULT_VPN_DELETED)
         finish()
     }
@@ -234,5 +280,6 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
     override fun onDestroy() {
         super.onDestroy()
         VpnStatus.removeProfileStateListener(this)
+        MinabProfileBus.notifyChanged()
     }
 }

@@ -53,4 +53,25 @@
     <string name="minab_widget_label_compact">Minab · Hızlı Bağlantı (2×1)</string>
     <string name="minab_widget_label_mini">Minab · Güç Düğmesi (1×1)</string>
     <string name="minab_widget_label_large">Minab · Durum ve Hız (4×2)</string>
+    <string name="minab_restore_backup">Yedeği yükle</string>
+    <string name="minab_real_settings_wait_hint">Önerilen: 20 saniye</string>
+    <string name="minab_real_settings_max_hint">Önerilen: 10</string>
+    <string name="minab_real_settings_url">Hedef test URL</string>
+    <string name="minab_sort_title">Sunucuları sırala</string>
+    <string name="minab_sort_best_badge">EN İYİ · ÖNERİLEN</string>
+    <string name="minab_sort_short_real">Gerçek</string>
+    <string name="minab_sort_short_ping">Ping</string>
+    <string name="minab_sort_short_country">Grup</string>
+    <string name="minab_sort_short_name">A–Z</string>
+    <string name="minab_sort_short_lru">Son</string>
+    <string name="minab_history_title">Test Geçmişi</string>
+    <string name="minab_redetect_btn">IP Ülke Bul</string>
+    <string name="minab_remove_duplicates">Kopyaları sil</string>
+    <string name="minab_remove_inactive">Başarısızları sil</string>
+    <string name="minab_select_all">Tümünü seç</string>
+    <string name="minab_deselect_all">Seçimi kaldır</string>
+    <string name="minab_credentials_for_selected">Seçilenler için (%1$d)</string>
+    <string name="minab_credentials_for_scope">%1$s için ayarla</string>
+    <string name="minab_test_compact_ping_done">Ping bitti · %1$d / %2$d yanıtladı</string>
+    <string name="minab_test_compact_real_done">Gerçek test bitti · %1$d / %2$d aktif</string>
 </resources>

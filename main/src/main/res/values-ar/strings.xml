@@ -83,4 +83,25 @@
     <string name="minab_widget_label_large">ميناب · الحالة والسرعة (4×2)</string>
     <string name="minab_widget_best_short">الأفضل</string>
     <string name="minab_widget_ready">جاهز للاتصال</string>
+    <string name="minab_restore_backup">استعادة النسخة</string>
+    <string name="minab_real_settings_wait_hint">الموصى به: 20 ثانية</string>
+    <string name="minab_real_settings_max_hint">الموصى به: 10</string>
+    <string name="minab_real_settings_url">رابط الاختبار</string>
+    <string name="minab_sort_title">فرز الخوادم</string>
+    <string name="minab_sort_best_badge">الأفضل · موصى به</string>
+    <string name="minab_sort_short_real">حقيقي</string>
+    <string name="minab_sort_short_ping">بينغ</string>
+    <string name="minab_sort_short_country">مجموعة</string>
+    <string name="minab_sort_short_name">أ–ي</string>
+    <string name="minab_sort_short_lru">الأخيرة</string>
+    <string name="minab_history_title">سجل الاختبارات</string>
+    <string name="minab_redetect_btn">فحص دولة IP</string>
+    <string name="minab_remove_duplicates">حذف المكرر</string>
+    <string name="minab_remove_inactive">حذف الفاشل</string>
+    <string name="minab_select_all">تحديد الكل</string>
+    <string name="minab_deselect_all">إلغاء التحديد</string>
+    <string name="minab_credentials_for_selected">بيانات المحدد (%1$d)</string>
+    <string name="minab_credentials_for_scope">بيانات %1$s</string>
+    <string name="minab_test_compact_ping_done">انتهى البينغ · استجاب %1$d من %2$d</string>
+    <string name="minab_test_compact_real_done">انتهى الفحص · يعمل %1$d من %2$d</string>
 </resources>

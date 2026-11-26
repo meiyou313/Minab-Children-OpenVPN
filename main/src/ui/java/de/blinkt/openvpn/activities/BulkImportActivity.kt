@@ -71,10 +71,10 @@ import de.blinkt.openvpn.minab.BulkImportHelper
 import de.blinkt.openvpn.minab.CategoryStore
 import de.blinkt.openvpn.minab.ImportSummaryStore
 import de.blinkt.openvpn.minab.MinabBackup
+import de.blinkt.openvpn.minab.MinabProfileBus
+import de.blinkt.openvpn.minab.MinabServerCountry
 import de.blinkt.openvpn.minab.SharedCredentials
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -96,6 +96,8 @@ class BulkImportActivity : BaseActivity() {
     private lateinit var applyAllBox: CheckBox
     private lateinit var autoCategoryBox: CheckBox
     private lateinit var categorySpinner: Spinner
+    private lateinit var loginScopeSpinner: Spinner
+    private lateinit var fillSavedLoginView: TextView
     private lateinit var statusView: TextView
     private lateinit var lastSummaryView: TextView
     private lateinit var progressBar: ProgressBar
@@ -124,6 +126,7 @@ class BulkImportActivity : BaseActivity() {
     private var selectedCategory: String? = null
     /** Files the user picked for the import currently running (or 0). */
     private var selectedCount: Int = 0
+    private var lastImportedUuids: Set<String> = emptySet()
 
     private val pickMultiple = registerForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
@@ -153,6 +156,8 @@ class BulkImportActivity : BaseActivity() {
         applyAllBox = findViewById(R.id.minab_bulk_apply_all)
         autoCategoryBox = findViewById(R.id.minab_bulk_auto_category)
         categorySpinner = findViewById(R.id.minab_bulk_category)
+        loginScopeSpinner = findViewById(R.id.minab_bulk_login_scope)
+        fillSavedLoginView = findViewById(R.id.minab_bulk_fill_saved)
         statusView = findViewById(R.id.minab_bulk_status)
         lastSummaryView = findViewById(R.id.minab_bulk_last_summary)
         progressBar = findViewById(R.id.minab_bulk_progress)
@@ -182,12 +187,11 @@ class BulkImportActivity : BaseActivity() {
             insets
         }
 
-        // v0.3 bug fix 2: pre-fill the saved shared credentials, so
-        // the user sees what is stored and can Apply again or edit.
-        if (SharedCredentials.hasCredentials(this)) {
-            usernameField.setText(SharedCredentials.getUsername(this))
-            passwordField.setText(SharedCredentials.getPassword(this))
-        }
+        // v0.9.7.1: Keep fields blank by default so saved credentials are NEVER silently applied.
+        // Offer a 1-tap optional fill pill when saved credentials exist.
+        lastImportedUuids = MinabProfileBus.getLastImportedUuids(this)
+        updateFillSavedPill()
+        setupLoginScopeSpinner()
 
         // v0.3 bug fix 1: the last import summary survives leaving
         // the page — show it again on return.
@@ -243,12 +247,37 @@ class BulkImportActivity : BaseActivity() {
         super.onDestroy()
     }
 
+    private fun updateFillSavedPill() {
+        if (!::fillSavedLoginView.isInitialized) return
+        if (SharedCredentials.hasCredentials(this)) {
+            val savedUser = SharedCredentials.getUsername(this)
+            fillSavedLoginView.visibility = View.VISIBLE
+            fillSavedLoginView.text = getString(R.string.minab_fill_saved_login, savedUser)
+            fillSavedLoginView.setOnClickListener {
+                usernameField.setText(SharedCredentials.getUsername(this))
+                passwordField.setText(SharedCredentials.getPassword(this))
+            }
+        } else {
+            fillSavedLoginView.visibility = View.GONE
+        }
+    }
+
+    private fun setupLoginScopeSpinner() {
+        val items = listOf(
+            getString(R.string.minab_bulk_login_scope_last),
+            getString(R.string.minab_bulk_login_scope_group),
+            getString(R.string.minab_bulk_login_scope_pick),
+            getString(R.string.minab_bulk_login_scope_all)
+        )
+        val adapter = ArrayAdapter(this, R.layout.minab_spinner_item, items)
+        adapter.setDropDownViewResource(R.layout.minab_spinner_dropdown_item)
+        loginScopeSpinner.adapter = adapter
+        loginScopeSpinner.setSelection(0)
+    }
+
     /**
-     * v0.3 bug fix 2 — the real Apply button. Saves the shared
-     * credentials and writes them into ALL profiles that need a
-     * username/password (already-imported ones included), so
-     * connecting no longer asks per profile. Runs off the UI thread
-     * because it saves every matching profile to disk.
+     * Scoped Shared Login Apply: applies typed credentials ONLY to the user-selected
+     * scope (Last imported batch [default], Specific group, Picked configs, or All).
      */
     private fun applySharedCredentials() {
         val username = usernameField.text.toString()
@@ -257,13 +286,91 @@ class BulkImportActivity : BaseActivity() {
             Toast.makeText(this, R.string.minab_credentials_empty, Toast.LENGTH_SHORT).show()
             return
         }
+        when (loginScopeSpinner.selectedItemPosition) {
+            0 -> {
+                val ids = if (lastImportedUuids.isNotEmpty()) {
+                    lastImportedUuids
+                } else {
+                    MinabProfileBus.getLastImportedUuids(this)
+                }
+                val all = ProfileManager.getInstance(this).getProfiles()
+                val targets = all.filter { ids.contains(it.getUUIDString()) }
+                if (targets.isEmpty()) {
+                    Toast.makeText(this, R.string.minab_bulk_no_last_import, Toast.LENGTH_SHORT).show()
+                    return
+                }
+                executeCredentialApply(username, password) {
+                    SharedCredentials.applyToProfiles(this, targets, username, password)
+                }
+            }
+            1 -> showGroupScopePicker { chosenGroup ->
+                executeCredentialApply(username, password) {
+                    SharedCredentials.applyToCategory(this, chosenGroup, username, password)
+                }
+            }
+            2 -> showManualConfigPicker { chosenProfiles ->
+                executeCredentialApply(username, password) {
+                    SharedCredentials.applyToProfiles(this, chosenProfiles, username, password)
+                }
+            }
+            else -> executeCredentialApply(username, password) {
+                SharedCredentials.applyToAllProfiles(this, username, password)
+            }
+        }
+    }
+
+    private fun showGroupScopePicker(onPicked: (String) -> Unit) {
+        val groups = CategoryStore.getOrderedCategories(this)
+        if (groups.isEmpty()) {
+            Toast.makeText(this, R.string.minab_no_profiles_yet, Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.minab_bulk_login_scope_group)
+            .setItems(groups.toTypedArray()) { _, which ->
+                onPicked(groups[which])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showManualConfigPicker(onPicked: (List<VpnProfile>) -> Unit) {
+        val all = ProfileManager.getInstance(this).getProfiles().toList()
+        if (all.isEmpty()) {
+            Toast.makeText(this, R.string.minab_no_profiles_yet, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val checked = BooleanArray(all.size)
+        val labels = all.map { "${it.mName ?: ""} [${it.getCategory()}]" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.minab_bulk_pick_configs_title)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton(R.string.minab_apply_credentials) { _, _ ->
+                val chosen = all.filterIndexed { i, _ -> checked[i] }
+                if (chosen.isNotEmpty()) onPicked(chosen)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun executeCredentialApply(
+        username: String,
+        password: String,
+        worker: () -> Int
+    ) {
         applyButton.isEnabled = false
+        val saveDefault = applyAllBox.isChecked
         lifecycleScope.launch(Dispatchers.IO) {
-            SharedCredentials.save(this@BulkImportActivity, username, password)
-            val count = SharedCredentials.applyToAllProfiles(
-                this@BulkImportActivity, username, password)
+            if (saveDefault) {
+                SharedCredentials.save(this@BulkImportActivity, username, password)
+            }
+            val count = worker()
             withContext(Dispatchers.Main) {
                 applyButton.isEnabled = true
+                updateFillSavedPill()
+                MinabProfileBus.notifyChanged()
                 val message = if (count > 0) {
                     getString(R.string.minab_credentials_applied, count)
                 } else {
@@ -279,24 +386,16 @@ class BulkImportActivity : BaseActivity() {
         }
     }
 
-    private fun options(): BulkImportHelper.ImportOptions {
+    private fun options(batchUsername: String?, batchPassword: String?): BulkImportHelper.ImportOptions {
         val o = BulkImportHelper.ImportOptions()
-        val username = usernameField.text.toString()
-        val password = passwordField.text.toString()
-        if (username.isNotEmpty() && password.isNotEmpty()) {
-            o.username = username
-            o.password = password
+        if (!batchUsername.isNullOrEmpty() && !batchPassword.isNullOrEmpty()) {
+            o.username = batchUsername
+            o.password = batchPassword
             o.applyCredentialsToAll = applyAllBox.isChecked
-            // Remember them, so profiles imported later get the same
-            // credentials without re-typing (v0.3 bug fix 2).
-            if (o.applyCredentialsToAll) SharedCredentials.save(this, username, password)
-        } else if (SharedCredentials.hasCredentials(this)) {
-            // Nothing typed now, but shared credentials were saved
-            // before (Apply or an earlier import): use them for the
-            // profiles imported in this batch.
-            o.username = SharedCredentials.getUsername(this)
-            o.password = SharedCredentials.getPassword(this)
-            o.applyCredentialsToAll = true
+            if (o.applyCredentialsToAll) {
+                SharedCredentials.save(this, batchUsername, batchPassword)
+                updateFillSavedPill()
+            }
         }
         o.category = selectedCategory
         return o
@@ -362,35 +461,32 @@ class BulkImportActivity : BaseActivity() {
             Toast.makeText(this, R.string.minab_no_files_picked, Toast.LENGTH_SHORT).show()
             return
         }
-        // Minab Beta v0.9.6.5 (fix #3) — after picking files, when
-        // no credentials are filled in anywhere yet, ask for the
-        // username/password in a dialog right here; the fields on
-        // the page stay as they are.
-        if (hasUsableCredentials()) {
-            startFilesImport(uris)
+        maybeAskCredentialsThen { user, pass ->
+            startFilesImport(uris, user, pass)
+        }
+    }
+
+    /**
+     * Always prompt for fresh credentials unless the user just typed a username
+     * & password into the visible page fields before starting import. Saved
+     * credentials are NEVER silently applied; only an explicit 1-tap pill inside
+     * the dialog fills them on request.
+     */
+    private fun maybeAskCredentialsThen(onProceed: (String?, String?) -> Unit) {
+        val typedUser = usernameField.text.toString()
+        val typedPass = passwordField.text.toString()
+        if (typedUser.isNotBlank() && typedPass.isNotBlank()) {
+            onProceed(typedUser, typedPass)
         } else {
             showCredentialsDialog(
                 onImport = { user, pass ->
-                    usernameField.setText(user)
-                    passwordField.setText(pass)
-                    startFilesImport(uris)
+                    onProceed(user.takeIf { it.isNotBlank() }, pass.takeIf { it.isNotBlank() })
                 },
-                onSkip = { startFilesImport(uris) }
+                onSkip = { onProceed(null, null) }
             )
         }
     }
 
-    /** True when the batch can be imported with a login: the page
-        fields are filled, or shared credentials were saved before. */
-    private fun hasUsableCredentials(): Boolean {
-        if (usernameField.text.isNotBlank() && passwordField.text.isNotBlank()) return true
-        return SharedCredentials.hasCredentials(this)
-    }
-
-    /** The username/password dialog after picking files (fix #3):
-        same card look as the page. "Import" fills the page fields
-        and starts the import; "Skip" (or back) imports without a
-        login — profiles that need one will ask when connecting. */
     private fun showCredentialsDialog(
         onImport: (String, String) -> Unit,
         onSkip: () -> Unit
@@ -398,6 +494,16 @@ class BulkImportActivity : BaseActivity() {
         val view = layoutInflater.inflate(R.layout.minab_credentials_dialog, null)
         val userField = view.findViewById<EditText>(R.id.minab_credentials_dialog_username)
         val passField = view.findViewById<EditText>(R.id.minab_credentials_dialog_password)
+        val fillSavedPill = view.findViewById<TextView>(R.id.minab_credentials_fill_saved)
+        if (SharedCredentials.hasCredentials(this)) {
+            val savedUser = SharedCredentials.getUsername(this)
+            fillSavedPill?.visibility = View.VISIBLE
+            fillSavedPill?.text = getString(R.string.minab_fill_saved_login, savedUser)
+            fillSavedPill?.setOnClickListener {
+                userField.setText(SharedCredentials.getUsername(this))
+                passField.setText(SharedCredentials.getPassword(this))
+            }
+        }
         AlertDialog.Builder(this)
             .setView(view)
             .setPositiveButton(R.string.minab_bulk_credentials_import) { _, _ ->
@@ -408,9 +514,9 @@ class BulkImportActivity : BaseActivity() {
             .show()
     }
 
-    private fun startFilesImport(uris: List<Uri>) {
+    private fun startFilesImport(uris: List<Uri>, batchUser: String?, batchPass: String?) {
         selectedCount = uris.size
-        runImport { result, opts ->
+        runImport(batchUser, batchPass) { result, opts ->
             var done = 0
             for (uri in uris) {
                 val name = displayName(uri)
@@ -455,38 +561,35 @@ class BulkImportActivity : BaseActivity() {
     }
 
     private fun onZipPicked(uri: Uri) {
-        selectedCount = 0 // total unknown until the zip is read
-        runImport { result, opts ->
-            var stream: InputStream? = null
-            try {
-                stream = contentResolver.openInputStream(uri)
-                if (stream == null) {
-                    result.failed++
-                    result.failedNames.add(displayName(uri) ?: uri.toString())
-                } else {
-                    // Minab Beta v0.9 — read the zip into memory
-                    // first (see onFilesPicked): a full Minab backup
-                    // is restored, anything else is a plain import.
-                    val bytes = readAllBytes(stream, MAX_ZIP_BYTES)
-                    if (bytes == null) {
+        maybeAskCredentialsThen { batchUser, batchPass ->
+            selectedCount = 0 // total unknown until the zip is read
+            runImport(batchUser, batchPass) { result, opts ->
+                var stream: InputStream? = null
+                try {
+                    stream = contentResolver.openInputStream(uri)
+                    if (stream == null) {
                         result.failed++
                         result.failedNames.add(displayName(uri) ?: uri.toString())
                     } else {
-                        importZipBytes(bytes, opts, result) { processed ->
-                            // Zip total is unknown: indeterminate bar
-                            // plus a running count (v0.3 bug fix 1).
-                            runOnUiThread {
-                                progressBar.isIndeterminate = true
-                                statusView.text =
-                                    getString(R.string.minab_importing) + " (" + processed + ")"
+                        val bytes = readAllBytes(stream, MAX_ZIP_BYTES)
+                        if (bytes == null) {
+                            result.failed++
+                            result.failedNames.add(displayName(uri) ?: uri.toString())
+                        } else {
+                            importZipBytes(bytes, opts, result) { processed ->
+                                runOnUiThread {
+                                    progressBar.isIndeterminate = true
+                                    statusView.text =
+                                        getString(R.string.minab_importing) + " (" + processed + ")"
+                                }
                             }
                         }
                     }
+                } finally {
+                    try { stream?.close() } catch (ignored: Exception) { }
                 }
-            } finally {
-                try { stream?.close() } catch (ignored: Exception) { }
+                result
             }
-            result
         }
     }
 
@@ -499,8 +602,12 @@ class BulkImportActivity : BaseActivity() {
         statusView.text = getString(R.string.minab_import_progress, done, total)
     }
 
-    /** Runs the import off the UI thread, then IP-based auto-categorises, then shows the clear applied card. */
-    private fun runImport(work: suspend (BulkImportHelper.ImportResult, BulkImportHelper.ImportOptions) -> BulkImportHelper.ImportResult) {
+    /** Runs the import off the UI thread, then batch-GeoIP auto-categorises, then shows the clear applied card. */
+    private fun runImport(
+        batchUser: String?,
+        batchPass: String?,
+        work: suspend (BulkImportHelper.ImportResult, BulkImportHelper.ImportOptions) -> BulkImportHelper.ImportResult
+    ) {
         setBusy(true)
         resultCard.visibility = View.VISIBLE
         resultCard.setBackgroundResource(R.drawable.minab_card_bg)
@@ -513,7 +620,7 @@ class BulkImportActivity : BaseActivity() {
         progressBar.progress = 0
         statusView.text = getString(R.string.minab_importing)
         rootScroll.post { rootScroll.smoothScrollTo(0, 0) }
-        val opts = options()
+        val opts = options(batchUser, batchPass)
         val autoCategorise = autoCategoryBox.isChecked
         if (opts.category != null) CategoryStore.addManualCategory(this, opts.category)
         lifecycleScope.launch(Dispatchers.IO) {
@@ -524,45 +631,44 @@ class BulkImportActivity : BaseActivity() {
                 result.failed++
                 result.failedNames.add(e.message ?: "import error")
             }
-            // IP-first country auto-detection in parallel chunks of 8.
-            // Uses each server's resolved IP geolocation (cached 30 days) with
-            // offline name/TLD fallback if offline or DNS fails.
-            if (autoCategorise && opts.category == null && result.importedProfiles.isNotEmpty()) {
-                val total = result.importedProfiles.size
-                var done = 0
-                for (chunk in result.importedProfiles.chunked(8)) {
-                    val guessed = chunk.map { profile ->
-                        async {
-                            profile to try {
-                                AutoCategory.guessCategory(
-                                    this@BulkImportActivity,
-                                    profile.mName, null, profile.primaryRemoteHost
-                                )
-                            } catch (ignored: Exception) {
-                                null
-                            }
+            if (result.importedProfiles.isNotEmpty()) {
+                val uuids = result.importedProfiles.map { it.getUUIDString() }.toSet()
+                lastImportedUuids = uuids
+                MinabProfileBus.setLastImportedUuids(this@BulkImportActivity, uuids)
+            }
+            // Accurate Batch HTTPS GeoIP auto-detection (no false-positive 2-letter matches).
+            if (autoCategorise && result.importedProfiles.isNotEmpty()) {
+                try {
+                    AutoCategory.detectCategoriesForProfiles(
+                        this@BulkImportActivity,
+                        result.importedProfiles,
+                        false
+                    ) { profile, code, category, done, total ->
+                        if (!code.isNullOrBlank()) {
+                            MinabServerCountry.put(
+                                this@BulkImportActivity, profile.getUUIDString(), code
+                            )
                         }
-                    }.awaitAll()
-                    for ((profile, category) in guessed) {
-                        if (category != null) {
+                        if (opts.category == null && !category.isNullOrBlank()) {
                             try {
                                 profile.setCategory(category)
                                 CategoryStore.addCategory(this@BulkImportActivity, category)
                                 ProfileManager.saveProfile(this@BulkImportActivity, profile)
-                            } catch (ignored: Exception) {
+                            } catch (_: Exception) {
                             }
                         }
-                        done++
-                        val shown = done
-                        withContext(Dispatchers.Main) {
+                        runOnUiThread {
                             progressBar.isIndeterminate = false
                             progressBar.max = total
-                            progressBar.progress = shown
+                            progressBar.progress = done
                             statusView.text = getString(
-                                R.string.minab_import_categorising, shown, total
+                                R.string.minab_import_categorising, done, total
                             )
                         }
                     }
+                    ProfileManager.getInstance(this@BulkImportActivity)
+                        .saveProfileList(this@BulkImportActivity)
+                } catch (_: Exception) {
                 }
             }
             withContext(Dispatchers.Main) {
@@ -594,8 +700,11 @@ class BulkImportActivity : BaseActivity() {
                 ImportSummaryStore.formatLastSummary(this@BulkImportActivity)?.let { stored ->
                     lastSummaryView.text = getString(R.string.minab_last_import, stored)
                 }
-                if (result.imported > 0) setResult(Activity.RESULT_OK)
+                if (result.imported > 0 || restored != null) {
+                    setResult(Activity.RESULT_OK)
+                }
                 refreshCategorySpinner(selectedCategory)
+                MinabProfileBus.notifyChanged()
             }
         }
     }
@@ -688,18 +797,20 @@ class BulkImportActivity : BaseActivity() {
             Toast.makeText(this, R.string.minab_link_failed, Toast.LENGTH_SHORT).show()
             return
         }
-        selectedCount = 0
-        runImport { result, opts ->
-            val bytes = downloadUrl(url)
-            if (bytes == null) {
-                result.failed++
-                result.failedNames.add(url)
-            } else if (isZipBytes(bytes)) {
-                importZipBytes(bytes, opts, result)
-            } else {
-                BulkImportHelper.importOne(this, ByteArrayInputStream(bytes), urlName(url), opts, result)
+        maybeAskCredentialsThen { batchUser, batchPass ->
+            selectedCount = 0
+            runImport(batchUser, batchPass) { result, opts ->
+                val bytes = downloadUrl(url)
+                if (bytes == null) {
+                    result.failed++
+                    result.failedNames.add(url)
+                } else if (isZipBytes(bytes)) {
+                    importZipBytes(bytes, opts, result)
+                } else {
+                    BulkImportHelper.importOne(this, ByteArrayInputStream(bytes), urlName(url), opts, result)
+                }
+                result
             }
-            result
         }
     }
 
@@ -771,6 +882,8 @@ class BulkImportActivity : BaseActivity() {
                     ),
                     detail = message
                 )
+                updateFillSavedPill()
+                MinabProfileBus.notifyChanged()
             }
         }
     }

@@ -140,6 +140,33 @@ public final class SharedCredentials {
         return updated;
     }
 
+    /**
+     * Write credentials into a caller-supplied subset of profiles that need
+     * username/password, and save each one. Returns how many were updated.
+     */
+    public static int applyToProfiles(
+            Context context,
+            java.util.Collection<VpnProfile> profiles,
+            String username,
+            String password) {
+        int updated = 0;
+        if (profiles == null || profiles.isEmpty()) return 0;
+        try {
+            ProfileManager pm = ProfileManager.getInstance(context);
+            for (VpnProfile profile : profiles) {
+                if (profile != null && profile.isUserPWAuth()) {
+                    profile.mUsername = username == null ? "" : username;
+                    profile.mPassword = password == null ? "" : password;
+                    ProfileManager.saveProfile(context, profile);
+                    updated++;
+                }
+            }
+            pm.saveProfileList(context);
+        } catch (Exception ignored) {
+        }
+        return updated;
+    }
+
     /** Apply the saved shared credentials to one profile, if it needs them. */
     public static boolean applyToProfile(Context context, VpnProfile profile) {
         if (profile == null || !profile.isUserPWAuth()) return false;
