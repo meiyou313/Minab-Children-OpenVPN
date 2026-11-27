@@ -33,14 +33,11 @@
 package de.blinkt.openvpn.minab;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Looper;
 import android.text.TextUtils;
-import android.widget.ScrollView;
-import android.widget.TextView;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -59,6 +56,10 @@ import java.util.concurrent.Executors;
 
 import de.blinkt.openvpn.BuildConfig;
 import de.blinkt.openvpn.R;
+import de.blinkt.openvpn.activities.MinabDiagnosticsActivity;
+import de.blinkt.openvpn.core.LogItem;
+import de.blinkt.openvpn.core.ProfileManager;
+import de.blinkt.openvpn.core.VpnStatus;
 
 public final class MinabCrashReporter {
     private static final String CRASH_FILE = "minab-crash-report.txt";
@@ -185,41 +186,68 @@ public final class MinabCrashReporter {
         }
     }
 
-    /** The dialog text: the crash trace (capped for display) plus the last breadcrumbs. */
-    private static String buildDialogText(Context ctx) {
-        StringBuilder sb = new StringBuilder();
-        String crash = readPrivateFile(ctx, CRASH_FILE);
-        if (crash != null && !crash.isEmpty()) {
-            sb.append("آخرین خرابی:\n").append(crash);
-        } else {
-            sb.append("برنامه بدون اینکه گزارشی بگذارد بسته شد.\n");
-        }
-        String crumbs = readPrivateFile(ctx, BREADCRUMB_FILE);
-        if (crumbs != null && !crumbs.isEmpty()) {
-            sb.append("\n\nآخرین رویدادها:\n").append(crumbs);
-        }
-        String text = sb.toString();
-        if (text.length() > MAX_DIALOG_CHARS) {
-            text = text.substring(0, MAX_DIALOG_CHARS) + "\n… (متن کامل در اشتراک‌گذاری)";
-        }
-        return text;
+    public static String getCrashText(Context ctx) {
+        if (ctx == null) return "";
+        return readPrivateFile(ctx.getApplicationContext(), CRASH_FILE);
     }
 
-    /** The share text: the FULL crash trace + the FULL breadcrumbs, never capped. */
-    private static String buildShareText(Context ctx) {
+    public static String getBreadcrumbsText(Context ctx) {
+        if (ctx == null) return "";
+        return readPrivateFile(ctx.getApplicationContext(), BREADCRUMB_FILE);
+    }
+
+    public static String getSystemOverview(Context ctx) {
         StringBuilder sb = new StringBuilder();
-        String crash = readPrivateFile(ctx, CRASH_FILE);
-        if (crash != null && !crash.isEmpty()) {
-            sb.append(crash);
-            if (!crash.endsWith("\n")) sb.append('\n');
-        } else {
-            sb.append("Minab closed without leaving a crash trace.\n");
+        sb.append("Minab OpenVPN v").append(BuildConfig.VERSION_NAME)
+                .append(" (code ").append(BuildConfig.VERSION_CODE).append(")\n");
+        sb.append("Android ").append(Build.VERSION.RELEASE)
+                .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");
+        sb.append("Device: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n');
+        sb.append("ABIs: ").append(TextUtils.join(", ", Build.SUPPORTED_ABIS)).append('\n');
+        try {
+            int count = ProfileManager.getInstance(ctx).getProfiles().size();
+            sb.append("Profiles loaded: ").append(count).append('\n');
+        } catch (Exception ignored) {
         }
-        String crumbs = readPrivateFile(ctx, BREADCRUMB_FILE);
-        if (crumbs != null && !crumbs.isEmpty()) {
-            sb.append("\nLast events before the close:\n").append(crumbs);
+        sb.append("Saved crash trace: ").append(hasSavedCrash(ctx) ? "Yes" : "No").append('\n');
+        sb.append("Telemetry: Disabled (all logs remain strictly local until you export/share them)");
+        return sb.toString();
+    }
+
+    public static String buildFullReport(Context ctx) {
+        Context app = ctx.getApplicationContext();
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== MINAB DIAGNOSTICS REPORT ===\n");
+        sb.append("Generated: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append('\n');
+        sb.append(getSystemOverview(app)).append("\n\n");
+
+        sb.append("=== CRASH TRACE ===\n");
+        String crash = getCrashText(app);
+        sb.append(TextUtils.isEmpty(crash) ? "(None)\n" : crash).append("\n\n");
+
+        sb.append("=== APP BREADCRUMBS ===\n");
+        String crumbs = getBreadcrumbsText(app);
+        sb.append(TextUtils.isEmpty(crumbs) ? "(Empty)\n" : crumbs).append("\n\n");
+
+        sb.append("=== OPENVPN CONNECTION LOG (RECENT) ===\n");
+        try {
+            LogItem[] items = VpnStatus.getlogbuffer();
+            if (items == null || items.length == 0) {
+                sb.append("(Empty)\n");
+            } else {
+                int start = Math.max(0, items.length - 150);
+                for (int i = start; i < items.length; i++) {
+                    sb.append(items[i].getString(app)).append('\n');
+                }
+            }
+        } catch (Exception e) {
+            sb.append("(Unavailable)\n");
         }
         return sb.toString();
+    }
+
+    public static void clearAll(Context ctx) {
+        if (ctx != null) clearReports(ctx.getApplicationContext());
     }
 
     private static void clearReports(Context ctx) {
@@ -246,118 +274,40 @@ public final class MinabCrashReporter {
     /** On-demand debug & crash report viewer opened from Settings (Debug section). */
     public static void showReportDialog(final Activity activity, final int iconResId) {
         if (activity == null || activity.isFinishing()) return;
-        if (Looper.myLooper() != Looper.getMainLooper()) return;
-        final Context ctx = activity.getApplicationContext();
         try {
-            final String crash = readPrivateFile(ctx, CRASH_FILE);
-            final String crumbs = readPrivateFile(ctx, BREADCRUMB_FILE);
-            final boolean hasCrash = crash != null && !crash.isEmpty();
-            final boolean hasCrumbs = crumbs != null && !crumbs.isEmpty();
-
-            final String displayText;
-            final String shareText;
-            if (!hasCrash && !hasCrumbs) {
-                displayText = activity.getString(R.string.minab_crash_report_empty);
-                shareText = "";
-            } else {
-                StringBuilder sb = new StringBuilder();
-                if (hasCrash) {
-                    sb.append(crash);
-                    if (!crash.endsWith("\n")) sb.append('\n');
-                }
-                if (hasCrumbs) {
-                    if (sb.length() > 0) sb.append("\n---\n");
-                    sb.append(crumbs);
-                }
-                shareText = sb.toString();
-                if (shareText.length() > MAX_DIALOG_CHARS) {
-                    displayText = shareText.substring(0, MAX_DIALOG_CHARS) + "\n…";
-                } else {
-                    displayText = shareText;
-                }
-            }
-
-            TextView textView = new TextView(activity);
-            textView.setText(displayText);
-            textView.setTextIsSelectable(true);
-            textView.setTextSize(12f);
-            int pad = (int) (16 * activity.getResources().getDisplayMetrics().density);
-            textView.setPadding(pad, pad, pad, pad);
-            ScrollView scroll = new ScrollView(activity);
-            scroll.addView(textView);
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(activity)
-                    .setTitle(R.string.minab_crash_report_title)
-                    .setView(scroll)
-                    .setNegativeButton(android.R.string.ok, null);
-            if (iconResId != 0) {
-                builder.setIcon(iconResId);
-            }
-            if (hasCrash || hasCrumbs) {
-                builder.setPositiveButton(R.string.minab_crash_share, (d, which) -> {
-                    try {
-                        Intent send = new Intent(Intent.ACTION_SEND);
-                        send.setType("text/plain");
-                        send.putExtra(Intent.EXTRA_SUBJECT,
-                                "Minab crash report " + BuildConfig.VERSION_NAME);
-                        send.putExtra(Intent.EXTRA_TEXT, shareText);
-                        activity.startActivity(Intent.createChooser(
-                                send, activity.getString(R.string.minab_crash_share)));
-                    } catch (Exception ignored) {
-                    }
-                });
-                builder.setNeutralButton(R.string.minab_crash_clear, (d, which) -> {
-                    clearReports(ctx);
-                    try {
-                        android.widget.Toast.makeText(
-                                activity, R.string.minab_crash_cleared,
-                                android.widget.Toast.LENGTH_SHORT).show();
-                    } catch (Exception ignored) {
-                    }
-                });
-            }
-            builder.show();
+            activity.startActivity(new Intent(activity, MinabDiagnosticsActivity.class));
         } catch (Exception ignored) {
         }
     }
 
-    /** Show the pending-report dialog, if any. Kept for backwards compatibility. */
+    /** Show the pending-report dialog after an unexpected termination or crash. */
     public static void showPendingReportDialogIfAny(final Activity activity) {
         if (activity == null || activity.isFinishing()) return;
         if (Looper.myLooper() != Looper.getMainLooper()) return;
         final Context ctx = activity.getApplicationContext();
         if (!hasPendingReport(ctx)) return;
         try {
-            final String dialogText = buildDialogText(ctx);
-            final String shareText = buildShareText(ctx);
-            TextView textView = new TextView(activity);
-            textView.setText(dialogText);
-            textView.setTextIsSelectable(true);
-            int pad = (int) (16 * activity.getResources().getDisplayMetrics().density);
-            textView.setPadding(pad, pad, pad, pad);
-            ScrollView scroll = new ScrollView(activity);
-            scroll.addView(textView);
-            AlertDialog dialog = new AlertDialog.Builder(activity)
-                    .setTitle("گزارش خرابی")
-                    .setView(scroll)
-                    .setPositiveButton("اشتراک‌گذاری", (d, which) -> {
-                        clearReports(ctx);
+            String crash = getCrashText(ctx);
+            String preview = TextUtils.isEmpty(crash)
+                    ? activity.getString(R.string.minab_diag_pending_unexpected_msg)
+                    : activity.getString(R.string.minab_diag_pending_crash_msg);
+            MinabDialogs.showConfirmJava(
+                    activity,
+                    activity.getString(R.string.minab_diag_title),
+                    preview,
+                    activity.getString(R.string.minab_diag_open_center),
+                    activity.getString(R.string.minab_test_dismiss_btn),
+                    !TextUtils.isEmpty(crash),
+                    true,
+                    () -> {
                         try {
-                            Intent send = new Intent(Intent.ACTION_SEND);
-                            send.setType("text/plain");
-                            send.putExtra(Intent.EXTRA_SUBJECT,
-                                    "Minab crash report " + BuildConfig.VERSION_NAME);
-                            send.putExtra(Intent.EXTRA_TEXT, shareText);
-                            activity.startActivity(Intent.createChooser(send, "اشتراک‌گذاری"));
+                            activity.startActivity(new Intent(activity, MinabDiagnosticsActivity.class));
                         } catch (Exception ignored) {
                         }
-                    })
-                    .setNegativeButton("بستن", (d, which) -> clearReports(ctx))
-                    .setOnCancelListener(d -> clearReports(ctx))
-                    .create();
-            dialog.show();
+                    },
+                    () -> clearReports(ctx)
+            );
         } catch (Exception ignored) {
-            // The report must never break the launch.
             try {
                 clearReports(ctx);
             } catch (Exception ignored2) {

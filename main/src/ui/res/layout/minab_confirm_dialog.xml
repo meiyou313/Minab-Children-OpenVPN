@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/minab_dialog_bg"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/minab_confirm_icon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="@null"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/minab_confirm_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:overScrollMode="ifContentScrolls">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/minab_confirm_message"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/minab_text_secondary"
+                android:textSize="12.5sp" />
+
+            <CheckBox
+                android:id="@+id/minab_confirm_checkbox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:buttonTint="@color/minab_teal"
+                android:fontFamily="@font/vazirmatn"
+                android:textColor="@color/minab_text_primary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/minab_confirm_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/minab_confirm_neutral"
+            style="@style/Minab.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:textSize="11.5sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/minab_confirm_negative"
+            style="@style/Minab.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:text="@android:string/cancel"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/minab_confirm_positive"
+            style="@style/Minab.PrimaryButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:text="@android:string/ok"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

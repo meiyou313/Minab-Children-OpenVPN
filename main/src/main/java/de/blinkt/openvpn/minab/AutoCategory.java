@@ -3,14 +3,9 @@
  * Copyright (c) 2026 Minab Children contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * AutoCategory (v0.9.7.1): accurate batch IP geolocation with strict offline fallback.
- *   1. Resolve each profile's remote host to IP in parallel (or use literal IP directly).
- *   2. Query GeoIP in batches (get.geojs.io supports up to 25 IPs in 1 HTTPS call!)
- *      with multi-provider per-IP fallbacks (api.country.is, ipwho.is, ipinfo.io).
- *   3. If offline / rate-limited, offline fallback ONLY accepts flag emojis or full
- *      country names ("Germany", "Netherlands", "United States", etc.) — NEVER
- *      ambiguous 2-letter English words like "in", "no", "it", "at", "be", "my",
- *      so configs are never silently misclassified into wrong countries.
+ * AutoCategory (v0.9.8): fast, cancellable batch IP geolocation with strict offline
+ * fallback and early circuit-breaker when GeoIP endpoints are unreachable so bulk
+ * import never freezes on filtered/offline networks.
  */
 
 package de.blinkt.openvpn.minab;
@@ -39,13 +34,15 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import de.blinkt.openvpn.VpnProfile;
 
 public final class AutoCategory {
     private static final String GEO_CACHE_PREFS = "MinabGeoCache";
     private static final long CACHE_TTL_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
-    private static final int HTTP_TIMEOUT_MS = 4500;
+    private static final int HTTP_TIMEOUT_MS = 2500;
     private static final int BATCH_SIZE = 25;
 
     public interface BatchProgressCallback {
@@ -55,18 +52,27 @@ public final class AutoCategory {
     private AutoCategory() {
     }
 
-    /**
-     * Resolve and categorise a batch of profiles accurately by IP geolocation.
-     * Returns map of profile UUID -> lower-case 2-letter ISO country code for
-     * every profile whose country was resolved. Must be called from a background thread.
-     */
     public static Map<String, String> detectCategoriesForProfiles(
             Context context,
             List<VpnProfile> profiles,
             boolean forceRefreshCache,
             BatchProgressCallback callback) {
+        return detectCategoriesForProfiles(context, profiles, forceRefreshCache, null, callback);
+    }
+
+    /**
+     * Resolve and categorise a batch of profiles accurately by IP geolocation,
+     * honoring cooperative cancellation so users can skip slow lookups immediately.
+     */
+    public static Map<String, String> detectCategoriesForProfiles(
+            Context context,
+            List<VpnProfile> profiles,
+            boolean forceRefreshCache,
+            AtomicBoolean cancelled,
+            BatchProgressCallback callback) {
         Map<String, String> detectedCodesByUuid = new HashMap<>();
         if (context == null || profiles == null || profiles.isEmpty()) return detectedCodesByUuid;
+        if (isCancelled(cancelled)) return detectedCodesByUuid;
 
         final Context appCtx = context.getApplicationContext();
         final int total = profiles.size();
@@ -79,12 +85,14 @@ public final class AutoCategory {
             List<Future<String[]>> futures = new ArrayList<>();
             for (final VpnProfile p : profiles) {
                 futures.add(dnsPool.submit((Callable<String[]>) () -> {
+                    if (isCancelled(cancelled)) return new String[]{p.getUUIDString(), null};
                     String host = p.getPrimaryRemoteHost();
                     String ip = TextUtils.isEmpty(host) ? null : resolveIp(host);
                     return new String[]{p.getUUIDString(), ip};
                 }));
             }
             for (Future<String[]> f : futures) {
+                if (isCancelled(cancelled)) break;
                 try {
                     String[] pair = f.get();
                     if (pair[1] != null) {
@@ -95,16 +103,20 @@ public final class AutoCategory {
                 }
             }
         } finally {
-            dnsPool.shutdown();
+            if (isCancelled(cancelled)) dnsPool.shutdownNow();
+            else dnsPool.shutdown();
         }
 
-        // 2. Batch-query GeoIP for all resolved IPs
+        if (isCancelled(cancelled)) return detectedCodesByUuid;
+
+        // 2. Batch-query GeoIP for all resolved IPs (with early abort if blocked)
         Map<String, String> ipToCode = countryCodesForIps(
-                appCtx, new ArrayList<>(uniqueIps), forceRefreshCache);
+                appCtx, new ArrayList<>(uniqueIps), forceRefreshCache, cancelled);
 
         // 3. Map each profile to its detected country (and strict offline fallback if needed)
         int done = 0;
         for (VpnProfile p : profiles) {
+            if (isCancelled(cancelled)) break;
             done++;
             String uuid = p.getUUIDString();
             String ip = uuidToIp.get(uuid);
@@ -123,17 +135,19 @@ public final class AutoCategory {
         return detectedCodesByUuid;
     }
 
-    /**
-     * Batch IP -> 2-letter country code lookup using cache + GeoJS batch API
-     * + individual multi-provider fallback. Background thread only.
-     */
     public static Map<String, String> countryCodesForIps(
             Context context, List<String> ips, boolean forceRefresh) {
+        return countryCodesForIps(context, ips, forceRefresh, null);
+    }
+
+    public static Map<String, String> countryCodesForIps(
+            Context context, List<String> ips, boolean forceRefresh, AtomicBoolean cancelled) {
         Map<String, String> result = new HashMap<>();
         if (context == null || ips == null || ips.isEmpty()) return result;
 
         List<String> uncached = new ArrayList<>();
         for (String ip : ips) {
+            if (isCancelled(cancelled)) return result;
             if (TextUtils.isEmpty(ip)) continue;
             if (!forceRefresh) {
                 String cached = cachedCountryCode(context, ip);
@@ -149,10 +163,13 @@ public final class AutoCategory {
 
         // Pass 1: Batch query via get.geojs.io (up to 25 IPs per request)
         List<String> remaining = new ArrayList<>();
+        boolean batchReachable = false;
         for (int i = 0; i < uncached.size(); i += BATCH_SIZE) {
+            if (isCancelled(cancelled)) return result;
             int end = Math.min(i + BATCH_SIZE, uncached.size());
             List<String> chunk = uncached.subList(i, end);
             Map<String, String> batch = queryGeoJsBatch(chunk);
+            if (!batch.isEmpty()) batchReachable = true;
             for (String ip : chunk) {
                 String code = batch.get(ip);
                 if (code != null) {
@@ -164,16 +181,29 @@ public final class AutoCategory {
             }
         }
 
-        // Pass 2: Parallel individual fallbacks for any IPs missed by batch
-        if (!remaining.isEmpty()) {
+        // Pass 2: Parallel individual fallbacks with circuit-breaker (abort after 4 consecutive misses)
+        if (!remaining.isEmpty() && !isCancelled(cancelled)) {
+            final AtomicInteger consecutiveFailures = new AtomicInteger(0);
+            final boolean hadBatch = batchReachable;
             ExecutorService pool = Executors.newFixedThreadPool(Math.min(4, remaining.size()));
             try {
                 List<Future<String[]>> futures = new ArrayList<>();
                 for (final String ip : remaining) {
-                    futures.add(pool.submit((Callable<String[]>) () ->
-                            new String[]{ip, lookupCountryCodeSingle(ip)}));
+                    futures.add(pool.submit((Callable<String[]>) () -> {
+                        if (isCancelled(cancelled) || (!hadBatch && consecutiveFailures.get() >= 4)) {
+                            return new String[]{ip, null};
+                        }
+                        String code = lookupCountryCodeFast(ip);
+                        if (code != null) {
+                            consecutiveFailures.set(0);
+                        } else {
+                            consecutiveFailures.incrementAndGet();
+                        }
+                        return new String[]{ip, code};
+                    }));
                 }
                 for (Future<String[]> f : futures) {
+                    if (isCancelled(cancelled)) break;
                     try {
                         String[] pair = f.get();
                         if (pair[1] != null) {
@@ -184,11 +214,16 @@ public final class AutoCategory {
                     }
                 }
             } finally {
-                pool.shutdown();
+                if (isCancelled(cancelled)) pool.shutdownNow();
+                else pool.shutdown();
             }
         }
 
         return result;
+    }
+
+    private static boolean isCancelled(AtomicBoolean cancelled) {
+        return (cancelled != null && cancelled.get()) || Thread.currentThread().isInterrupted();
     }
 
     /** Single-profile country guess (IP first, strict offline fallback). */
@@ -215,7 +250,7 @@ public final class AutoCategory {
         try {
             String cached = cachedCountryCode(context, ip);
             if (cached != null) return cached;
-            String fetched = lookupCountryCodeSingle(ip);
+            String fetched = lookupCountryCodeFast(ip);
             if (fetched != null) {
                 cacheCountryCode(context, ip, fetched);
                 return fetched;
@@ -269,7 +304,7 @@ public final class AutoCategory {
         int bestLen = 0;
         for (String code : CountryCodes.knownCodes()) {
             String name = CountryCodes.nameForCode(code);
-            if (name == null || name.length() <= 3) continue; // skip short acronyms like UAE unless matched cleanly
+            if (name == null || name.length() <= 3) continue;
             String lowerName = name.toLowerCase(Locale.US);
             if (lowerName.length() > bestLen && lower.contains(" " + lowerName + " ")) {
                 bestCode = code;
@@ -362,19 +397,11 @@ public final class AutoCategory {
         }
     }
 
-    private static String lookupCountryCodeSingle(String ip) {
+    private static String lookupCountryCodeFast(String ip) {
         String code = queryJsonField("https://api.country.is/" + ip, null, "country");
         if (code != null) return code;
-
-        code = queryJsonField("https://ipwho.is/" + ip + "?fields=success,country_code",
+        return queryJsonField("https://ipwho.is/" + ip + "?fields=success,country_code",
                 "success", "country_code");
-        if (code != null) return code;
-
-        code = queryJsonField("https://get.geojs.io/v1/ip/country/" + ip + ".json",
-                null, "country");
-        if (code != null) return code;
-
-        return queryPlainCode("https://ipinfo.io/" + ip + "/country");
     }
 
     private static String queryJsonField(String urlStr, String boolGateKey, String codeKey) {
@@ -399,29 +426,6 @@ public final class AutoCategory {
             if (TextUtils.isEmpty(code)) return null;
             code = code.trim().toLowerCase(Locale.US);
             return CountryCodes.isKnownCode(code) ? code : null;
-        } catch (Exception e) {
-            return null;
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
-    }
-
-    private static String queryPlainCode(String urlStr) {
-        HttpURLConnection conn = null;
-        try {
-            conn = (HttpURLConnection) new URL(urlStr).openConnection();
-            conn.setConnectTimeout(HTTP_TIMEOUT_MS);
-            conn.setReadTimeout(HTTP_TIMEOUT_MS);
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "Minab");
-            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) return null;
-            try (BufferedReader r = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
-                String line = r.readLine();
-                if (TextUtils.isEmpty(line)) return null;
-                String code = line.trim().toLowerCase(Locale.US);
-                return CountryCodes.isKnownCode(code) ? code : null;
-            }
         } catch (Exception e) {
             return null;
         } finally {

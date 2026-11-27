@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/minab_dialog_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_minab_dead_server"
+            android:tint="@color/minab_danger" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:text="@string/minab_dead_servers_title"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/minab_dead_close"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/minab_test_dismiss_btn"
+            android:padding="5dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_baseline_close_24"
+            android:tint="@color/minab_text_secondary" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/minab_live_stats_bg"
+        android:fontFamily="@font/vazirmatn"
+        android:paddingStart="10dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="6dp"
+        android:text="@string/minab_dead_servers_safe_hint"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="11sp" />
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/minab_dead_filter_2fails"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/minab_chip_bg_selected"
+                android:fontFamily="@font/vazirmatn"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:text="@string/minab_dead_filter_2fails"
+                android:textColor="@color/minab_teal_dark"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/minab_dead_filter_3fails"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/minab_chip_bg"
+                android:fontFamily="@font/vazirmatn"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:text="@string/minab_dead_filter_3fails"
+                android:textColor="@color/minab_chip_text"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/minab_dead_filter_2nets"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/minab_chip_bg"
+                android:fontFamily="@font/vazirmatn"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:text="@string/minab_dead_filter_2nets"
+                android:textColor="@color/minab_chip_text"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <LinearLayout
+        android:id="@+id/minab_dead_select_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/minab_dead_count_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:textColor="@color/minab_text_secondary"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/minab_dead_toggle_all"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:fontFamily="@font/vazirmatn"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="4dp"
+            android:text="@string/minab_deselect_all"
+            android:textColor="@color/minab_teal"
+            android:textSize="11.5sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/minab_dead_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center"
+        android:paddingTop="18dp"
+        android:paddingBottom="18dp"
+        android:text="@string/minab_dead_servers_empty"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:id="@+id/minab_dead_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:overScrollMode="ifContentScrolls">
+
+        <LinearLayout
+            android:id="@+id/minab_dead_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/minab_dead_cancel"
+            style="@style/Minab.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:minHeight="36dp"
+            android:text="@android:string/cancel"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/minab_dead_delete_btn"
+            style="@style/Minab.PrimaryButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:minHeight="36dp"
+            android:text="@string/minab_delete_short"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

@@ -33,8 +33,10 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import de.blinkt.openvpn.BuildConfig
 import de.blinkt.openvpn.R
+import de.blinkt.openvpn.activities.LogWindow
 import de.blinkt.openvpn.activities.MainActivity
 import de.blinkt.openvpn.activities.MinabAllowedAppsActivity
+import de.blinkt.openvpn.activities.MinabDiagnosticsActivity
 import de.blinkt.openvpn.activities.OpenSSLSpeed
 import de.blinkt.openvpn.api.ConfirmDialog.ANONYMOUS_PACKAGE
 import de.blinkt.openvpn.api.ExternalAppDatabase
@@ -43,6 +45,7 @@ import de.blinkt.openvpn.core.ProfileManager
 import de.blinkt.openvpn.minab.FlagHelper
 import de.blinkt.openvpn.minab.MinabAllowedApps
 import de.blinkt.openvpn.minab.MinabCrashReporter
+import de.blinkt.openvpn.minab.MinabDialogs
 import de.blinkt.openvpn.minab.MinabProfileBus
 import de.blinkt.openvpn.minab.MinabUiPrefs
 import de.blinkt.openvpn.minab.MinabUpdateChecker
@@ -202,21 +205,23 @@ class GeneralSettings : Fragment() {
                     return@setOnCheckedChangeListener
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    AlertDialog.Builder(ctx)
-                        .setMessage(R.string.use_alwayson_vpn)
-                        .setNeutralButton(R.string.open_vpn_settings) { _, _ ->
-                            try {
-                                startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
-                            } catch (_: ActivityNotFoundException) {
-                                Toast.makeText(
-                                    ctx,
-                                    "Cannot launch VPN settings directly, please manually open the settings instead.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                    MinabDialogs.showConfirm(
+                        context = ctx,
+                        title = getString(R.string.open_vpn_settings),
+                        message = getString(R.string.use_alwayson_vpn),
+                        positiveText = getString(R.string.open_vpn_settings),
+                        negativeText = getString(android.R.string.ok)
+                    ) {
+                        try {
+                            startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(
+                                ctx,
+                                "Cannot launch VPN settings directly, please manually open the settings instead.",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
+                    }
                 }
             }
             prefs.edit().putBoolean("restartvpnonboot", isChecked).apply()
@@ -300,14 +305,16 @@ class GeneralSettings : Fragment() {
         clearApiRow?.setOnClickListener {
             if (!mExtapp.checkAllowingModifyingRemoteControl(ctx)) return@setOnClickListener
             if (mExtapp.extAppList.isEmpty()) return@setOnClickListener
-            AlertDialog.Builder(ctx)
-                .setMessage(getString(R.string.clearappsdialog, getExtAppList(", ")))
-                .setPositiveButton(R.string.clear) { _, _ ->
-                    mExtapp.clearAllApiApps()
-                    setClearApiSummary()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            MinabDialogs.showConfirm(
+                context = ctx,
+                title = getString(R.string.clear_external_apps),
+                message = getString(R.string.clearappsdialog, getExtAppList(", ")),
+                positiveText = getString(R.string.clear),
+                isDanger = true
+            ) {
+                mExtapp.clearAllApiApps()
+                setClearApiSummary()
+            }
         }
         root.findViewById<View>(R.id.minab_settings_update_row)?.setOnClickListener {
             val tag = minabLatestTag
@@ -321,8 +328,11 @@ class GeneralSettings : Fragment() {
         root.findViewById<View>(R.id.minab_settings_faq_row)?.setOnClickListener {
             (activity as? MainActivity)?.showFaq()
         }
+        root.findViewById<View>(R.id.minab_settings_openvpn_log_row)?.setOnClickListener {
+            startActivity(Intent(ctx, LogWindow::class.java))
+        }
         root.findViewById<View>(R.id.minab_settings_crash_row)?.setOnClickListener {
-            activity?.let { MinabCrashReporter.showReportDialog(it, R.drawable.ic_minab_ladybug) }
+            startActivity(Intent(ctx, MinabDiagnosticsActivity::class.java))
         }
     }
 

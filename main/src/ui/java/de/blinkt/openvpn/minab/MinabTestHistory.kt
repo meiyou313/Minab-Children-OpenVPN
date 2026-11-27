@@ -212,6 +212,7 @@ object MinabTestHistory {
         )
         IO_EXECUTOR.execute {
             saveNewRun(appCtx, record)
+            MinabServerStats.recordTestRun(appCtx, isRealTest, net.fingerprint, testedProfiles)
         }
     }
 

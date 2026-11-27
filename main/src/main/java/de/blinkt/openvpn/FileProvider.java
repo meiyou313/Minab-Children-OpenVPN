@@ -84,7 +84,13 @@ implements PipeDataWriter<InputStream> {
 
 	@Override
 	public String getType(Uri uri) {
-		// For this sample, assume all files are .apks.
+		String path = uri == null ? null : uri.getPath();
+		if (path != null) {
+			String lower = path.toLowerCase(java.util.Locale.US);
+			if (lower.endsWith(".zip")) return "application/zip";
+			if (lower.endsWith(".ovpn")) return "application/x-openvpn-profile";
+			if (lower.endsWith(".txt") || lower.endsWith(".log")) return "text/plain";
+		}
 		return "application/octet-stream";
 	}
 
@@ -110,14 +116,10 @@ implements PipeDataWriter<InputStream> {
 		if(path.startsWith("/"))
 			path = path.replaceFirst("/", "");       
 
-		// I think this already random enough, no need for magic secure cookies
-		// 1f9563a4-a1f5-2165-255f2219-111823ef.dmp
-		// Minab Beta v0.5: also serve the config-share zips
-		// (minab-share-<timestamp>.zip) that ConfigsFragment writes
-		// to the cache dir for the Android share sheet. The name is
-		// still restricted to safe characters and one of the three
-		// known suffixes.
-		if (!path.matches("^[0-9a-z-.]*(dmp|dmp.log|zip)$"))
+		// Minab v0.9.8: serve dumps, config-share zips, single .ovpn files,
+		// and debug .txt logs using strict single-filename validation.
+		if (path.contains("..") || path.contains("/") || path.contains("\\")
+				|| !path.matches("^[0-9A-Za-z._-]+\\.(dmp|dmp\\.log|zip|ovpn|txt)$"))
 			throw new FileNotFoundException("url not in expect format " + uri);
 		File cachedir = getContext().getCacheDir();
         return new File(cachedir,path);

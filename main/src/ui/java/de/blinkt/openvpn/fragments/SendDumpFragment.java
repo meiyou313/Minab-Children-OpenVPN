@@ -86,23 +86,23 @@ public class SendDumpFragment extends Fragment {
         //need to "send multiple" to get more than one attachment
         final Intent emailIntent = new Intent(android.content.Intent.ACTION_SEND_MULTIPLE);
         emailIntent.setType("*/*");
-        emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL,
-                new String[]{"Arne Schwabe <arne@rfc2549.org>"});
 
         String version;
-        String name = "ics-openvpn";
+        String name = "Minab OpenVPN";
         try {
             PackageInfo packageinfo = getActivity().getPackageManager().getPackageInfo(getActivity().getPackageName(), 0);
             version = packageinfo.versionName;
-            name = packageinfo.applicationInfo.name;
+            if (packageinfo.applicationInfo != null && packageinfo.applicationInfo.name != null) {
+                name = packageinfo.applicationInfo.name;
+            }
         } catch (NameNotFoundException e) {
-            version = "error fetching version";
+            version = "unknown";
         }
 
 
-        emailIntent.putExtra(Intent.EXTRA_SUBJECT, String.format("%s(%s) %s Minidump", name, getActivity().getPackageName(), version));
+        emailIntent.putExtra(Intent.EXTRA_SUBJECT, String.format("%s (%s) %s Minidump", name, getActivity().getPackageName(), version));
 
-        emailIntent.putExtra(Intent.EXTRA_TEXT, "Please describe the issue you have experienced");
+        emailIntent.putExtra(Intent.EXTRA_TEXT, "Attach to a GitHub issue on meiyou313/Minab-Children-OpenVPN if reporting a native crash.");
 
         ArrayList<Uri> uris = new ArrayList<>();
 
@@ -112,8 +112,9 @@ public class SendDumpFragment extends Fragment {
             return;
         }
 
-        uris.add(Uri.parse("content://de.blinkt.openvpn.FileProvider/" + ldump.first.getName()));
-        uris.add(Uri.parse("content://de.blinkt.openvpn.FileProvider/" + ldump.first.getName() + ".log"));
+        String authority = getActivity().getPackageName() + ".FileProvider/";
+        uris.add(Uri.parse("content://" + authority + ldump.first.getName()));
+        uris.add(Uri.parse("content://" + authority + ldump.first.getName() + ".log"));
 
         emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         emailIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);

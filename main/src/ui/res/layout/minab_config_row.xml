@@ -119,10 +119,12 @@
                         android:background="@drawable/minab_ping_badge_fast"
                         android:drawableStart="@drawable/ic_minab_badge_ping"
                         android:ellipsize="end"
+                        android:gravity="center"
                         android:maxLines="1"
+                        android:minWidth="62dp"
                         android:singleLine="true"
                         android:textSize="8.5sp"
-                        android:visibility="gone" />
+                        android:visibility="invisible" />
 
                     <TextView
                         android:id="@+id/minab_config_real_badge"
@@ -132,10 +134,12 @@
                         android:background="@drawable/minab_ping_badge_fast"
                         android:drawableStart="@drawable/ic_minab_badge_real_ok"
                         android:ellipsize="end"
+                        android:gravity="center"
                         android:maxLines="1"
+                        android:minWidth="64dp"
                         android:singleLine="true"
                         android:textSize="8.5sp"
-                        android:visibility="gone" />
+                        android:visibility="invisible" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>

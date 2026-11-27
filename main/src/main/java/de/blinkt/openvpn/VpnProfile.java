@@ -45,9 +45,13 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PSSParameterSpec;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
 
@@ -198,6 +202,10 @@ public class VpnProfile implements Serializable, Cloneable {
     public long mLastRealTime = 0;
     // Human-readable last result: "Real: 850 ms" or "Blocked".
     public String mLastRealResult = "";
+    // Minab v0.9.8: extra groups (so one unique profile can belong to multiple groups
+    // without creating duplicate copies) and sanitized original .ovpn text for clean export.
+    public LinkedHashSet<String> mExtraGroups = new LinkedHashSet<>();
+    public String mOriginalConfig = null;
 
 
     static class ChangeLogEntry implements Serializable {
@@ -349,10 +357,127 @@ public class VpnProfile implements Serializable, Cloneable {
     }
 
     public void setCategory(String category) {
-        if (TextUtils.isEmpty(category))
+        String norm = TextUtils.isEmpty(category) ? "Uncategorized" : category.trim();
+        if (norm.isEmpty()) norm = "Uncategorized";
+        mCategory = norm;
+        if (mExtraGroups != null) {
+            removeIgnoreCase(mExtraGroups, norm);
+            removeIgnoreCase(mExtraGroups, "Uncategorized");
+        }
+    }
+
+    private static boolean containsIgnoreCase(Collection<String> items, String target) {
+        if (items == null || target == null) return false;
+        for (String item : items) {
+            if (item != null && item.equalsIgnoreCase(target)) return true;
+        }
+        return false;
+    }
+
+    private static void removeIgnoreCase(Collection<String> items, String target) {
+        if (items == null || target == null) return;
+        items.removeIf(item -> item == null || item.equalsIgnoreCase(target));
+    }
+
+    /** All unique groups this profile belongs to (never empty; falls back to Uncategorized). */
+    public LinkedHashSet<String> getAllGroups() {
+        LinkedHashSet<String> groups = new LinkedHashSet<>();
+        String primary = getCategory().trim();
+        if (!primary.isEmpty() && !"Uncategorized".equalsIgnoreCase(primary)) {
+            groups.add(primary);
+        }
+        if (mExtraGroups != null) {
+            for (String g : mExtraGroups) {
+                if (g == null) continue;
+                String trimmed = g.trim();
+                if (!trimmed.isEmpty() && !"Uncategorized".equalsIgnoreCase(trimmed)
+                        && !containsIgnoreCase(groups, trimmed)) {
+                    groups.add(trimmed);
+                }
+            }
+        }
+        if (groups.isEmpty()) {
+            groups.add("Uncategorized");
+        }
+        return groups;
+    }
+
+    public boolean belongsToGroup(String group) {
+        if (TextUtils.isEmpty(group)) return false;
+        return containsIgnoreCase(getAllGroups(), group.trim());
+    }
+
+    public void addToGroup(String group) {
+        if (TextUtils.isEmpty(group)) return;
+        String trimmed = group.trim();
+        if (trimmed.isEmpty() || "Uncategorized".equalsIgnoreCase(trimmed)) return;
+        if (mExtraGroups == null) mExtraGroups = new LinkedHashSet<>();
+        String currentPrimary = getCategory().trim();
+        if ("Uncategorized".equalsIgnoreCase(currentPrimary) || currentPrimary.isEmpty()) {
+            mCategory = trimmed;
+            removeIgnoreCase(mExtraGroups, trimmed);
+        } else if (!currentPrimary.equalsIgnoreCase(trimmed) && !containsIgnoreCase(mExtraGroups, trimmed)) {
+            mExtraGroups.add(trimmed);
+        }
+    }
+
+    public void removeFromGroup(String group) {
+        if (TextUtils.isEmpty(group)) return;
+        String trimmed = group.trim();
+        if (mExtraGroups == null) mExtraGroups = new LinkedHashSet<>();
+        removeIgnoreCase(mExtraGroups, trimmed);
+        if (getCategory().trim().equalsIgnoreCase(trimmed)) {
+            if (!mExtraGroups.isEmpty()) {
+                String promoted = mExtraGroups.iterator().next();
+                mExtraGroups.remove(promoted);
+                mCategory = promoted;
+            } else {
+                mCategory = "Uncategorized";
+            }
+        }
+    }
+
+    public void moveGroup(String fromGroup, String toGroup) {
+        String target = TextUtils.isEmpty(toGroup) ? "Uncategorized" : toGroup.trim();
+        if (target.isEmpty()) target = "Uncategorized";
+        if (!TextUtils.isEmpty(fromGroup) && !fromGroup.startsWith("\u0001")) {
+            removeFromGroup(fromGroup);
+            if (!"Uncategorized".equalsIgnoreCase(target)) {
+                addToGroup(target);
+            }
+        } else {
+            mCategory = target;
+            if (mExtraGroups == null) mExtraGroups = new LinkedHashSet<>();
+            else mExtraGroups.clear();
+        }
+    }
+
+    public void setAllGroups(Collection<String> groups) {
+        LinkedHashSet<String> clean = new LinkedHashSet<>();
+        if (groups != null) {
+            for (String g : groups) {
+                if (g == null) continue;
+                String t = g.trim();
+                if (!t.isEmpty() && !"Uncategorized".equalsIgnoreCase(t) && !containsIgnoreCase(clean, t)) {
+                    clean.add(t);
+                }
+            }
+        }
+        if (mExtraGroups == null) mExtraGroups = new LinkedHashSet<>();
+        else mExtraGroups.clear();
+        if (clean.isEmpty()) {
             mCategory = "Uncategorized";
-        else
-            mCategory = category.trim();
+        } else {
+            java.util.Iterator<String> it = clean.iterator();
+            mCategory = it.next();
+            while (it.hasNext()) {
+                mExtraGroups.add(it.next());
+            }
+        }
+    }
+
+    public String getGroupsDisplayText() {
+        return TextUtils.join(" · ", getAllGroups());
     }
 
     /** Remote host of the first enabled connection, or of connection[0]. */
@@ -457,6 +582,12 @@ public class VpnProfile implements Serializable, Cloneable {
         if (mLastRealMs == 0) {
             mLastRealMs = -1;
             mLastRealResult = "";
+        }
+        if (mExtraGroups == null) {
+            mExtraGroups = new LinkedHashSet<>();
+        } else {
+            removeIgnoreCase(mExtraGroups, "Uncategorized");
+            removeIgnoreCase(mExtraGroups, mCategory);
         }
 
         mProfileVersion = CURRENT_PROFILE_VERSION;
@@ -943,6 +1074,299 @@ public class VpnProfile implements Serializable, Cloneable {
         cfg.close();
     }
 
+    /**
+     * Sanitize raw imported .ovpn text so any inline credentials or Android-specific
+     * management options are stripped before storing or exporting.
+     */
+    public static String sanitizeOriginalConfig(String raw) {
+        if (TextUtils.isEmpty(raw)) return null;
+        String normalized = raw.replace("\r\n", "\n").replace("\r", "\n");
+        if (normalized.startsWith("\uFEFF")) normalized = normalized.substring(1);
+        String[] lines = normalized.split("\n", -1);
+        StringBuilder out = new StringBuilder(normalized.length());
+        boolean skipInlineAuthBlock = false;
+        for (String line : lines) {
+            String trimmed = line.trim();
+            String lower = trimmed.toLowerCase(Locale.US);
+            if (skipInlineAuthBlock) {
+                if (lower.equals("</auth-user-pass>")) {
+                    skipInlineAuthBlock = false;
+                    out.append("auth-user-pass\n");
+                }
+                continue;
+            }
+            if (lower.equals("<auth-user-pass>")) {
+                skipInlineAuthBlock = true;
+                continue;
+            }
+            if (isAndroidOnlyDirective(lower)) {
+                continue;
+            }
+            if (lower.startsWith("auth-user-pass ") || lower.startsWith("auth-user-pass\t")) {
+                out.append("auth-user-pass\n");
+                continue;
+            }
+            out.append(line).append('\n');
+        }
+        String res = out.toString().trim();
+        return res.isEmpty() ? null : res + "\n";
+    }
+
+    private static boolean isAndroidOnlyDirective(String lowerTrimmed) {
+        if (lowerTrimmed.isEmpty() || lowerTrimmed.startsWith("#") || lowerTrimmed.startsWith(";")) {
+            return false;
+        }
+        String clean = lowerTrimmed.startsWith("--") ? lowerTrimmed.substring(2) : lowerTrimmed;
+        String[] androidOnlyExact = {
+                "management", "management-client", "management-query-passwords",
+                "management-hold", "management-query-proxy", "management-external-key",
+                "management-forget-disconnect", "management-signal", "management-log-cache",
+                "management-up-down", "management-client-user", "management-client-group",
+                "machine-readable-output", "allow-recursive-routing", "ifconfig-nowarn",
+                "preresolve", "app-custom-control"
+        };
+        for (String prefix : androidOnlyExact) {
+            if (clean.equals(prefix) || clean.startsWith(prefix + " ") || clean.startsWith(prefix + "\t")) {
+                return true;
+            }
+        }
+        if (clean.startsWith("setenv iv_")) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Cross-platform OpenVPN config suitable for sharing/exporting to official OpenVPN
+     * Connect / OpenVPN GUI (Windows, macOS, iOS, Linux, Android).
+     * Never injects Android management/runtime directives and never includes credentials.
+     */
+    public String getExportConfigFile() {
+        if (!TextUtils.isEmpty(mOriginalConfig)) {
+            String sanitized = sanitizeOriginalConfig(mOriginalConfig);
+            if (!TextUtils.isEmpty(sanitized)) {
+                return sanitized;
+            }
+        }
+
+        StringBuilder cfg = new StringBuilder();
+        boolean useTLSClient = (mAuthenticationType != TYPE_STATICKEYS);
+        if (useTLSClient && mUsePull)
+            cfg.append("client\n");
+        else if (mUsePull)
+            cfg.append("pull\n");
+        else if (useTLSClient)
+            cfg.append("tls-client\n");
+
+        cfg.append("dev tun\n");
+        if (mNobind)
+            cfg.append("nobind\n");
+
+        if (mConnections != null) {
+            if (mConnections.length == 1) {
+                if (mConnections[0] != null) {
+                    appendCleanConnectionBlock(cfg, mConnections[0]);
+                }
+            } else {
+                boolean canUsePlain = true;
+                for (Connection conn : mConnections) {
+                    if (conn != null && !conn.isOnlyRemote(true)) {
+                        canUsePlain = false;
+                        break;
+                    }
+                }
+                if (mRemoteRandom)
+                    cfg.append("remote-random\n");
+                if (canUsePlain) {
+                    for (Connection conn : mConnections) {
+                        if (conn != null && conn.mEnabled) {
+                            appendCleanConnectionBlock(cfg, conn);
+                        }
+                    }
+                } else {
+                    for (Connection conn : mConnections) {
+                        if (conn != null && conn.mEnabled) {
+                            cfg.append("<connection>\n");
+                            appendCleanConnectionBlock(cfg, conn);
+                            cfg.append("</connection>\n");
+                        }
+                    }
+                }
+            }
+        }
+
+        switch (mAuthenticationType) {
+            case TYPE_USERPASS_CERTIFICATES:
+                cfg.append("auth-user-pass\n");
+            case TYPE_CERTIFICATES:
+                if (!TextUtils.isEmpty(mCaFilename))
+                    cfg.append(insertFileData("ca", mCaFilename));
+                if (!TextUtils.isEmpty(mClientKeyFilename))
+                    cfg.append(insertFileData("key", mClientKeyFilename));
+                if (!TextUtils.isEmpty(mClientCertFilename))
+                    cfg.append(insertFileData("cert", mClientCertFilename));
+                break;
+            case TYPE_USERPASS_PKCS12:
+                cfg.append("auth-user-pass\n");
+            case TYPE_PKCS12:
+                if (!TextUtils.isEmpty(mPKCS12Filename))
+                    cfg.append(insertFileData("pkcs12", mPKCS12Filename));
+                if (!TextUtils.isEmpty(mCaFilename))
+                    cfg.append(insertFileData("ca", mCaFilename));
+                break;
+            case TYPE_USERPASS:
+                cfg.append("auth-user-pass\n");
+                if (!TextUtils.isEmpty(mCaFilename))
+                    cfg.append(insertFileData("ca", mCaFilename));
+                // Prevent "Missing external certificate" on OpenVPN Connect desktop/mobile
+                cfg.append("setenv CLIENT_CERT 0\n");
+                break;
+            default:
+                if (isUserPWAuth())
+                    cfg.append("auth-user-pass\n");
+                if (!TextUtils.isEmpty(mCaFilename))
+                    cfg.append(insertFileData("ca", mCaFilename));
+                break;
+        }
+
+        if (mCheckPeerFingerprint && !TextUtils.isEmpty(mPeerFingerPrints)) {
+            cfg.append("<peer-fingerprint>\n").append(mPeerFingerPrints).append("\n</peer-fingerprint>\n");
+        }
+        if (isUserPWAuth() && mAuthRetry == AUTH_RETRY_NOINTERACT) {
+            cfg.append("auth-retry nointeract\n");
+        }
+        if (mUseLzo) cfg.append("comp-lzo\n");
+
+        if (mUseTLSAuth && !TextUtils.isEmpty(mTLSAuthFilename)) {
+            boolean useTlsCrypt = "tls-crypt".equals(mTLSAuthDirection);
+            boolean useTlsCrypt2 = "tls-crypt-v2".equals(mTLSAuthDirection);
+            if (mAuthenticationType == TYPE_STATICKEYS)
+                cfg.append(insertFileData("secret", mTLSAuthFilename));
+            else if (useTlsCrypt)
+                cfg.append(insertFileData("tls-crypt", mTLSAuthFilename));
+            else if (useTlsCrypt2)
+                cfg.append(insertFileData("tls-crypt-v2", mTLSAuthFilename));
+            else
+                cfg.append(insertFileData("tls-auth", mTLSAuthFilename));
+
+            if (!TextUtils.isEmpty(mTLSAuthDirection) && !useTlsCrypt && !useTlsCrypt2) {
+                cfg.append("key-direction ").append(mTLSAuthDirection).append("\n");
+            }
+        }
+
+        if (!mUsePull) {
+            if (!TextUtils.isEmpty(mIPv4Address))
+                cfg.append("ifconfig ").append(cidrToIPAndNetmask(mIPv4Address)).append("\n");
+            if (!TextUtils.isEmpty(mIPv6Address)) {
+                String fakegw = mIPv6Address.split("/", 2)[0];
+                cfg.append("ifconfig-ipv6 ").append(mIPv6Address).append(" ").append(fakegw).append("\n");
+            }
+        }
+        if (mUsePull && mRoutenopull)
+            cfg.append("route-nopull\n");
+
+        if (!mUseDefaultRoute) {
+            for (String route : getCustomRoutes(mCustomRoutes)) {
+                cfg.append("route ").append(route).append(" vpn_gateway\n");
+            }
+            for (String route : getCustomRoutes(mExcludedRoutes)) {
+                cfg.append("route ").append(route).append(" net_gateway\n");
+            }
+        }
+        if (!mUseDefaultRoutev6) {
+            for (String route : getCustomRoutesv6(mCustomRoutesv6)) {
+                cfg.append("route-ipv6 ").append(route).append("\n");
+            }
+        }
+
+        if (mOverrideDNS || !mUsePull) {
+            if (!TextUtils.isEmpty(mDNS1))
+                cfg.append("dhcp-option DNS ").append(mDNS1).append("\n");
+            if (!TextUtils.isEmpty(mDNS2))
+                cfg.append("dhcp-option DNS ").append(mDNS2).append("\n");
+            if (!TextUtils.isEmpty(mSearchDomain))
+                cfg.append("dhcp-option DOMAIN ").append(mSearchDomain).append("\n");
+        }
+
+        if (mMssFix != 0) {
+            if (mMssFix != 1450)
+                cfg.append(String.format(Locale.US, "mssfix %d\n", mMssFix));
+            else
+                cfg.append("mssfix\n");
+        }
+        if (mTunMtu >= 48 && mTunMtu != 1500) {
+            cfg.append(String.format(Locale.US, "tun-mtu %d\n", mTunMtu));
+        }
+
+        if (mAuthenticationType != TYPE_STATICKEYS) {
+            if (mCheckRemoteCN) {
+                if (TextUtils.isEmpty(mRemoteCN)) {
+                    if (mConnections != null && mConnections.length > 0 && mConnections[0] != null) {
+                        cfg.append("verify-x509-name ").append(openVpnEscape(mConnections[0].mServerName)).append(" name\n");
+                    }
+                } else {
+                    switch (mX509AuthType) {
+                        case X509_VERIFY_TLSREMOTE_COMPAT_NOREMAPPING:
+                            cfg.append("compat-names no-remapping\n");
+                        case X509_VERIFY_TLSREMOTE:
+                            cfg.append("tls-remote ").append(openVpnEscape(mRemoteCN)).append("\n");
+                            break;
+                        case X509_VERIFY_TLSREMOTE_RDN:
+                            cfg.append("verify-x509-name ").append(openVpnEscape(mRemoteCN)).append(" name\n");
+                            break;
+                        case X509_VERIFY_TLSREMOTE_RDN_PREFIX:
+                            cfg.append("verify-x509-name ").append(openVpnEscape(mRemoteCN)).append(" name-prefix\n");
+                            break;
+                        case X509_VERIFY_TLSREMOTE_DN:
+                            cfg.append("verify-x509-name ").append(openVpnEscape(mRemoteCN)).append("\n");
+                            break;
+                    }
+                }
+                if (!TextUtils.isEmpty(mx509UsernameField))
+                    cfg.append("x509-username-field ").append(openVpnEscape(mx509UsernameField)).append("\n");
+            }
+            if (mExpectTLSCert)
+                cfg.append("remote-cert-tls server\n");
+        }
+
+        if (!TextUtils.isEmpty(mDataCiphers))
+            cfg.append("data-ciphers ").append(mDataCiphers).append("\n");
+        if (!TextUtils.isEmpty(mCipher) && mCompatMode > 0)
+            cfg.append("cipher ").append(mCipher).append("\n");
+        if (!TextUtils.isEmpty(mAuth))
+            cfg.append("auth ").append(mAuth).append("\n");
+        if (mUseRandomHostname)
+            cfg.append("remote-random-hostname\n");
+        if (mUseFloat)
+            cfg.append("float\n");
+        if (mPushPeerInfo)
+            cfg.append("push-peer-info\n");
+
+        if (mUseCustomConfig && !TextUtils.isEmpty(mCustomConfigOptions)) {
+            for (String line : mCustomConfigOptions.replace("\r\n", "\n").split("\n")) {
+                if (!isAndroidOnlyDirective(line.trim().toLowerCase(Locale.US))) {
+                    cfg.append(line).append("\n");
+                }
+            }
+        }
+        return cfg.toString();
+    }
+
+    private void appendCleanConnectionBlock(StringBuilder cfg, Connection conn) {
+        cfg.append("remote ").append(conn.mServerName).append(" ").append(conn.mServerPort);
+        cfg.append(conn.mUseUdp ? " udp\n" : " tcp\n");
+        if (conn.mConnectTimeout != 0) {
+            cfg.append(String.format(Locale.US, "connect-timeout %d\n", conn.mConnectTimeout));
+        }
+        if (conn.mUseCustomConfig && !TextUtils.isEmpty(conn.mCustomConfiguration)) {
+            for (String line : conn.mCustomConfiguration.replace("\r\n", "\n").split("\n")) {
+                if (!isAndroidOnlyDirective(line.trim().toLowerCase(Locale.US))) {
+                    cfg.append(line).append("\n");
+                }
+            }
+        }
+    }
+
     public Intent getStartServiceIntent(Context context, String startReason, boolean replace_running_vpn) {
         Intent intent = new Intent(context, OpenVPNService.class);
         intent.putExtra(EXTRA_PROFILEUUID, mUuid.toString());
@@ -974,6 +1398,8 @@ public class VpnProfile implements Serializable, Cloneable {
             copy.mConnections[i++] = conn.clone();
         }
         copy.mAllowedAppsVpn = (HashSet<String>) mAllowedAppsVpn.clone();
+        copy.mExtraGroups = mExtraGroups != null ? new LinkedHashSet<>(mExtraGroups) : new LinkedHashSet<>();
+        copy.mOriginalConfig = mOriginalConfig;
         copy.changesLog = new Vector<>();
         copy.mVersion = 1;
         copy.addChangeLogEntry(String.format(Locale.US, "Cloned from profile '%s', uuid '%s'", mName, getUUIDString()));

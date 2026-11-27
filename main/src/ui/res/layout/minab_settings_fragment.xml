@@ -1178,7 +1178,67 @@
                 android:layout_height="1dp"
                 android:background="@color/minab_divider" />
 
-            <!-- Crash report & debug log (ladybug) -->
+            <!-- OpenVPN connection log (moved out of top bar) -->
+            <LinearLayout
+                android:id="@+id/minab_settings_openvpn_log_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginEnd="10dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_baseline_receipt_long_24"
+                    app:tint="@color/minab_teal" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/vazirmatn"
+                        android:text="@string/openvpn_log"
+                        android:textColor="@color/minab_text_primary"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:text="@string/minab_openvpn_log_summary"
+                        android:textColor="@color/minab_text_secondary"
+                        android:textSize="10.5sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="6dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_minab_chevron_right"
+                    app:tint="@color/minab_text_secondary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/minab_divider" />
+
+            <!-- Diagnostics & debug log center -->
             <LinearLayout
                 android:id="@+id/minab_settings_crash_row"
                 android:layout_width="match_parent"
@@ -1208,7 +1268,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/vazirmatn"
-                        android:text="@string/minab_crash_report_title"
+                        android:text="@string/minab_diag_title"
                         android:textColor="@color/minab_text_primary"
                         android:textSize="12.5sp"
                         android:textStyle="bold" />

@@ -16,21 +16,16 @@
          (ic_menu_add), because that is what the user expects
          "add a config" to look like. -->
     <item
+        android:id="@+id/minab_top_smart_tools"
+        app:actionLayout="@layout/minab_menu_sparkle_action"
+        app:showAsAction="always"
+        android:visible="false"
+        android:title="@string/minab_smart_tools_title"
+        android:titleCondensed="@string/minab_smart_tools_short"/>
+    <item
         android:id="@+id/minab_top_bulk_import"
         android:icon="@drawable/ic_menu_add"
         app:showAsAction="always"
         android:title="@string/minab_bulk_import"
         android:titleCondensed="@string/minab_bulk_import_short"/>
-    <item
-        android:id="@+id/minab_top_settings"
-        android:icon="@drawable/ic_minab_settings"
-        app:showAsAction="always"
-        android:title="@string/generalsettings"
-        android:titleCondensed="@string/generalsettings"/>
-    <item
-        android:id="@+id/show_log"
-        android:icon="@drawable/ic_receipt"
-        app:showAsAction="ifRoom"
-        android:title="@string/show_log_window"
-        android:titleCondensed="@string/show_log"/>
 </menu>

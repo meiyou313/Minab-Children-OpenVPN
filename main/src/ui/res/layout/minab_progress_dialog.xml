@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/minab_dialog_bg"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ProgressBar
+            android:id="@+id/minab_progress_spinner"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="10dp"
+            android:indeterminateTint="@color/minab_teal" />
+
+        <TextView
+            android:id="@+id/minab_progress_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:textColor="@color/minab_text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/minab_progress_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:fontFamily="@font/vazirmatn"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="12.5sp" />
+
+    <ProgressBar
+        android:id="@+id/minab_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="10dp"
+        android:max="100"
+        android:progressDrawable="@drawable/minab_test_progress_drawable"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/minab_progress_cancel"
+        style="@style/Minab.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:layout_marginTop="12dp"
+        android:minHeight="38dp"
+        android:text="@android:string/cancel"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

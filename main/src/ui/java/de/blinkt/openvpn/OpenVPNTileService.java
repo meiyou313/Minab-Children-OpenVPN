@@ -24,6 +24,7 @@ import de.blinkt.openvpn.core.OpenVPNService;
 import de.blinkt.openvpn.core.ProfileManager;
 import de.blinkt.openvpn.core.VPNLaunchHelper;
 import de.blinkt.openvpn.core.VpnStatus;
+import de.blinkt.openvpn.minab.MinabDisconnectSignal;
 import de.blinkt.openvpn.minab.MinabFailover;
 
 
@@ -60,6 +61,7 @@ public class OpenVPNTileService extends TileService implements VpnStatus.StateLi
             // own disconnect (fix #10): tell failover, or it would
             // reconnect to a new server on its own.
             MinabFailover.noteUserDisconnect();
+            MinabDisconnectSignal.markUserDisconnect(this);
             Intent intent = new Intent(this, OpenVPNService.class);
             intent.setAction(OpenVPNService.START_SERVICE);
             bindService(intent, new ServiceConnection() {

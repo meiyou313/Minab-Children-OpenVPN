@@ -37,11 +37,13 @@ object MinabTestHistoryDialog {
         val listContainer = root.findViewById<LinearLayout>(R.id.minab_history_list)
         val emptyView = root.findViewById<TextView>(R.id.minab_history_empty)
         val clearAllBtn = root.findViewById<TextView>(R.id.minab_history_clear_all)
+        val closeBtn = root.findViewById<ImageButton>(R.id.minab_history_close)
 
         val dialog = AlertDialog.Builder(context)
             .setView(root)
-            .setNegativeButton(R.string.minab_test_dismiss_btn, null)
             .create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        closeBtn?.setOnClickListener { dialog.dismiss() }
 
         var selectedFilter: String? = null
         val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
@@ -187,20 +189,15 @@ object MinabTestHistoryDialog {
         run: MinabTestHistory.TestRunRecord,
         onDone: () -> Unit
     ) {
-        val entry = EditText(context).apply {
-            setSingleLine()
-            setText(run.networkLabel)
+        MinabDialogs.showTextInput(
+            context = context,
+            title = context.getString(R.string.minab_history_rename_network),
+            initialText = run.networkLabel,
             hint = context.getString(R.string.minab_history_label_hint)
+        ) { newLabel ->
+            MinabTestHistory.renameNetworkLabel(context, run.id, newLabel)
+            onDone()
         }
-        AlertDialog.Builder(context)
-            .setTitle(R.string.minab_history_rename_network)
-            .setView(entry)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                MinabTestHistory.renameNetworkLabel(context, run.id, entry.text.toString())
-                onDone()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 
     private fun showServersListDialog(
@@ -213,11 +210,12 @@ object MinabTestHistoryDialog {
             Toast.makeText(context, R.string.minab_history_none_working, Toast.LENGTH_SHORT).show()
             return
         }
-        val labels = passed.map { "${it.name}  —  ${it.ms} ms" }.toTypedArray()
-        AlertDialog.Builder(context)
-            .setTitle("${run.networkLabel} (${passed.size})")
-            .setItems(labels) { _, which ->
-                val item = passed[which]
+        val items = passed.map { item ->
+            MinabDialogs.ActionItem(
+                title = item.name,
+                iconRes = R.drawable.ic_minab_power,
+                badgeText = "${item.ms} ms"
+            ) {
                 val p = try {
                     ProfileManager.getIfPresent(context, item.uuid)
                 } catch (_: Exception) {
@@ -229,7 +227,12 @@ object MinabTestHistoryDialog {
                     Toast.makeText(context, R.string.minab_no_profiles_yet, Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
+        MinabDialogs.showActionList(
+            context = context,
+            title = "${run.networkLabel} (${passed.size})",
+            iconRes = R.drawable.ic_minab_history,
+            items = items
+        )
     }
 }

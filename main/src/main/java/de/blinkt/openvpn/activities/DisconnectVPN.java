@@ -14,9 +14,11 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.widget.Toast;
 
+import de.blinkt.openvpn.R;
 import de.blinkt.openvpn.core.IOpenVPNServiceInternal;
 import de.blinkt.openvpn.core.OpenVPNService;
 import de.blinkt.openvpn.core.VpnStatus;
+import de.blinkt.openvpn.minab.MinabDisconnectSignal;
 
 /**
  * Created by arne on 13.10.13.
@@ -38,6 +40,7 @@ public class DisconnectVPN extends Activity {
 
             mService = IOpenVPNServiceInternal.Stub.asInterface(service);
             if (disconnectPending) {
+                MinabDisconnectSignal.markUserDisconnect(DisconnectVPN.this);
                 try {
                     mService.stopVPN(false);
                 } catch (RemoteException e) {
@@ -57,6 +60,7 @@ public class DisconnectVPN extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        MinabDisconnectSignal.markUserDisconnect(this);
         Intent intent = new Intent(this, OpenVPNService.class);
         intent.setAction(OpenVPNService.START_SERVICE);
         // Minab Beta v0.9.1 — no confirmation dialog (fix #11):
@@ -65,7 +69,7 @@ public class DisconnectVPN extends Activity {
         // paths now, and it always disconnects silently. (The old
         // "disableconfirmation" preference is gone with the dialog.)
         disconnectPending = true;
-        Toast.makeText(this, "Disconnecting VPN", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, R.string.minab_status_disconnecting, Toast.LENGTH_SHORT).show();
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
     }
 

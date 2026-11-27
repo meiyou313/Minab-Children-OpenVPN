@@ -45,7 +45,7 @@ public class ProfileManager {
     private ProfileManager() {
     }
 
-    private static VpnProfile get(String key) {
+    private synchronized static VpnProfile get(String key) {
         if (tmpprofile != null && tmpprofile.getUUIDString().equals(key))
             return tmpprofile;
 
@@ -260,11 +260,11 @@ public class ProfileManager {
         view threw ConcurrentModificationException when the UI
         thread iterated it while a worker/binder thread mutated
         the map. */
-    public Collection<VpnProfile> getProfiles() {
+    public synchronized Collection<VpnProfile> getProfiles() {
         return new ArrayList<>(profiles.values());
     }
 
-    public VpnProfile getProfileByName(String name) {
+    public synchronized VpnProfile getProfileByName(String name) {
         for (VpnProfile vpnp : profiles.values()) {
             if (vpnp.getName().equals(name)) {
                 return vpnp;
@@ -273,7 +273,7 @@ public class ProfileManager {
         return null;
     }
 
-    public void saveProfileList(Context context) {
+    public synchronized void saveProfileList(Context context) {
         SharedPreferences sharedprefs = Preferences.getSharedPreferencesMulti(PREFS_NAME, context);
         Editor editor = sharedprefs.edit();
         /* preference saving might be asynchronous*/
@@ -290,6 +290,14 @@ public class ProfileManager {
 
     public synchronized void addProfile(VpnProfile profile) {
         profiles.put(profile.getUUID().toString(), profile);
+    }
+
+    public synchronized void addProfilesBatch(Context context, java.util.List<VpnProfile> batch) {
+        if (batch == null || batch.isEmpty()) return;
+        for (VpnProfile p : batch) {
+            if (p != null) profiles.put(p.getUUID().toString(), p);
+        }
+        saveProfileList(context);
     }
 
     /**

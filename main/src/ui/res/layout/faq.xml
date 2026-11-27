@@ -1,16 +1,138 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-  ~ Copyright (c) 2012-2016 Arne Schwabe
-  ~ Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
-  -->
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/minab_surface"
+    android:orientation="vertical">
 
-<androidx.recyclerview.widget.RecyclerView xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
+    <!-- Search field -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="14dp">
+
+        <EditText
+            android:id="@+id/faq_search"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:background="@drawable/minab_input_bg"
+            android:drawableStart="@drawable/ic_baseline_search_24"
+            android:drawablePadding="8dp"
+            android:drawableTint="@color/minab_text_secondary"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
+            android:hint="@string/minab_faq_search_hint"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:paddingStart="12dp"
+            android:paddingEnd="34dp"
+            android:singleLine="true"
+            android:textColor="@color/minab_text_primary"
+            android:textColorHint="@color/minab_text_secondary"
+            android:textSize="12.5sp" />
+
+        <ImageButton
+            android:id="@+id/faq_search_clear"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="4dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/minab_clear_search_desc"
+            android:padding="6dp"
+            android:src="@drawable/ic_minab_clear_small"
+            android:tint="@color/minab_text_secondary"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Category filter pills -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/faq_category_chips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- Active hashtag filter pill (shown when a #tag is tapped) -->
+    <LinearLayout
+        android:id="@+id/faq_active_tag_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="14dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:fontFamily="@font/vazirmatn"
+            android:text="@string/minab_faq_filtering_tag"
+            android:textColor="@color/minab_text_secondary"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/faq_active_tag_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/minab_chip_bg_selected"
+            android:clickable="true"
+            android:focusable="true"
+            android:fontFamily="@font/vazirmatn"
+            android:paddingStart="10dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="4dp"
+            android:textColor="@color/minab_teal_dark"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/faq_result_count"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="16dp"
+        android:fontFamily="@font/vazirmatn"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="10.5sp" />
+
+    <TextView
+        android:id="@+id/faq_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center"
+        android:padding="32dp"
+        android:text="@string/minab_faq_no_results"
+        android:textColor="@color/minab_text_secondary"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/faq_recycler_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:clipToPadding="false"
-        android:horizontalSpacing="@dimen/stdpadding"
-        android:paddingLeft="@dimen/stdpadding"
-        android:paddingRight="@dimen/stdpadding"
-        android:paddingTop="8dp"
-        android:verticalSpacing="@dimen/stdpadding" />
+        android:paddingStart="14dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="18dp" />
+</LinearLayout>

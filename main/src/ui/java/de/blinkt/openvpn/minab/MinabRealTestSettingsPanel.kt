@@ -112,43 +112,37 @@ class MinabRealTestSettingsPanel(
         val currentUrl = MinabRealTestSettings.getTestUrl(appContext)
         val presetUrls = MinabRealTestSettings.PRESET_URLS
         val presetLabels = MinabRealTestSettings.PRESET_LABELS
-        val items = (presetLabels.toList() + uiContext.getString(R.string.minab_real_url_custom))
-            .toTypedArray()
+        val items = presetLabels.toList() + uiContext.getString(R.string.minab_real_url_custom)
         val checkedIdx = presetUrls.indexOfFirst { it.equals(currentUrl, ignoreCase = true) }
             .let { if (it >= 0) it else presetLabels.size }
 
-        AlertDialog.Builder(uiContext)
-            .setTitle(R.string.minab_real_settings_url_dialog_title)
-            .setSingleChoiceItems(items, checkedIdx) { dialog, which ->
-                dialog.dismiss()
-                if (which < presetUrls.size) {
-                    MinabRealTestSettings.setTestUrl(appContext, presetUrls[which])
-                    refresh()
-                    MinabProfileBus.notifyChanged()
-                } else {
-                    showCustomUrlInput(currentUrl)
-                }
+        MinabDialogs.showSingleChoice(
+            context = uiContext,
+            title = uiContext.getString(R.string.minab_real_settings_url_dialog_title),
+            options = items,
+            selectedIndex = checkedIdx
+        ) { which ->
+            if (which < presetUrls.size) {
+                MinabRealTestSettings.setTestUrl(appContext, presetUrls[which])
+                refresh()
+                MinabProfileBus.notifyChanged()
+            } else {
+                showCustomUrlInput(currentUrl)
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
     }
 
     private fun showCustomUrlInput(currentUrl: String) {
-        val entry = EditText(uiContext).apply {
-            setSingleLine()
-            setText(currentUrl)
+        MinabDialogs.showTextInput(
+            context = uiContext,
+            title = uiContext.getString(R.string.minab_real_url_custom),
+            initialText = currentUrl,
             hint = "https://api.telegram.org/"
+        ) { raw ->
+            MinabRealTestSettings.setTestUrl(appContext, raw)
+            refresh()
+            MinabProfileBus.notifyChanged()
         }
-        AlertDialog.Builder(uiContext)
-            .setTitle(R.string.minab_real_url_custom)
-            .setView(entry)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                MinabRealTestSettings.setTestUrl(appContext, entry.text.toString())
-                refresh()
-                MinabProfileBus.notifyChanged()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 
     private fun stepWait(delta: Int) {

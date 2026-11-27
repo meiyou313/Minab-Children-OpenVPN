@@ -296,7 +296,7 @@
     <string name="minab_settings_default_vpn_none">تنظیم نشده (برای انتخاب لمس کنید)</string>
     <string name="minab_settings_screenoff_short">توقف موقت VPN هنگام خاموشی صفحه و بیکاری ۶۰ ثانیه‌ای</string>
     <string name="minab_settings_none_option">هیچ‌کدام</string>
-    <string name="minab_configs_login_short">رمز ورود</string>
+    <string name="minab_configs_login_short">یوزر و پسورد</string>
     <string name="minab_configs_backup_short">پشتیبان</string>
     <string name="minab_configs_share_short">اشتراک</string>
     <string name="minab_configs_cleanup_short">پاک‌سازی</string>
@@ -307,4 +307,134 @@
     <string name="minab_configs_backup_scope_all">پشتیبان کامل · همه کانفیگ‌ها (%1$d)</string>
     <string name="minab_configs_cleanup_scope_title">پاک‌سازی · %1$s</string>
     <string name="minab_connect_server">اتصال</string>
+
+    <!-- Minab Beta v0.9.8 -->
+    <string name="minab_configs_login_btn">تنظیم نام کاربری و رمز عبور</string>
+    <string name="minab_creds_save_default">ذخیره بعنوان پیش‌فرض برای ایمپورت‌های بعدی</string>
+    <string name="minab_fill_saved_creds">پر کردن با یوزر و پسورد ذخیره‌شده</string>
+    <string name="minab_toggle_password">نمایش یا مخفی کردن رمز عبور</string>
+    <string name="minab_credentials_scope_selected">ثبت فقط برای %1$d کانفیگ انتخاب‌شده</string>
+    <string name="minab_credentials_scope_group">ثبت برای گروه: %1$s (%2$d سرور)</string>
+    <string name="minab_credentials_scope_all_warn">هشدار: این نام کاربری و رمز برای همه %1$d کانفیگ برنامه ثبت می‌شود!</string>
+    <string name="minab_credentials_scope_single">کانفیگ: %1$s</string>
+    <string name="minab_bulk_credentials_scope_new">فقط برای کانفیگ‌هایی که الان وارد می‌شوند ثبت می‌شود</string>
+    <string name="minab_bulk_skip_geoip">رد کردن تشخیص کشور</string>
+    <string name="minab_restore_preview_title">جزئیات فایل پشتیبان</string>
+    <string name="minab_restore_preview_msg">محدوده: %1$s\nتعداد سرورها: %2$d\nزمان بکاپ: %3$s\n\nنام کاربری و رمز عبور هرگز در فایل پشتیبان ذخیره نمی‌شوند.</string>
+
+    <string name="minab_add_to_group_short">افزودن به گروه</string>
+    <string name="minab_add_to_group_title">افزودن سرورهای انتخاب‌شده به گروه</string>
+    <string name="minab_move_to_group_title">انتقال سرورهای انتخاب‌شده به گروه</string>
+    <string name="minab_added_to_group">%1$d سرور به گروه «%2$s» اضافه شد.</string>
+    <string name="minab_removed_from_group">%1$d سرور از گروه «%2$s» جدا شد.</string>
+    <string name="minab_remove_from_group_short">جدا از %1$s</string>
+    <string name="minab_remove_or_delete">جدا از گروه / حذف</string>
+    <string name="minab_delete_permanently">حذف همیشگی</string>
+    <string name="minab_delete_confirm_title">تایید حذف</string>
+    <string name="minab_delete_count_fmt">حذف (%1$d)</string>
+    <string name="minab_delete_selected_group_confirm">آیا %1$d سرور انتخاب‌شده فقط از گروه «%2$s» جدا شوند یا برای همیشه از کل برنامه حذف شوند؟</string>
+    <string name="minab_delete_single_group_confirm">آیا «%1$s» فقط از گروه «%2$s» جدا شود یا برای همیشه از کل برنامه حذف شود؟</string>
+    <string name="minab_manage_groups_for_server">مدیریت گروه‌های سرور</string>
+    <string name="minab_new_group_assign_hint">ساخت یک گروه دستی جدید و افزودن این سرور به آن</string>
+    <string name="minab_group_manual_tag">دستی</string>
+
+    <string name="minab_smart_tools_title">ابزارهای هوشمند</string>
+    <string name="minab_smart_tools_short">ابزارها</string>
+    <string name="minab_smart_redetect_sub">بررسی مجدد کشور سرورها از روی IP</string>
+    <string name="minab_smart_clean_empty_sub">حذف گروه‌های خالی اتومات یا دستی</string>
+    <string name="minab_smart_dedup_sub">ادغام تکراری‌ها با حفظ همه گروه‌ها و ستاره‌ها</string>
+    <string name="minab_smart_dead_sub">مشاهده و حذف سرورهایی که هرگز وصل نمی‌شوند</string>
+    <string name="minab_smart_failed_sub">حذف ناموفق‌ها بدون دست زدن به تست‌نشده‌ها</string>
+    <string name="minab_smart_dedup_confirm">آیا %1$d کانفیگ تکراری ادغام و حذف شوند؟ عضویت در گروه‌ها و ستاره سرورها روی بهترین نمونه حفظ خواهد شد.</string>
+    <string name="minab_redetect_cancelled">تشخیص کشور متوقف شد (%1$d مورد بروزرسانی شد).</string>
+
+    <string name="minab_clean_empty_title">حذف گروه‌های خالی</string>
+    <string name="minab_clean_empty_pill_fmt">حذف خالی‌ها (%1$d)</string>
+    <string name="minab_clean_empty_action">پاک‌سازی</string>
+    <string name="minab_no_empty_groups">هیچ گروه خالی‌ای برای حذف وجود ندارد.</string>
+    <string name="minab_empty_groups_cleaned">%1$d گروه خالی حذف شد.</string>
+    <string name="minab_clean_empty_msg_auto">آیا %1$d گروه اتوماتیک خالی (ایجادشده از روی IP) حذف شوند؟</string>
+    <string name="minab_clean_empty_msg_manual">فقط %1$d گروه دستی خالی وجود دارد. در صورت تمایل تیک زیر را بزنید تا حذف شوند.</string>
+    <string name="minab_clean_empty_msg_both">%1$d گروه اتوماتیک خالی حذف می‌شود. همچنین %2$d گروه دستی خالی دارید.</string>
+    <string name="minab_clean_empty_include_manual">گروه‌های دستی خالی (%1$d عدد) هم حذف شوند</string>
+    <string name="minab_clean_empty_none_selected">هیچ گروهی برای حذف انتخاب نشد.</string>
+
+    <string name="minab_no_inactive">هیچ سرور ناموفقی برای حذف وجود ندارد.</string>
+    <string name="minab_delete_failed_msg_only">آیا %1$d سروری که در آخرین تست پینگ یا ریل‌تست ناموفق بوده‌اند حذف شوند؟ سرورهای سالم و تست‌نشده امن هستند.</string>
+    <string name="minab_delete_failed_msg_none_tested">سرور ناموفقی پیدا نشد. %1$d سرور هنوز تست نشده‌اند.</string>
+    <string name="minab_delete_failed_msg_with_untested">آیا %1$d سرور ناموفق حذف شوند؟ (%2$d سرور تست‌نشده بطور پیش‌فرض حفظ می‌شوند)</string>
+    <string name="minab_delete_failed_include_untested">سرورهای تست‌نشده (%1$d عدد) هم حذف شوند</string>
+
+    <string name="minab_dead_servers_title">سرورهای همیشه‌خراب</string>
+    <string name="minab_dead_servers_safe_hint">فقط سرورهایی نشان داده می‌شوند که در تست‌های مختلف هیچ‌وقت موفق نشده‌اند. سرورهای تست‌نشده یا سالم هرگز اینجا نمی‌آیند.</string>
+    <string name="minab_dead_filter_2fails">۲+ بار خطا</string>
+    <string name="minab_dead_filter_3fails">۳+ بار خطا</string>
+    <string name="minab_dead_filter_2nets">۲+ اینترنت مختلف</string>
+    <string name="minab_dead_found_count">%1$d سرور همیشه ناموفق</string>
+    <string name="minab_dead_servers_empty">فعلاً هیچ سروری با این فیلتر همیشه خراب تشخیص داده نشده است.</string>
+    <string name="minab_dead_badge_fmt">%1$d خطا · %2$d شبکه</string>
+    <string name="minab_dead_delete_confirm">آیا %1$d سرور همیشه‌خراب انتخاب‌شده برای همیشه حذف شوند؟</string>
+    <string name="minab_dead_deleted_toast">%1$d سرور همیشه‌خراب حذف شد.</string>
+
+    <string name="minab_openvpn_log_summary">مشاهده گزارش لحظه‌ای موتور اتصال OpenVPN</string>
+    <string name="minab_diag_title">گزارش خطا و لاگ‌های عیب‌یابی</string>
+    <string name="minab_diag_local_only_banner">کاملاً محلی و خصوصی: برنامه هیچ اطلاعات یا لاگی را خودکار به هیچ سروری نمی‌فرستد و همه گزارش‌ها فقط روی گوشی شما می‌مانند.</string>
+    <string name="minab_diag_github_title">ارسال مشکل یا باگ در GitHub Issues</string>
+    <string name="minab_diag_github_url">https://github.com/meiyou313/Minab-Children-OpenVPN/issues</string>
+    <string name="minab_diag_github_howto">راهنمای گزارش مشکل:\n۱. ابتدا دکمه «دانلود .txt» یا «اشتراک .txt» را بزنید.\n۲. وارد صفحه GitHub Issues در بالا شوید.\n۳. توضیح مشکل و فایل Minab-DebugLog.txt را ضمیمه کنید.\n\nهیچ نام کاربری، رمز عبور یا گواهی‌نامه‌ای در لاگ‌ها ثبت نمی‌شود.</string>
+    <string name="minab_diag_tab_overview">کلی</string>
+    <string name="minab_diag_tab_crashes">کرش‌ها</string>
+    <string name="minab_diag_tab_applog">لاگ برنامه</string>
+    <string name="minab_diag_tab_ovpnlog">لاگ OpenVPN</string>
+    <string name="minab_diag_download_txt">دانلود .txt</string>
+    <string name="minab_diag_share_txt">اشتراک .txt</string>
+    <string name="minab_diag_copy">کپی</string>
+    <string name="minab_diag_copied">در کلیپ‌بورد کپی شد</string>
+    <string name="minab_diag_saved_toast">فایل گزارش .txt ذخیره شد</string>
+    <string name="minab_diag_save_failed">خطا در ذخیره فایل گزارش</string>
+    <string name="minab_diag_clear_confirm">آیا گزارش‌های کرش و رویدادهای ذخیره‌شده پاک شوند؟</string>
+    <string name="minab_diag_empty_applog">هنوز رویدادی در برنامه ثبت نشده است.</string>
+    <string name="minab_diag_empty_ovpnlog">لاگ OpenVPN خالی است — ابتدا یک اتصال برقرار کنید.</string>
+    <string name="minab_diag_open_center">باز کردن عیب‌یابی</string>
+    <string name="minab_diag_pending_crash_msg">برنامه در اجرای قبلی بدلیل یک خطا بسته شد. می‌توانید گزارش محلی خطا را در بخش عیب‌یابی ببینید یا ذخیره کنید.</string>
+    <string name="minab_diag_pending_unexpected_msg">اجرای قبلی برنامه بطور ناگهانی بسته شد. آخرین رویدادهای ثبت‌شده بطور محلی در بخش عیب‌یابی قابل مشاهده است.</string>
+
+    <string name="minab_faq_search_hint">جستجو در سوالات، پاسخ‌ها یا #هشتگ‌ها…</string>
+    <string name="minab_faq_cat_start">شروع و ایمپورت</string>
+    <string name="minab_faq_cat_testing">تست و سرعت</string>
+    <string name="minab_faq_cat_groups">گروه‌ها و بکاپ</string>
+    <string name="minab_faq_cat_troubleshoot">اتصال و حریم خصوصی</string>
+    <string name="minab_faq_filtering_tag">فیلتر با هشتگ:</string>
+    <string name="minab_faq_no_results">موردی مطابق جستجوی شما پیدا نشد. عبارت یا فیلترها را تغییر دهید.</string>
+    <string name="minab_faq_count_fmt">نمایش %1$d از %2$d سوال</string>
+
+    <string name="minab_faq_v98_import_title">چطور چندین فایل .ovpn یا فایل زیپ (ZIP) را وارد کنم؟</string>
+    <string name="minab_faq_v98_import_body">روی آیکون &lt;b&gt;+&lt;/b&gt; در نوار بالای برنامه بزنید. می‌توانید چند فایل &lt;b&gt;.ovpn&lt;/b&gt;، فایل &lt;b&gt;.zip&lt;/b&gt;، لینک دانلود یا فایل پشتیبان میناب را انتخاب کنید.&lt;br/&gt;&lt;br/&gt;ابتدا تمام کانفیگ‌ها یکجا در دیتابیس ثبت می‌شوند و سپس کشور آن‌ها از روی IP تشخیص داده می‌شود. اگر روی اینترنت محدود تشخیص کشور کند بود، با دکمه &lt;b&gt;رد کردن تشخیص کشور&lt;/b&gt; می‌توانید بدون از دست رفتن سرورها سریع خارج شوید. هنگام بازیابی بکاپ هم ابتدا جزئیات بکاپ نمایش داده می‌شود.</string>
+    <string name="minab_faq_v98_creds_title">بخش «یوزر و پسورد» (Set User/Pass) چطور کار می‌کند؟</string>
+    <string name="minab_faq_v98_creds_body">در تب Configs یا هنگام ایمپورت، گزینه &lt;b&gt;یوزر و پسورد&lt;/b&gt; را بزنید. یک &lt;b&gt;کادر سبز&lt;/b&gt; دقیقاً مشخص می‌کند رمز برای کدام گروه یا چند سرور انتخاب‌شده ثبت می‌شود. اگر روی گروه All بدون انتخاب باشید، یک &lt;b&gt;کادر هشدار نارنجی&lt;/b&gt; یادآوری می‌کند که تغییر روی کل سرورها اعمال می‌شود.&lt;br/&gt;&lt;br/&gt;با آیکون چشم می‌توانید رمز را ببینید، از یوزر/پس ذخیره‌شده پر کنید و در صورت تمایل گزینه ذخیره پیش‌فرض برای ایمپورت‌های بعدی را بزنید.</string>
+    <string name="minab_faq_v98_multigroup_title">سیستم سرورهای یکتا و عضویت چندگروهی چطور کار می‌کند؟</string>
+    <string name="minab_faq_v98_multigroup_body">هر سرور فقط یک بار در برنامه ذخیره می‌شود و با &lt;b&gt;افزودن به گروه&lt;/b&gt; یا &lt;b&gt;مدیریت گروه‌های سرور&lt;/b&gt; کپی اضافه نمی‌سازد؛ بلکه یک سرور می‌تواند هم‌زمان عضو چند گروه باشد و زیر اسمش بصورت &lt;b&gt;[گروه۱ · گروه۲]&lt;/b&gt; دیده شود.&lt;br/&gt;&lt;br/&gt;ستاره (★)، نتایج تست و رمز عبور در همه تب‌ها و گروه‌ها کاملاً هماهنگ است. داخل هر گروه موقع حذف می‌توانید انتخاب کنید فقط از همان گروه جدا شود یا برای همیشه از کل برنامه حذف گردد.</string>
+    <string name="minab_faq_v98_dedup_empty_title">آیا حذف تکراری‌ها سرورهای گلچین‌شده را پاک می‌کند؟ گروه‌های خالی چطور؟</string>
+    <string name="minab_faq_v98_dedup_empty_body">خیر! &lt;b&gt;حذف تکراری‌ها&lt;/b&gt; ابتدا همه عضویت‌های گروهی و ستاره‌ها را روی بهترین سرور (وصل یا دارای بهترین پینگ/ریل‌تست) &lt;b&gt;ادغام&lt;/b&gt; می‌کند تا هیچ سروری از گروه‌های منتخب شما کم نشود.&lt;br/&gt;&lt;br/&gt;گزینه &lt;b&gt;حذف گروه‌های خالی&lt;/b&gt; داخل منوی ✨ و مدیریت گروه‌ها نیز بطور پیش‌فرض فقط گروه‌های اتوماتیک خالی را حذف می‌کند و یک تیک اختیاری برای گروه‌های دستی خالی دارد.</string>
+    <string name="minab_faq_v98_tests_title">تفاوت Ping Test و Real Test چیست؟</string>
+    <string name="minab_faq_v98_tests_body">&lt;b&gt;Ping Test&lt;/b&gt; خیلی سریع با هندشیک اولیه، زنده بودن و تاخیر سرور را می‌سنجد.&lt;br/&gt;&lt;b&gt;Real Test&lt;/b&gt; بصورت واقعی به سرورها وصل می‌شود و آدرس هدف (قابل تنظیم با آیکون چرخ‌دنده کنار Real Test) را باز می‌کند تا از اینترنت واقعی سرور مطمئن شود.&lt;br/&gt;&lt;br/&gt;نتایج قبلی سرورهایی که الان تست نشده‌اند پاک نمی‌شود، ستون پینگ (چپ) و ریل‌تست (راست) کاملاً منظم هستند و ریل‌تست با قفل شدن صفحه یا تعویض تب قطع نمی‌شود.</string>
+    <string name="minab_faq_v98_dead_servers_title">«سرورهای همیشه‌خراب» چیست و آیا حذف ناموفق‌ها امن است؟</string>
+    <string name="minab_faq_v98_dead_servers_body">بخش &lt;b&gt;سرورهای همیشه‌خراب&lt;/b&gt; آمار تست‌های مختلف شما روی اینترنت‌های گوناگون را نگه می‌دارد و سرورهایی که با &lt;b&gt;۲+ خطا&lt;/b&gt;، &lt;b&gt;۳+ خطا&lt;/b&gt; یا در &lt;b&gt;۲+ شبکه مختلف&lt;/b&gt; هیچ‌وقت سالم نبوده‌اند را برای حذف یکجا نمایش می‌دهد.&lt;br/&gt;&lt;br/&gt;سرورهای تست‌نشده یا حتی یک‌بارموفق هرگز در این لیست نمی‌آیند و گزینه «حذف ناموفق‌ها» هم بطور پیش‌فرض سرورهای تست‌نشده را حذف نمی‌کند.</string>
+    <string name="minab_faq_v98_history_title">تاریخچه تست‌ها (Test History) چه کاربردی دارد؟</string>
+    <string name="minab_faq_v98_history_body">پس از هر Ping Test یا Real Test کامل‌شده، نتایج بهمراه نوع اینترنت (وای‌فای یا اپراتور) در تاریخچه (آیکون ساعت) ذخیره می‌شود. می‌توانید شبکه‌ها را نام‌گذاری کنید، سرورهای سالم هر شبکه را ببینید، مستقیم وصل شوید یا نتایج قدیمی را روی لیست برگردانید.</string>
+    <string name="minab_faq_v98_smarttools_title">گزینه‌های Re-detect IP، حذف خالی‌ها، تکراری‌ها و ✨ کجا رفته‌اند؟</string>
+    <string name="minab_faq_v98_smarttools_body">در تب Configs آیکون &lt;b&gt;✨&lt;/b&gt; در نوار بالا (و آیکون آچار در صفحه Home) ابزارهای هوشمند را یکجا جمع کرده است. هر زمان سرور دسته‌بندی‌نشده زیاد، گروه اتوماتیک خالی، کانفیگ تکراری یا سرور همیشه‌خراب وجود داشته باشد، یک &lt;b&gt;نقطه سبز کوچک&lt;/b&gt; کنار ✨ ظاهر می‌شود.</string>
+    <string name="minab_faq_v98_backup_share_title">بکاپ و اشتراک‌گذاری چطور کار می‌کنند؟ رمزها ذخیره می‌شوند؟ در ویندوز باز می‌شود؟</string>
+    <string name="minab_faq_v98_backup_share_body">نام بکاپ‌ها بصورت استاندارد و تاریخ‌دار مانند &lt;b&gt;Minab-Backup_UnitedStates_18cfg_2026.11.27_16.30.zip&lt;/b&gt; ساخته می‌شود (و اشتراک تکی مستقیم فایل &lt;b&gt;.ovpn&lt;/b&gt; می‌فرستد). داخل زیپ علاوه بر فایل استاندارد &lt;b&gt;.ovpn&lt;/b&gt; قابل استفاده در OpenVPN Connect ویندوز/لینوکس/مک، فایل &lt;b&gt;Minab-Info.txt&lt;/b&gt; نیز وجود دارد. فایل &lt;b&gt;minab-backup.json&lt;/b&gt; هم هیچ تداخلی با برنامه‌های اصلی OpenVPN ندارد.&lt;br/&gt;&lt;br/&gt;&lt;b&gt;امنیت:&lt;/b&gt; نام کاربری و رمز عبور &lt;b&gt;هرگز&lt;/b&gt; در بکاپ یا اشتراک‌گذاری ذخیره نمی‌شود.</string>
+    <string name="minab_faq_v98_best_failover_title">«بهترین سرور» و «تغییر خودکار سرور» (Auto-failover) چطور کار می‌کنند؟</string>
+    <string name="minab_faq_v98_best_failover_body">&lt;b&gt;بهترین سرور&lt;/b&gt; سریع‌ترین سرور تاییدشده در گروه فعلی را انتخاب و متصل می‌کند (اولویت با سرعت Real Test و سپس Ping). با فعال بودن Auto-failover در تنظیمات، هنگام قطعی ناخواسته تا ۳ سرور سالم بعدی بصورت خودکار امتحان می‌شوند.</string>
+    <string name="minab_faq_v98_ip_widget_perapp_title">امکانات IP و پرچم، ویجت صفحه اصلی و VPN برنامه‌های خاص چطور کار می‌کنند؟</string>
+    <string name="minab_faq_v98_ip_widget_perapp_body">در تب Home آی‌پی و پرچم فعلی (قبل و بعد از اتصال) نمایش داده می‌شود. ۳ ویجت مختلف برای صفحه اصلی گوشی در نظر گرفته شده و در تنظیمات -&gt; VPN فقط برای برنامه‌های خاص می‌توانید تعیین کنید فقط کدام اپ‌ها از فیلترشکن رد شوند یا مستثنی باشند.</string>
+    <string name="minab_faq_v98_disconnect_notif_title">قطع اتصال دستی و کلیک روی نوتیفیکیشن چه تغییری کرده‌اند؟</string>
+    <string name="minab_faq_v98_disconnect_notif_body">هرگاه بصورت دستی اتصال را قطع کنید (از دکمه Home، دکمه قطع در نوتیفیکیشن یا Quick Tile)، سیستم تغییر خودکار و تایمرهای اتصال مجدد بلافاصله متوقف می‌شوند تا دیگر خودکار وصل نشود.&lt;br/&gt;کلیک روی نوتیفیکیشن OpenVPN نیز مستقیم تب &lt;b&gt;Home&lt;/b&gt; برنامه را باز می‌کند.</string>
+    <string name="minab_faq_v98_battery_title">چرا وقتی صفحه گوشی خاموش می‌شود VPN قطع می‌شود؟</string>
+    <string name="minab_faq_v98_battery_body">در تب Settings گزینه توقف موقت هنگام خاموشی صفحه را چک کنید و از تنظیمات باتری اندروید، محدودیت باتری را برای Minab OpenVPN روی Unrestricted (بدون محدودیت) بگذارید.</string>
+    <string name="minab_faq_v98_diagnostics_title">آیا گزارش کرش یا لاگ‌های عیب‌یابی خودکار جایی ارسال می‌شوند؟</string>
+    <string name="minab_faq_v98_diagnostics_body">&lt;b&gt;خیر، به هیچ عنوان.&lt;/b&gt; برنامه هیچ تله‌متری یا ارسال خودکاری ندارد. از مسیر &lt;b&gt;Settings -&gt; راهنما و عیب‌یابی&lt;/b&gt; به &lt;b&gt;گزارش خطا و لاگ‌ها&lt;/b&gt; (و همینطور &lt;b&gt;لاگ OpenVPN&lt;/b&gt;) دسترسی دارید و می‌توانید در صورت نیاز فایل &lt;b&gt;.txt&lt;/b&gt; را دانلود یا در GitHub Issues ضمیمه کنید.</string>
+
 </resources>

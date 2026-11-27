@@ -3,51 +3,20 @@
  * Copyright (c) 2026 Minab contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * BulkImportActivity: bulk import of .ovpn/.conf files and .zip files.
- *
- * Flow:
- *   1. User picks many files at once (ACTION_OPEN_DOCUMENT +
- *      EXTRA_ALLOW_MULTIPLE, MIME application/x-openvpn-profile and
- *      any MIME type, so file managers that do not know the .ovpn MIME
- *      type can still pick them) or a single .zip.
- *   2. One username + one password + "apply to all" checkbox. When
- *      checked, BulkImportHelper writes them into VpnProfile.mUsername /
- *      mPassword of every imported profile that uses auth-user-pass —
- *      the same fields the profile editor writes, persisted by
- *      ProfileManager into the (optionally encrypted) profile file.
- *      The Activity never stores the password anywhere else and clears
- *      the fields when it finishes.
- *   3. Import runs on a background thread (Dispatchers.IO); the UI
- *      shows live progress ("Imported X of N…" + progress bar) and
- *      then the summary (imported / duplicates skipped / failed,
- *      with failed names). The summary is stored in
- *      ImportSummaryStore and shown again when the screen re-opens
- *      (v0.3 bug fix 1 — in v0.2 it was only a transient Toast).
- *   4. Auto-categorisation runs AFTER the import, also in the
- *      background, in two batched passes with no per-profile delay
- *      (v0.3 bug fix 1 — v0.2 paused ~1 s per profile): first the
- *      offline heuristic for every profile at once, then the online
- *      lookup for the rest, in chunks of 8 in parallel. It never
- *      blocks or fails the import: a profile keeps its manual
- *      category when no country could be determined.
- *   5. Shared credentials (v0.3 bug fix 2): the Apply button saves
- *      the username/password (EncryptedSharedPreferences, see
- *      SharedCredentials) and writes them into ALL profiles that
- *      need a username/password — already-imported ones included —
- *      so connecting stops asking per profile. Profiles imported
- *      later get the saved credentials automatically, without
- *      re-typing. The fields are pre-filled from the saved values.
+ * BulkImportActivity (v0.9.8): fast, non-freezing batch import of .ovpn/.conf/.zip
+ * files & URLs, two-phase import + cancellable GeoIP detection with Skip button,
+ * backup inspection preview, and modern MinabDialogs throughout.
  */
 
 package de.blinkt.openvpn.activities
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -55,7 +24,6 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.Spinner
-import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -71,6 +39,7 @@ import de.blinkt.openvpn.minab.BulkImportHelper
 import de.blinkt.openvpn.minab.CategoryStore
 import de.blinkt.openvpn.minab.ImportSummaryStore
 import de.blinkt.openvpn.minab.MinabBackup
+import de.blinkt.openvpn.minab.MinabDialogs
 import de.blinkt.openvpn.minab.MinabProfileBus
 import de.blinkt.openvpn.minab.MinabServerCountry
 import de.blinkt.openvpn.minab.SharedCredentials
@@ -82,12 +51,10 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 
 class BulkImportActivity : BaseActivity() {
     companion object {
-        /** Cap for one downloaded or picked zip: MinabBackup uses the
-            same 64 MB cap, so a backup picked here is never refused
-            there for size. */
         private const val MAX_ZIP_BYTES = 64 * 1024 * 1024
     }
 
@@ -104,7 +71,6 @@ class BulkImportActivity : BaseActivity() {
     private lateinit var importButton: Button
     private lateinit var zipButton: Button
     private lateinit var applyButton: Button
-    // --- Minab v0.9: import from a link + restore a full backup ---
     private lateinit var urlField: EditText
     private lateinit var fetchButton: Button
     private lateinit var restoreButton: Button
@@ -112,21 +78,15 @@ class BulkImportActivity : BaseActivity() {
     private lateinit var resultCard: View
     private lateinit var resultIcon: ImageView
     private lateinit var resultTitle: TextView
+    private lateinit var skipGeoIpButton: Button
     private lateinit var doneButton: Button
     private lateinit var footerBackButton: Button
-    /** Set while a run restores a full backup: the restore summary
-        replaces the import summary at the end of the run. */
-    private var restoreSummary: String? = null
 
-    /** Minab Beta v0.9.6.3 (fix #5) — the group the new configs go
-        to: null = "All" (the default — no group chosen, so the
-        country auto-detection decides, else "Uncategorized"); a
-        name = the group the user picked in the spinner. An explicit
-        pick always wins over auto-detection. */
+    private var restoreSummary: String? = null
     private var selectedCategory: String? = null
-    /** Files the user picked for the import currently running (or 0). */
     private var selectedCount: Int = 0
     private var lastImportedUuids: Set<String> = emptySet()
+    private val geoCancelled = AtomicBoolean(false)
 
     private val pickMultiple = registerForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
@@ -149,6 +109,7 @@ class BulkImportActivity : BaseActivity() {
         resultCard = findViewById(R.id.minab_bulk_result_card)
         resultIcon = findViewById(R.id.minab_bulk_result_icon)
         resultTitle = findViewById(R.id.minab_bulk_result_title)
+        skipGeoIpButton = findViewById(R.id.minab_bulk_skip_geoip)
         doneButton = findViewById(R.id.minab_bulk_done_btn)
         footerBackButton = findViewById(R.id.minab_bulk_footer_back)
         usernameField = findViewById(R.id.minab_bulk_username)
@@ -170,15 +131,11 @@ class BulkImportActivity : BaseActivity() {
 
         doneButton.setOnClickListener { finish() }
         footerBackButton.setOnClickListener { finish() }
+        skipGeoIpButton.setOnClickListener {
+            geoCancelled.set(true)
+            skipGeoIpButton.isEnabled = false
+        }
 
-        // Minab Beta v0.9 — edge-to-edge: this activity never
-        // applied the system-bars insets, so its content started
-        // under the status bar / action bar and the header text was
-        // clipped (v0.8 screenshot). Push the ScrollView down by the
-        // top inset and pad its bottom by the navigation-bar inset,
-        // so the spinner at the end scrolls fully into view.
-        // (BaseActivity.setUpEdgeEdgeInsetsListener is not usable
-        // here — it assumes a statusbar_background view exists.)
         val root = findViewById<View>(R.id.minab_bulk_root)
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -187,28 +144,18 @@ class BulkImportActivity : BaseActivity() {
             insets
         }
 
-        // v0.9.7.1: Keep fields blank by default so saved credentials are NEVER silently applied.
-        // Offer a 1-tap optional fill pill when saved credentials exist.
         lastImportedUuids = MinabProfileBus.getLastImportedUuids(this)
         updateFillSavedPill()
         setupLoginScopeSpinner()
 
-        // v0.3 bug fix 1: the last import summary survives leaving
-        // the page — show it again on return.
         ImportSummaryStore.formatLastSummary(this)?.let { summary ->
             lastSummaryView.text = getString(R.string.minab_last_import, summary)
         }
 
-        // Minab Beta v0.9.6.3 (fix #5) — the group picker: "Create
-        // group" FIRST (top of the list, at hand), then "All" (the
-        // default), then the existing groups. "All" means no group
-        // is chosen: the configs land in "all" and the country
-        // auto-detection puts each into its own country group.
         refreshCategorySpinner(null)
         categorySpinner.setOnItemSelectedListener(object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, pos: Int, id: Long) {
                 if (pos == 0) {
-                    // "Create group": ask for the name, then select it.
                     showNewCategoryDialog { name -> refreshCategorySpinner(name) }
                     return
                 }
@@ -224,13 +171,7 @@ class BulkImportActivity : BaseActivity() {
             pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "*/*"))
         }
         applyButton.setOnClickListener { applySharedCredentials() }
-
-        // Minab Beta v0.9 — import from a link: paste a URL to a
-        // .ovpn file or a .zip of .ovpn files and fetch it.
         fetchButton.setOnClickListener { onFetchUrlClicked() }
-
-        // Minab Beta v0.9 — restore a full Minab backup (configs +
-        // groups + credentials + favorites + settings).
         restoreButton.setOnClickListener {
             pickRestore.launch(arrayOf("application/zip", "*/*"))
         }
@@ -242,7 +183,7 @@ class BulkImportActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
-        // Do not keep the bulk password in memory longer than needed.
+        geoCancelled.set(true)
         if (::passwordField.isInitialized) passwordField.setText("")
         super.onDestroy()
     }
@@ -275,10 +216,6 @@ class BulkImportActivity : BaseActivity() {
         loginScopeSpinner.setSelection(0)
     }
 
-    /**
-     * Scoped Shared Login Apply: applies typed credentials ONLY to the user-selected
-     * scope (Last imported batch [default], Specific group, Picked configs, or All).
-     */
     private fun applySharedCredentials() {
         val username = usernameField.text.toString()
         val password = passwordField.text.toString()
@@ -325,13 +262,14 @@ class BulkImportActivity : BaseActivity() {
             Toast.makeText(this, R.string.minab_no_profiles_yet, Toast.LENGTH_SHORT).show()
             return
         }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.minab_bulk_login_scope_group)
-            .setItems(groups.toTypedArray()) { _, which ->
-                onPicked(groups[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        MinabDialogs.showSingleChoice(
+            context = this,
+            title = getString(R.string.minab_bulk_login_scope_group),
+            options = groups,
+            iconRes = R.drawable.ic_baseline_folder_24
+        ) { which ->
+            onPicked(groups[which])
+        }
     }
 
     private fun showManualConfigPicker(onPicked: (List<VpnProfile>) -> Unit) {
@@ -340,19 +278,23 @@ class BulkImportActivity : BaseActivity() {
             Toast.makeText(this, R.string.minab_no_profiles_yet, Toast.LENGTH_SHORT).show()
             return
         }
-        val checked = BooleanArray(all.size)
-        val labels = all.map { "${it.mName ?: ""} [${it.getCategory()}]" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle(R.string.minab_bulk_pick_configs_title)
-            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
-                checked[which] = isChecked
-            }
-            .setPositiveButton(R.string.minab_apply_credentials) { _, _ ->
-                val chosen = all.filterIndexed { i, _ -> checked[i] }
-                if (chosen.isNotEmpty()) onPicked(chosen)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        val options = all.map {
+            MinabDialogs.MultiChoiceOption(
+                label = it.mName ?: "",
+                sublabel = "[${it.getGroupsDisplayText()}]",
+                checked = false
+            )
+        }
+        MinabDialogs.showMultiChoice(
+            context = this,
+            title = getString(R.string.minab_bulk_pick_configs_title),
+            options = options,
+            positiveText = getString(R.string.minab_apply_credentials),
+            showSelectAll = true
+        ) { selectedIndices, _ ->
+            val chosen = selectedIndices.map { all[it] }
+            if (chosen.isNotEmpty()) onPicked(chosen)
+        }
     }
 
     private fun executeCredentialApply(
@@ -388,6 +330,7 @@ class BulkImportActivity : BaseActivity() {
 
     private fun options(batchUsername: String?, batchPassword: String?): BulkImportHelper.ImportOptions {
         val o = BulkImportHelper.ImportOptions()
+        o.deferSaveList = true
         if (!batchUsername.isNullOrEmpty() && !batchPassword.isNullOrEmpty()) {
             o.username = batchUsername
             o.password = batchPassword
@@ -401,10 +344,6 @@ class BulkImportActivity : BaseActivity() {
         return o
     }
 
-    /** Minab Beta v0.9.6.3 (fix #5) — the spinner's items:
-        "Create group" first, "All" second, then the existing
-        groups (without "Uncategorized" — "All" covers the no-group
-        case now). */
     private fun categorySpinnerItems(): List<String> {
         val groups = CategoryStore.getCategories(this)
             .filter { it != CategoryStore.DEFAULT_CATEGORY }
@@ -414,14 +353,8 @@ class BulkImportActivity : BaseActivity() {
         ) + groups
     }
 
-    /** Minab Beta v0.9.6.3 (fix #5) — rebuild the spinner and
-        select the given group (null = "All"). Called at setup and
-        after a group is created. */
     private fun refreshCategorySpinner(selectCategory: String?) {
         val items = categorySpinnerItems()
-        // Minab Beta v0.9.6.5 (fix #3) — custom Vazirmatn items
-        // for the closed picker and the dropdown (the stock
-        // simple_spinner layouts looked old and ugly).
         val adapter = ArrayAdapter(this, R.layout.minab_spinner_item, items)
         adapter.setDropDownViewResource(R.layout.minab_spinner_dropdown_item)
         categorySpinner.adapter = adapter
@@ -433,27 +366,17 @@ class BulkImportActivity : BaseActivity() {
         categorySpinner.setSelection(pos)
     }
 
-    /** Minab Beta v0.9.6.3 (fix #5) — ask for a new group name
-        (same dialog as Home/Configs). On cancel or back-press the
-        spinner goes back to showing the current selection, so it
-        never displays "Create group" while another group is
-        actually selected. */
     private fun showNewCategoryDialog(onCreated: (String) -> Unit) {
-        val entry = EditText(this)
-        entry.setSingleLine()
-        AlertDialog.Builder(this)
-            .setTitle(R.string.minab_new_category)
-            .setView(entry)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val name = CategoryStore.normalise(entry.text.toString())
-                CategoryStore.addManualCategory(this, name)
-                onCreated(name)
-            }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
-                refreshCategorySpinner(selectedCategory)
-            }
-            .setOnCancelListener { refreshCategorySpinner(selectedCategory) }
-            .show()
+        MinabDialogs.showTextInput(
+            context = this,
+            title = getString(R.string.minab_new_category),
+            hint = getString(R.string.minab_group_name_hint),
+            onCancel = { refreshCategorySpinner(selectedCategory) }
+        ) { raw ->
+            val name = CategoryStore.normalise(raw)
+            CategoryStore.addManualCategory(this, name)
+            onCreated(name)
+        }
     }
 
     private fun onFilesPicked(uris: List<Uri>) {
@@ -466,52 +389,28 @@ class BulkImportActivity : BaseActivity() {
         }
     }
 
-    /**
-     * Always prompt for fresh credentials unless the user just typed a username
-     * & password into the visible page fields before starting import. Saved
-     * credentials are NEVER silently applied; only an explicit 1-tap pill inside
-     * the dialog fills them on request.
-     */
     private fun maybeAskCredentialsThen(onProceed: (String?, String?) -> Unit) {
         val typedUser = usernameField.text.toString()
         val typedPass = passwordField.text.toString()
         if (typedUser.isNotBlank() && typedPass.isNotBlank()) {
             onProceed(typedUser, typedPass)
         } else {
-            showCredentialsDialog(
-                onImport = { user, pass ->
+            MinabDialogs.showCredentialsDialog(
+                context = this,
+                title = getString(R.string.minab_bulk_credentials_title),
+                scopeSummary = getString(R.string.minab_bulk_credentials_scope_new),
+                isAllScopeWarning = false,
+                showSaveDefaultOption = true,
+                initialSaveDefault = applyAllBox.isChecked,
+                positiveText = getString(R.string.minab_bulk_credentials_import),
+                negativeText = getString(R.string.minab_bulk_credentials_skip),
+                onConfirm = { user, pass, saveDefault ->
+                    applyAllBox.isChecked = saveDefault
                     onProceed(user.takeIf { it.isNotBlank() }, pass.takeIf { it.isNotBlank() })
                 },
-                onSkip = { onProceed(null, null) }
+                onCancel = { onProceed(null, null) }
             )
         }
-    }
-
-    private fun showCredentialsDialog(
-        onImport: (String, String) -> Unit,
-        onSkip: () -> Unit
-    ) {
-        val view = layoutInflater.inflate(R.layout.minab_credentials_dialog, null)
-        val userField = view.findViewById<EditText>(R.id.minab_credentials_dialog_username)
-        val passField = view.findViewById<EditText>(R.id.minab_credentials_dialog_password)
-        val fillSavedPill = view.findViewById<TextView>(R.id.minab_credentials_fill_saved)
-        if (SharedCredentials.hasCredentials(this)) {
-            val savedUser = SharedCredentials.getUsername(this)
-            fillSavedPill?.visibility = View.VISIBLE
-            fillSavedPill?.text = getString(R.string.minab_fill_saved_login, savedUser)
-            fillSavedPill?.setOnClickListener {
-                userField.setText(SharedCredentials.getUsername(this))
-                passField.setText(SharedCredentials.getPassword(this))
-            }
-        }
-        AlertDialog.Builder(this)
-            .setView(view)
-            .setPositiveButton(R.string.minab_bulk_credentials_import) { _, _ ->
-                onImport(userField.text.toString(), passField.text.toString())
-            }
-            .setNegativeButton(R.string.minab_bulk_credentials_skip) { _, _ -> onSkip() }
-            .setOnCancelListener { onSkip() }
-            .show()
     }
 
     private fun startFilesImport(uris: List<Uri>, batchUser: String?, batchPass: String?) {
@@ -525,12 +424,6 @@ class BulkImportActivity : BaseActivity() {
                     stream = contentResolver.openInputStream(uri)
                     if (stream != null) {
                         if (isZipName(name)) {
-                            // Minab Beta v0.9 — read the zip into
-                            // memory first: a full Minab backup is
-                            // detected by its metadata and restored
-                            // (groups + credentials + favorites +
-                            // settings), anything else is a plain
-                            // import as before.
                             val bytes = readAllBytes(stream, MAX_ZIP_BYTES)
                             if (bytes == null) {
                                 result.failed++
@@ -549,12 +442,11 @@ class BulkImportActivity : BaseActivity() {
                     result.failed++
                     result.failedNames.add(name ?: uri.toString())
                 } finally {
-                    try { stream?.close() } catch (ignored: Exception) { }
+                    try { stream?.close() } catch (_: Exception) { }
                 }
                 done++
-                // v0.3 bug fix 1: live progress, not a static line.
                 withContext(Dispatchers.Main) { updateProgress(done, uris.size) }
-                if (result.imported + result.failed > BulkImportHelper.MAX_FILES_PER_IMPORT) break
+                if (result.imported + result.failed >= BulkImportHelper.MAX_FILES_PER_IMPORT) break
             }
             result
         }
@@ -562,7 +454,7 @@ class BulkImportActivity : BaseActivity() {
 
     private fun onZipPicked(uri: Uri) {
         maybeAskCredentialsThen { batchUser, batchPass ->
-            selectedCount = 0 // total unknown until the zip is read
+            selectedCount = 0
             runImport(batchUser, batchPass) { result, opts ->
                 var stream: InputStream? = null
                 try {
@@ -576,42 +468,43 @@ class BulkImportActivity : BaseActivity() {
                             result.failed++
                             result.failedNames.add(displayName(uri) ?: uri.toString())
                         } else {
+                            val totalInZip = BulkImportHelper.countZipOvpnEntries(bytes).coerceAtLeast(1)
+                            selectedCount = totalInZip
                             importZipBytes(bytes, opts, result) { processed ->
                                 runOnUiThread {
-                                    progressBar.isIndeterminate = true
-                                    statusView.text =
-                                        getString(R.string.minab_importing) + " (" + processed + ")"
+                                    updateProgress(processed, totalInZip)
                                 }
                             }
                         }
                     }
                 } finally {
-                    try { stream?.close() } catch (ignored: Exception) { }
+                    try { stream?.close() } catch (_: Exception) { }
                 }
                 result
             }
         }
     }
 
-    /** Live progress: bar + "Imported X of N…" (main thread only). */
     private fun updateProgress(done: Int, total: Int) {
         progressBar.visibility = View.VISIBLE
         progressBar.isIndeterminate = false
         progressBar.max = total.coerceAtLeast(1)
-        progressBar.progress = done
+        progressBar.progress = done.coerceAtMost(total)
         statusView.text = getString(R.string.minab_import_progress, done, total)
     }
 
-    /** Runs the import off the UI thread, then batch-GeoIP auto-categorises, then shows the clear applied card. */
     private fun runImport(
         batchUser: String?,
         batchPass: String?,
         work: suspend (BulkImportHelper.ImportResult, BulkImportHelper.ImportOptions) -> BulkImportHelper.ImportResult
     ) {
+        geoCancelled.set(false)
         setBusy(true)
         resultCard.visibility = View.VISIBLE
         resultCard.setBackgroundResource(R.drawable.minab_card_bg)
         resultIcon.visibility = View.GONE
+        skipGeoIpButton.visibility = View.GONE
+        skipGeoIpButton.isEnabled = true
         doneButton.visibility = View.GONE
         resultTitle.text = getString(R.string.minab_importing)
         progressBar.visibility = View.VISIBLE
@@ -622,7 +515,6 @@ class BulkImportActivity : BaseActivity() {
         rootScroll.post { rootScroll.smoothScrollTo(0, 0) }
         val opts = options(batchUser, batchPass)
         val autoCategorise = autoCategoryBox.isChecked
-        if (opts.category != null) CategoryStore.addManualCategory(this, opts.category)
         lifecycleScope.launch(Dispatchers.IO) {
             val result = BulkImportHelper.ImportResult()
             try {
@@ -631,18 +523,40 @@ class BulkImportActivity : BaseActivity() {
                 result.failed++
                 result.failedNames.add(e.message ?: "import error")
             }
+
+            // Commit imported profile list ONCE at end of Phase 1 so navigating Home
+            // immediately sees 100% consistent profiles (no half-imported disappearing rows).
+            try {
+                ProfileManager.getInstance(this@BulkImportActivity)
+                    .saveProfileList(this@BulkImportActivity)
+            } catch (_: Exception) {
+            }
+
             if (result.importedProfiles.isNotEmpty()) {
                 val uuids = result.importedProfiles.map { it.getUUIDString() }.toSet()
                 lastImportedUuids = uuids
                 MinabProfileBus.setLastImportedUuids(this@BulkImportActivity, uuids)
+                withContext(Dispatchers.Main) {
+                    setResult(Activity.RESULT_OK)
+                    MinabProfileBus.notifyChanged()
+                }
             }
-            // Accurate Batch HTTPS GeoIP auto-detection (no false-positive 2-letter matches).
-            if (autoCategorise && result.importedProfiles.isNotEmpty()) {
+
+            // Phase 2: Cancellable Batch HTTPS GeoIP auto-detection with Skip button
+            if (autoCategorise && result.importedProfiles.isNotEmpty() && !geoCancelled.get()) {
+                withContext(Dispatchers.Main) {
+                    skipGeoIpButton.visibility = View.VISIBLE
+                    progressBar.isIndeterminate = true
+                    statusView.text = getString(
+                        R.string.minab_import_categorising, 0, result.importedProfiles.size
+                    )
+                }
                 try {
                     AutoCategory.detectCategoriesForProfiles(
                         this@BulkImportActivity,
                         result.importedProfiles,
-                        false
+                        false,
+                        geoCancelled
                     ) { profile, code, category, done, total ->
                         if (!code.isNullOrBlank()) {
                             MinabServerCountry.put(
@@ -671,9 +585,11 @@ class BulkImportActivity : BaseActivity() {
                 } catch (_: Exception) {
                 }
             }
+
             withContext(Dispatchers.Main) {
                 setBusy(false)
                 progressBar.visibility = View.GONE
+                skipGeoIpButton.visibility = View.GONE
                 val restored = restoreSummary
                 restoreSummary = null
                 val summary = restored ?: getString(
@@ -729,16 +645,6 @@ class BulkImportActivity : BaseActivity() {
         restoreButton.isEnabled = !busy
     }
 
-    /**
-     * Minab Beta v0.9 — one zip, two meanings. A zip that carries a
-     * Minab backup (a minab-backup.json metadata entry) is
-     * RESTORED: profiles plus groups, credentials, favorites and
-     * settings, exactly as they were. Anything else is a plain
-     * import, as before — and restored profiles are deliberately
-     * NOT added to result.importedProfiles, so the auto-categoriser
-     * in runImport does not re-group them (their groups come from
-     * the backup's metadata).
-     */
     private fun importZipBytes(
         bytes: ByteArray,
         opts: BulkImportHelper.ImportOptions,
@@ -766,7 +672,6 @@ class BulkImportActivity : BaseActivity() {
         result.importedProfiles.addAll(zipResult.importedProfiles)
     }
 
-    /** Read a stream fully, capped — null when it is too large. */
     private fun readAllBytes(stream: InputStream, maxBytes: Int): ByteArray? {
         val out = ByteArrayOutputStream()
         val buf = ByteArray(8192)
@@ -781,19 +686,9 @@ class BulkImportActivity : BaseActivity() {
         return out.toByteArray()
     }
 
-    /** Minab Beta v0.9 — import from a link: download the URL, then
-        import it like a file picked by hand. A zip goes through the
-        same backup-or-plain routing as a picked zip; anything else
-        is treated as one .ovpn file (the parser rejects an HTML
-        error page as a failure, so a wrong link shows as failed
-        instead of importing garbage). */
     private fun onFetchUrlClicked() {
         val url = urlField.text.toString().trim()
-        if (url.isEmpty()) {
-            Toast.makeText(this, R.string.minab_link_failed, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        if (url.isEmpty() || (!url.startsWith("http://") && !url.startsWith("https://"))) {
             Toast.makeText(this, R.string.minab_link_failed, Toast.LENGTH_SHORT).show()
             return
         }
@@ -814,8 +709,6 @@ class BulkImportActivity : BaseActivity() {
         }
     }
 
-    /** Download a URL, capped at MAX_ZIP_BYTES, following redirects.
-        Null on any failure (bad URL, HTTP error, timeout, too big). */
     private fun downloadUrl(url: String): ByteArray? {
         var conn: HttpURLConnection? = null
         try {
@@ -826,10 +719,10 @@ class BulkImportActivity : BaseActivity() {
             conn.setRequestProperty("User-Agent", "Minab")
             if (conn.responseCode != HttpURLConnection.HTTP_OK) return null
             return readAllBytes(conn.inputStream, MAX_ZIP_BYTES)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return null
         } finally {
-            try { conn?.disconnect() } catch (ignored: Exception) { }
+            try { conn?.disconnect() } catch (_: Exception) { }
         }
     }
 
@@ -838,38 +731,71 @@ class BulkImportActivity : BaseActivity() {
             bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&
             bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
 
-    /** A file name for a downloaded single config: the URL's last
-        segment, or "link.ovpn" when it has none. */
     private fun urlName(url: String): String {
         val last = url.substringAfterLast('/').substringBefore('?').substringBefore('#')
         return if (last.isEmpty()) "link.ovpn" else last
     }
 
-    /** Minab Beta v0.9 — restore a full Minab backup picked by hand.
-        A zip without backup metadata is NOT imported here: the user
-        asked for a restore, so they are told plainly that this file
-        is not a Minab backup (plain import is the two buttons
-        above). */
     private fun onRestorePicked(uri: Uri) {
         setBusy(true)
+        lifecycleScope.launch(Dispatchers.IO) {
+            val bytes = try {
+                contentResolver.openInputStream(uri)?.use { readAllBytes(it, MAX_ZIP_BYTES) }
+            } catch (_: Exception) {
+                null
+            }
+            if (bytes == null || !MinabBackup.hasMetadata(bytes)) {
+                val msg = getString(
+                    if (bytes == null) R.string.minab_restore_failed
+                    else R.string.minab_restore_no_metadata
+                )
+                withContext(Dispatchers.Main) {
+                    setBusy(false)
+                    showResultCard(false, getString(R.string.minab_bulk_done_partial), msg)
+                }
+                return@launch
+            }
+            val preview = MinabBackup.inspectBackup(bytes)
+            withContext(Dispatchers.Main) {
+                setBusy(false)
+                val datePart = preview.exportedAtFormatted.ifEmpty { "—" }
+                val msg = getString(
+                    R.string.minab_restore_preview_msg,
+                    preview.scopeLabel,
+                    preview.profileCount,
+                    datePart
+                )
+                MinabDialogs.showConfirm(
+                    context = this@BulkImportActivity,
+                    title = getString(R.string.minab_restore_preview_title),
+                    message = msg,
+                    positiveText = getString(R.string.minab_restore_backup)
+                ) {
+                    executeRestoreBytes(bytes)
+                }
+            }
+        }
+    }
+
+    private fun executeRestoreBytes(bytes: ByteArray) {
+        setBusy(true)
+        resultCard.visibility = View.VISIBLE
+        resultCard.setBackgroundResource(R.drawable.minab_card_bg)
+        resultIcon.visibility = View.GONE
+        skipGeoIpButton.visibility = View.GONE
+        doneButton.visibility = View.GONE
+        resultTitle.text = getString(R.string.minab_importing)
         statusView.text = getString(R.string.minab_importing)
         lifecycleScope.launch(Dispatchers.IO) {
             var message: String
             var ok = false
             try {
-                val bytes = contentResolver.openInputStream(uri)?.use { readAllBytes(it, MAX_ZIP_BYTES) }
-                when {
-                    bytes == null -> message = getString(R.string.minab_restore_failed)
-                    !MinabBackup.hasMetadata(bytes) -> message = getString(R.string.minab_restore_no_metadata)
-                    else -> {
-                        val restore = MinabBackup.restoreBackup(this@BulkImportActivity, bytes)
-                        ok = restore.error == null
-                        message = if (restore.error != null) getString(R.string.minab_restore_failed)
-                            else getString(R.string.minab_restore_done, restore.profilesRestored)
-                        if (restore.imported > 0) setResult(Activity.RESULT_OK)
-                    }
-                }
-            } catch (e: Exception) {
+                val restore = MinabBackup.restoreBackup(this@BulkImportActivity, bytes)
+                ok = restore.error == null
+                message = if (restore.error != null) getString(R.string.minab_restore_failed)
+                    else getString(R.string.minab_restore_done, restore.profilesRestored)
+                if (restore.imported > 0) setResult(Activity.RESULT_OK)
+            } catch (_: Exception) {
                 message = getString(R.string.minab_restore_failed)
             }
             withContext(Dispatchers.Main) {
@@ -883,6 +809,7 @@ class BulkImportActivity : BaseActivity() {
                     detail = message
                 )
                 updateFillSavedPill()
+                refreshCategorySpinner(selectedCategory)
                 MinabProfileBus.notifyChanged()
             }
         }
@@ -896,9 +823,9 @@ class BulkImportActivity : BaseActivity() {
                 val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 if (idx != -1) return cursor.getString(idx)
             }
-        } catch (ignored: Exception) {
+        } catch (_: Exception) {
         } finally {
-            try { cursor?.close() } catch (ignored: Exception) { }
+            try { cursor?.close() } catch (_: Exception) { }
         }
         return uri.lastPathSegment
     }

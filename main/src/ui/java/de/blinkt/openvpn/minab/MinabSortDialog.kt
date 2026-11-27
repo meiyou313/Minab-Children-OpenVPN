@@ -12,6 +12,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.ImageButton
 import android.widget.ImageView
 import de.blinkt.openvpn.R
 
@@ -29,8 +30,9 @@ object MinabSortDialog {
         val view = LayoutInflater.from(context).inflate(R.layout.minab_sort_dialog, null)
         val dialog = AlertDialog.Builder(context)
             .setView(view)
-            .setNegativeButton(android.R.string.cancel, null)
             .create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        view.findViewById<ImageButton>(R.id.minab_sort_close)?.setOnClickListener { dialog.dismiss() }
 
         val options = listOf(
             Triple(MinabProfileBus.SORT_REAL, R.id.minab_sort_opt_real, R.id.minab_sort_check_real),

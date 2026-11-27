@@ -71,27 +71,48 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@color/minab_surface"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="4dp">
+            android:paddingStart="12dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="8dp">
 
-            <ImageButton
-                android:id="@+id/minab_faq_close"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@android:string/cancel"
-                android:src="@android:drawable/ic_menu_close_clear_cancel" />
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_marginEnd="10dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_minab_help"
+                android:tint="@color/minab_teal" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:fontFamily="@font/vazirmatn"
                 android:text="@string/faq"
                 android:textColor="@color/minab_text_primary"
-                android:textSize="18sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/minab_faq_close"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@android:string/cancel"
+                android:padding="6dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_baseline_close_24"
+                android:tint="@color/minab_text_secondary" />
         </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/minab_divider" />
 
         <FrameLayout
             android:id="@+id/minab_faq_content"

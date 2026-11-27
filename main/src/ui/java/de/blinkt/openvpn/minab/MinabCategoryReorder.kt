@@ -105,10 +105,33 @@ object MinabCategoryReorder {
         }
         listView.adapter = adapter
 
-        AlertDialog.Builder(context)
-            .setTitle(R.string.minab_reorder_groups)
+        root.setBackgroundResource(R.drawable.minab_dialog_bg)
+        val header = TextView(context).apply {
+            text = context.getString(R.string.minab_reorder_groups)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.minab_text_primary))
+            setPadding(0, 0, 0, dp(8))
+        }
+        root.addView(header, 0)
+
+        val doneBtn = Button(context, null, 0, R.style.Minab_PrimaryButton).apply {
+            text = context.getString(android.R.string.ok)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+        }
+        val btnLp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(40)
+        ).apply {
+            topMargin = dp(10)
+        }
+        root.addView(doneBtn, btnLp)
+
+        val dialog = AlertDialog.Builder(context)
             .setView(root)
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
+            .create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        doneBtn.setOnClickListener { dialog.dismiss() }
+        dialog.show()
     }
 }

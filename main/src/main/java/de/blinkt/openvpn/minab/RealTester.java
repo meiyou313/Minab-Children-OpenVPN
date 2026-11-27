@@ -135,6 +135,11 @@ public class RealTester implements VpnStatus.StateListener {
     private volatile int realTotalCount = 0;
     private volatile int realWorkingCount = 0;
     private volatile String realCurrentName = null;
+    private volatile long runStartTimeMs = 0L;
+
+    public long getRunStartTimeMs() {
+        return runStartTimeMs;
+    }
 
     private PingTester pingTester = null;
 
@@ -173,6 +178,7 @@ public class RealTester implements VpnStatus.StateListener {
         still owns it), stop scheduling further servers, leave
         already-recorded results. Safe to call when nothing runs. */
     public void cancel() {
+        MinabDisconnectSignal.markUserDisconnect(appContext);
         cancelled.set(true);
         runId++;
         active = false;
@@ -224,12 +230,14 @@ public class RealTester implements VpnStatus.StateListener {
     // --- The coordinator: runs on the worker thread. ---
 
     private void run(List<VpnProfile> profiles) {
+        runStartTimeMs = System.currentTimeMillis();
         int myRunId = runId;
         boolean finishedOk = false;
         try {
             // Stage 0: drop any VPN already up, so pings and real
             // tests measure the direct path, not the old tunnel.
             if (VpnStatus.isVPNActive()) {
+                MinabDisconnectSignal.markUserDisconnect(appContext);
                 postToMain(() -> Toast.makeText(
                         appContext, R.string.minab_real_disconnects_vpn,
                         Toast.LENGTH_LONG).show());
@@ -358,11 +366,13 @@ public class RealTester implements VpnStatus.StateListener {
             }
             // Leave no VPN up behind the run.
             if (myRunId == runId && VpnStatus.isVPNActive()) {
+                MinabDisconnectSignal.markUserDisconnect(appContext);
                 requestDisconnect();
                 waitForDisconnected(5_000);
             }
             finishedOk = !cancelled.get() && myRunId == runId;
         } finally {
+            MinabDisconnectSignal.markUserDisconnect(appContext);
             VpnStatus.removeStateListener(this);
             synchronized (LOCK) {
                 if (current == this) current = null;

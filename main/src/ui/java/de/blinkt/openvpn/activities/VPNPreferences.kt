@@ -4,8 +4,6 @@
  */
 package de.blinkt.openvpn.activities
 
-import android.app.AlertDialog
-import android.content.DialogInterface
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -39,6 +37,7 @@ import de.blinkt.openvpn.fragments.Settings_Routing
 import de.blinkt.openvpn.fragments.Settings_UserEditable
 import de.blinkt.openvpn.fragments.ShowConfigFragment
 import de.blinkt.openvpn.fragments.VPNProfileList
+import de.blinkt.openvpn.minab.MinabDialogs
 import de.blinkt.openvpn.minab.MinabPagerSensitivity
 import de.blinkt.openvpn.minab.MinabProfileBus
 import de.blinkt.openvpn.views.ScreenSlidePagerAdapter
@@ -210,6 +209,10 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
 
 
     override fun onBackPressed() {
+        mProfile?.let {
+            it.mOriginalConfig = null
+            ProfileManager.saveProfile(this, it)
+        }
         setResult(RESULT_OK, intent)
         super.onBackPressed()
     }
@@ -234,15 +237,16 @@ class VPNPreferences : BaseActivity(), VpnStatus.ProfileNotifyListener {
     }
 
     private fun askProfileRemoval() {
-        val dialog = AlertDialog.Builder(this)
-        dialog.setTitle("Confirm deletion")
-        dialog.setMessage(getString(R.string.remove_vpn_query, mProfile!!.mName))
-
-        dialog.setPositiveButton(
-            android.R.string.yes
-        ) { dialog1: DialogInterface?, which: Int -> removeProfile(mProfile) }
-        dialog.setNegativeButton(android.R.string.no, null)
-        dialog.create().show()
+        val profile = mProfile ?: return
+        MinabDialogs.showConfirm(
+            context = this,
+            title = getString(R.string.minab_delete_confirm_title),
+            message = getString(R.string.remove_vpn_query, profile.mName),
+            positiveText = getString(R.string.delete),
+            isDanger = true
+        ) {
+            removeProfile(profile)
+        }
     }
 
     protected fun removeProfile(profile: VpnProfile?) {

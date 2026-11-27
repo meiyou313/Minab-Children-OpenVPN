@@ -3,37 +3,10 @@
  * Copyright (c) 2026 Minab Children contributors.
  * Distributed under the GNU GPL v2, same as the base project.
  *
- * BulkImportHelper: the non-UI core of bulk import. It parses .ovpn /
- * .conf text with the upstream ConfigParser (exactly the same parser the
- * single-file ConfigConverter uses), de-duplicates, applies one shared
- * username/password, and saves through ProfileManager.
- *
- * Credentials: they are stored EXACTLY the way upstream stores them —
- * on the profile itself, VpnProfile.mUsername / mPassword, persisted by
- * ProfileManager.saveProfile() into the profile file (encrypted with
- * ProfileEncryption when the user has encryption enabled, as upstream
- * does). No new plaintext store is introduced anywhere: no
- * SharedPreferences password, no extra file. The bulk dialog only
- * collects the values once and hands them to this helper; the helper
- * clears its local copies after saving.
- *
- * Duplicates: a profile is a duplicate when another existing profile
- * has the same name AND the same primary remote host+port. The name
- * alone is not enough (providers reuse names), the remote alone is not
- * enough (one server, several profiles). Duplicates are skipped and
- * counted, never overwritten.
- *
- * .zip: supported. A zip may contain .ovpn / .conf files at any depth;
- * other entries are ignored and counted as failed with their name.
- * Entries are capped (200 files, 2 MB each — the upstream per-file
- * MAX_EMBED_FILE_SIZE) so a hostile zip cannot exhaust memory.
- *
- * Auto-categorisation is intentionally NOT done here: it needs network
- * and must never block the import. The caller (BulkImportActivity)
- * runs AutoCategory.guessCategory() afterwards, on a background thread,
- * in batches (offline heuristic for all profiles at once, then the
- * online lookup in chunks of 8 in parallel, no per-profile delay),
- * and saves the category only when a country was actually found.
+ * BulkImportHelper: non-UI core of bulk import. Parses .ovpn / .conf text with
+ * ConfigParser, preserves sanitized original .ovpn config text for clean export,
+ * detects duplicates BEFORE renaming, supports deferred batch ProfileManager saves,
+ * and avoids blocking on GeoIP.
  */
 
 package de.blinkt.openvpn.minab;
@@ -45,9 +18,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -56,7 +31,7 @@ import de.blinkt.openvpn.core.ConfigParser;
 import de.blinkt.openvpn.core.ProfileManager;
 
 public final class BulkImportHelper {
-    public static final int MAX_FILES_PER_IMPORT = 200;
+    public static final int MAX_FILES_PER_IMPORT = 500;
     public static final int MAX_ENTRY_BYTES = 2 * 1024 * 1024; // = VpnProfile.MAX_EMBED_FILE_SIZE
 
     public static final class ImportResult {
@@ -80,13 +55,10 @@ public final class BulkImportHelper {
         public boolean applyCredentialsToAll;
         /** Category to assign to every imported profile (null = leave default). */
         public String category;
+        /** When true, caller invokes ProfileManager.saveProfileList(context) once at batch end. */
+        public boolean deferSaveList;
     }
 
-    /**
-     * Live import progress (v0.3 bug fix 1). Called on the worker
-     * thread after every zip entry is processed, with the number of
-     * entries handled so far. The caller posts to the UI thread.
-     */
     public interface ProgressListener {
         void onProgress(int processed);
     }
@@ -94,44 +66,78 @@ public final class BulkImportHelper {
     private BulkImportHelper() {
     }
 
+    /** Count .ovpn/.conf entries inside a zip byte array so progress can be determinate. */
+    public static int countZipOvpnEntries(byte[] zipBytes) {
+        if (zipBytes == null) return 0;
+        int count = 0;
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (!entry.isDirectory() && isOvpnName(entry.getName())) {
+                    count++;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return count;
+    }
+
     /**
-     * Import one .ovpn/.conf document. {@code displayName} is used for
-     * the profile name when the config itself has no name, and for the
-     * failure list. Returns the created profile, or null on parse failure.
+     * Import one .ovpn/.conf document. Checks duplicate endpoint BEFORE renaming,
+     * preserves sanitized original config text, and persists via ProfileManager.
      */
     public static VpnProfile importOne(Context context, InputStream in,
                                        String displayName, ImportOptions options,
                                        ImportResult result) {
         try {
+            byte[] rawBytes = readCapped(in, MAX_ENTRY_BYTES);
+            if (rawBytes == null || rawBytes.length == 0) {
+                result.failed++;
+                if (displayName != null) result.failedNames.add(displayName);
+                return null;
+            }
+            String rawText = new String(rawBytes, StandardCharsets.UTF_8);
+
             ConfigParser cp = new ConfigParser();
-            cp.parseConfig(new InputStreamReader(in, "UTF-8"));
+            cp.parseConfig(new StringReader(rawText));
             VpnProfile profile = cp.convertProfile();
             if (profile == null) {
                 result.failed++;
                 if (displayName != null) result.failedNames.add(displayName);
                 return null;
             }
-            // Name: prefer the file name, fall back to what the parser made.
-            String baseName = baseName(displayName);
-            if (baseName != null && !baseName.isEmpty()) {
-                profile.mName = uniqueName(context, baseName);
-            } else if (TextUtils.isEmpty(profile.mName)) {
-                profile.mName = uniqueName(context, "Imported profile");
-            } else {
-                profile.mName = uniqueName(context, profile.mName);
-            }
 
-            if (isDuplicate(context, profile)) {
+            // Preserve sanitized original .ovpn text so sharing exports clean configs
+            profile.mOriginalConfig = VpnProfile.sanitizeOriginalConfig(rawText);
+
+            // Preferred candidate name before deduplication/uniquification
+            String baseName = baseName(displayName);
+            String desiredName = (baseName != null && !baseName.isEmpty())
+                    ? baseName
+                    : (!TextUtils.isEmpty(profile.mName) ? profile.mName : "Imported profile");
+            profile.mName = desiredName;
+
+            // Check duplicate BEFORE renaming to "name (2)"!
+            VpnProfile existing = findDuplicate(context, profile);
+            if (existing != null) {
+                if (options != null && !TextUtils.isEmpty(options.category)) {
+                    existing.addToGroup(options.category);
+                    ProfileManager.saveProfile(context, existing);
+                }
                 result.skippedDuplicates++;
                 return null;
             }
+
+            profile.mName = uniqueName(context, desiredName);
 
             applyOptions(context, profile, options);
             ProfileManager pm = ProfileManager.getInstance(context);
             pm.addProfile(profile);
             profile.addChangeLogEntry("Profile imported via Minab bulk import");
             ProfileManager.saveProfile(context, profile);
-            pm.saveProfileList(context);
+            if (options == null || !options.deferSaveList) {
+                pm.saveProfileList(context);
+            }
             result.imported++;
             result.importedProfiles.add(profile);
             return profile;
@@ -151,6 +157,10 @@ public final class BulkImportHelper {
     public static ImportResult importZip(Context context, InputStream in, ImportOptions options,
                                          ProgressListener listener) {
         ImportResult result = new ImportResult();
+        boolean prevDefer = options != null && options.deferSaveList;
+        ImportOptions batchOpts = options != null ? options : new ImportOptions();
+        batchOpts.deferSaveList = true;
+
         try (ZipInputStream zip = new ZipInputStream(in)) {
             ZipEntry entry;
             int seen = 0;
@@ -171,8 +181,11 @@ public final class BulkImportHelper {
                     if (listener != null) listener.onProgress(seen);
                     continue;
                 }
-                importOne(context, new ByteArrayInputStream(bytes), fileNameOf(name), options, result);
+                importOne(context, new ByteArrayInputStream(bytes), fileNameOf(name), batchOpts, result);
                 if (listener != null) listener.onProgress(seen);
+            }
+            if (!prevDefer && result.imported > 0) {
+                ProfileManager.getInstance(context).saveProfileList(context);
             }
             if (seen == 0) {
                 result.failed++;
@@ -181,24 +194,41 @@ public final class BulkImportHelper {
         } catch (Exception e) {
             result.failed++;
             result.failedNames.add("zip: " + e.getMessage());
+        } finally {
+            batchOpts.deferSaveList = prevDefer;
         }
         return result;
     }
 
-    /** True when an identical name + primary remote already exists. */
+    /** True when an identical endpoint (host + port + protocol) already exists. */
     public static boolean isDuplicate(Context context, VpnProfile candidate) {
+        return findDuplicate(context, candidate) != null;
+    }
+
+    public static VpnProfile findDuplicate(Context context, VpnProfile candidate) {
+        if (candidate == null) return null;
         ProfileManager pm = ProfileManager.getInstance(context);
         String host = candidate.getPrimaryRemoteHost();
+        String normHost = host == null ? "" : host.trim().toLowerCase(Locale.US);
         int port = candidate.getPrimaryRemotePort();
+        boolean udp = candidate.mUseUdp;
         for (VpnProfile existing : pm.getProfiles()) {
             if (existing == candidate) continue;
-            if (TextUtils.equals(existing.mName, candidate.mName)
-                    && TextUtils.equals(existing.getPrimaryRemoteHost(), host)
-                    && existing.getPrimaryRemotePort() == port) {
-                return true;
+            String exHost = existing.getPrimaryRemoteHost();
+            String normExHost = exHost == null ? "" : exHost.trim().toLowerCase(Locale.US);
+            if (!normHost.isEmpty()) {
+                if (normHost.equals(normExHost)
+                        && existing.getPrimaryRemotePort() == port
+                        && existing.mUseUdp == udp) {
+                    return existing;
+                }
+            } else if (TextUtils.equals(existing.mName, candidate.mName)
+                    && existing.getPrimaryRemotePort() == port
+                    && existing.mUseUdp == udp) {
+                return existing;
             }
         }
-        return false;
+        return null;
     }
 
     /** Unique profile name: "name", "name (2)", "name (3)", ... */
@@ -213,26 +243,12 @@ public final class BulkImportHelper {
     private static void applyOptions(Context context, VpnProfile profile, ImportOptions options) {
         if (options == null) return;
         if (options.category != null && !options.category.isEmpty()) {
-            // The category name itself is recorded in CategoryStore by the
-            // caller (BulkImportActivity), which owns the Context.
             profile.setCategory(options.category);
         }
         if (options.applyCredentialsToAll && profile.isUserPWAuth()) {
-            // Same fields the profile editor (Settings_Basic) writes.
-            // Persisted by ProfileManager.saveProfile(), encrypted when
-            // upstream profile encryption is enabled.
             if (options.username != null) profile.mUsername = options.username;
             if (options.password != null) profile.mPassword = options.password;
         }
-        // Minab Beta v0.9 — per-app VPN: a choice saved in Settings
-        // ("Apps using the VPN") applies to configs imported later
-        // too, so the user does not have to re-pick apps after every
-        // import. No choice saved yet means the upstream default
-        // (every app uses the VPN).
-        // Note: restore (MinabBackup) imports with empty options and
-        // then overwrites category/credentials from the metadata, so
-        // this stored choice does not fight the restore — the
-        // metadata's own allowed-apps are applied afterwards.
         MinabAllowedApps.applyStoredToProfile(context, profile);
     }
 
@@ -250,7 +266,7 @@ public final class BulkImportHelper {
 
     private static boolean isOvpnName(String name) {
         if (name == null) return false;
-        String lower = name.toLowerCase(java.util.Locale.US);
+        String lower = name.toLowerCase(Locale.US);
         return lower.endsWith(".ovpn") || lower.endsWith(".conf");
     }
 
@@ -263,9 +279,9 @@ public final class BulkImportHelper {
     private static String baseName(String displayName) {
         if (displayName == null) return null;
         String name = fileNameOf(displayName);
-        if (name.toLowerCase(java.util.Locale.US).endsWith(".ovpn")) {
+        if (name.toLowerCase(Locale.US).endsWith(".ovpn")) {
             name = name.substring(0, name.length() - 5);
-        } else if (name.toLowerCase(java.util.Locale.US).endsWith(".conf")) {
+        } else if (name.toLowerCase(Locale.US).endsWith(".conf")) {
             name = name.substring(0, name.length() - 5);
         }
         return name;

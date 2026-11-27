@@ -29,9 +29,14 @@ import de.blinkt.openvpn.R
 import de.blinkt.openvpn.activities.BulkImportActivity
 import de.blinkt.openvpn.core.ConnectionStatus
 import de.blinkt.openvpn.core.GlobalPreferences
+import de.blinkt.openvpn.core.ProfileManager
 import de.blinkt.openvpn.core.VpnStatus
+import de.blinkt.openvpn.minab.CategoryStore
 import de.blinkt.openvpn.minab.MinabCrashReporter
 import de.blinkt.openvpn.minab.MinabFailover
+import de.blinkt.openvpn.minab.MinabFavorites
+import de.blinkt.openvpn.minab.MinabProfileBus
+import de.blinkt.openvpn.minab.MinabServerStats
 import de.blinkt.openvpn.minab.MinabWidgetProvider
 import de.blinkt.openvpn.fragments.*
 import de.blinkt.openvpn.fragments.ImportRemoteConfig.Companion.newInstance
@@ -42,6 +47,16 @@ class MainActivity : BaseActivity() {
     private lateinit var mPager: ViewPager2
     private lateinit var mPagerAdapter: ScreenSlidePagerAdapter
     private var tabBaseTypeface: Typeface? = null
+    private var smartToolsItem: MenuItem? = null
+    private var smartToolsDot: View? = null
+
+    private val smartBusListener = MinabProfileBus.Listener {
+        runOnUiThread {
+            if (!isFinishing && !isDestroyed) {
+                updateSmartToolsDot()
+            }
+        }
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -208,6 +223,7 @@ class MainActivity : BaseActivity() {
             )
             mPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
+                    updateSmartToolsMenuState(position)
                     try {
                         val title = try {
                             mPagerAdapter.getPageTitle(position).toString()
@@ -310,8 +326,37 @@ class MainActivity : BaseActivity() {
     /** Index of the Settings tab (Home 0, Configs 1, Graph 2,
         Settings 3 — unless the crash-dump tab is present, which is
         why this is looked up instead of hard-coded). */
+    private fun configsTabIndex(): Int =
+        mPagerAdapter.indexOfFragment(ConfigsFragment::class.java)
+
     private fun settingsTabIndex(): Int =
         mPagerAdapter.indexOfFragment(GeneralSettings::class.java)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        if (Intent.ACTION_VIEW == action) {
+            val uri = intent.data
+            uri?.let { checkUriForProfileImport(it) }
+        }
+        when (intent.getStringExtra("PAGE")) {
+            "home" -> {
+                val homeIdx = mPagerAdapter.indexOfFragment(VPNProfileList::class.java)
+                mPager.currentItem = if (homeIdx >= 0) homeIdx else 0
+            }
+            "graph" -> {
+                val graphIdx = mPagerAdapter.indexOfFragment(GraphFragment::class.java)
+                mPager.currentItem = if (graphIdx >= 0) graphIdx else 2
+            }
+        }
+        setIntent(null)
+    }
 
 
     private fun disableToolbarElevation() {
@@ -333,25 +378,14 @@ class MainActivity : BaseActivity() {
         // VPN from the background is blocked by Android), so
         // failover only runs while the app is open.
         VpnStatus.addStateListener(minabStateListener)
+        MinabProfileBus.addListener(smartBusListener)
+        updateSmartToolsDot()
         MinabWidgetProvider.updateAllWidgets(this)
-        val intent = intent
-        if (intent != null) {
-            val action = intent.action
-            if (Intent.ACTION_VIEW == action) {
-                val uri = intent.data
-                uri?.let { checkUriForProfileImport(it) }
-            }
-            val page = intent.getStringExtra("PAGE")
-            if ("graph" == page) {
-                // Minab v0.4: Graph moved to index 2 (Home 0,
-                // Configs 1, Graph 2) when the Configs tab was added.
-                mPager.currentItem = 2
-            }
-            setIntent(null)
-        }
+        handleIncomingIntent(intent)
     }
 
     override fun onPause() {
+        MinabProfileBus.removeListener(smartBusListener)
         VpnStatus.removeStateListener(minabStateListener)
         // Minab Beta v0.9.5 — a normal backgrounding must not be
         // mistaken for a crash on the next launch: this is the
@@ -416,30 +450,81 @@ class MainActivity : BaseActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        if (!GlobalPreferences.getMinimalUi())
+        if (!GlobalPreferences.getMinimalUi()) {
             menuInflater.inflate(R.menu.main_menu, menu)
+            bindSmartToolsMenuItem(menu)
+        }
         return super.onCreateOptionsMenu(menu)
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.show_log) {
-            val showLog = Intent(this, LogWindow::class.java)
-            startActivity(showLog)
-            return true
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        bindSmartToolsMenuItem(menu)
+        updateSmartToolsMenuState(if (::mPager.isInitialized) mPager.currentItem else -1)
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun bindSmartToolsMenuItem(menu: Menu?) {
+        val item = menu?.findItem(R.id.minab_top_smart_tools)
+        smartToolsItem = item
+        val actionView = item?.actionView
+        smartToolsDot = actionView?.findViewById(R.id.minab_sparkle_menu_dot)
+        actionView?.setOnClickListener { openSmartToolsFromTopBar() }
+    }
+
+    private fun updateSmartToolsMenuState(position: Int = if (::mPager.isInitialized) mPager.currentItem else -1) {
+        val configsIdx = if (::mPagerAdapter.isInitialized) configsTabIndex() else -1
+        val visible = configsIdx >= 0 && position == configsIdx
+        val item = smartToolsItem
+        if (item == null) {
+            invalidateOptionsMenu()
+            return
         }
-        // Minab Beta v0.5 — the top-bar actions are constant on
-        // every tab (they live in the activity menu). Bulk import
-        // opens the bulk importer; the gear jumps to the Settings
-        // tab. (The "+" add-one-config item was removed in v0.9:
-        // it opened the upstream "create an EMPTY profile by hand"
-        // dialog, not an import, and it closed the app.)
+        if (item.isVisible != visible) {
+            item.isVisible = visible
+        }
+        if (visible) {
+            updateSmartToolsDot()
+        }
+    }
+
+    private fun updateSmartToolsDot() {
+        val dot = smartToolsDot ?: return
+        dot.visibility = if (hasSmartMaintenanceHint()) View.VISIBLE else View.GONE
+    }
+
+    private fun hasSmartMaintenanceHint(): Boolean {
+        return try {
+            val profiles = ProfileManager.getInstance(this).getProfiles().toList()
+            val uncategorized = profiles.count {
+                it.getAllGroups().singleOrNull() == CategoryStore.DEFAULT_CATEGORY
+            }
+            if (uncategorized >= 3) return true
+            if (CategoryStore.getEmptyAutoCategories(this, profiles).isNotEmpty()) return true
+            val favs = MinabFavorites.getAll(this)
+            if (MinabProfileBus.planSmartDeduplication(this, profiles, favs).toRemove.isNotEmpty()) return true
+            if (MinabServerStats.findDeadServers(this, profiles, minFails = 2, minNetworks = 1).isNotEmpty()) return true
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun openSmartToolsFromTopBar() {
+        val configsIdx = if (::mPagerAdapter.isInitialized) configsTabIndex() else -1
+        val byTag = if (configsIdx >= 0) {
+            supportFragmentManager.findFragmentByTag("f$configsIdx") as? ConfigsFragment
+        } else null
+        val frag = byTag ?: supportFragmentManager.fragments.filterIsInstance<ConfigsFragment>().firstOrNull()
+        frag?.showSmartToolsMenu()
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == R.id.minab_top_bulk_import) {
             startActivity(Intent(this, BulkImportActivity::class.java))
             return true
         }
-        if (item.itemId == R.id.minab_top_settings) {
-            val index = settingsTabIndex()
-            if (index >= 0) mPager.currentItem = index
+        if (item.itemId == R.id.minab_top_smart_tools) {
+            openSmartToolsFromTopBar()
             return true
         }
         return super.onOptionsItemSelected(item)

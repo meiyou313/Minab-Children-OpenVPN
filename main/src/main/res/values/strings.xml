@@ -957,7 +957,7 @@
     <string name="minab_settings_default_vpn_none">Not set (tap to choose)</string>
     <string name="minab_settings_screenoff_short">Pause VPN when screen is off and idle for 60s</string>
     <string name="minab_settings_none_option">None</string>
-    <string name="minab_configs_login_short">Login</string>
+    <string name="minab_configs_login_short">Set User/Pass</string>
     <string name="minab_configs_backup_short">Back up</string>
     <string name="minab_configs_share_short">Share</string>
     <string name="minab_configs_cleanup_short">Clean up</string>
@@ -968,5 +968,134 @@
     <string name="minab_configs_backup_scope_all">Full backup · All configs (%1$d)</string>
     <string name="minab_configs_cleanup_scope_title">Clean up · %1$s</string>
     <string name="minab_connect_server">Connect</string>
+
+    <!-- Minab Beta v0.9.8 -->
+    <string name="minab_configs_login_btn">Set username &amp; password</string>
+    <string name="minab_creds_save_default">Save as default for future imports</string>
+    <string name="minab_fill_saved_creds">Fill saved User/Pass</string>
+    <string name="minab_toggle_password">Toggle password visibility</string>
+    <string name="minab_credentials_scope_selected">Applies only to the %1$d selected config(s)</string>
+    <string name="minab_credentials_scope_group">Applies to group: %1$s (%2$d config(s))</string>
+    <string name="minab_credentials_scope_all_warn">Warning: Applies to ALL %1$d configs across every group</string>
+    <string name="minab_credentials_scope_single">Config: %1$s</string>
+    <string name="minab_bulk_credentials_scope_new">Applies only to configs being imported right now</string>
+    <string name="minab_bulk_skip_geoip">Skip IP detection</string>
+    <string name="minab_restore_preview_title">Backup details</string>
+    <string name="minab_restore_preview_msg">Scope: %1$s\nServers: %2$d\nExported: %3$s\n\nCredentials are never stored inside backup files.</string>
+
+    <string name="minab_add_to_group_short">Add to group</string>
+    <string name="minab_add_to_group_title">Add selected servers to group</string>
+    <string name="minab_move_to_group_title">Move selected servers to group</string>
+    <string name="minab_added_to_group">%1$d server(s) added to %2$s.</string>
+    <string name="minab_removed_from_group">Removed %1$d server(s) from %2$s.</string>
+    <string name="minab_remove_from_group_short">Remove from %1$s</string>
+    <string name="minab_remove_or_delete">Remove from group / Delete</string>
+    <string name="minab_delete_permanently">Delete permanently</string>
+    <string name="minab_delete_confirm_title">Confirm deletion</string>
+    <string name="minab_delete_count_fmt">Delete (%1$d)</string>
+    <string name="minab_delete_selected_group_confirm">Remove %1$d selected server(s) from \"%2$s\" only, or delete them permanently from all groups?</string>
+    <string name="minab_delete_single_group_confirm">Remove \"%1$s\" from \"%2$s\" only, or delete it permanently from all groups?</string>
+    <string name="minab_manage_groups_for_server">Manage groups</string>
+    <string name="minab_new_group_assign_hint">Create a manual group and include this server</string>
+    <string name="minab_group_manual_tag">Manual</string>
+
+    <string name="minab_smart_tools_title">Smart Tools</string>
+    <string name="minab_smart_tools_short">Tools</string>
+    <string name="minab_smart_redetect_sub">Refresh server countries via IP lookup</string>
+    <string name="minab_smart_clean_empty_sub">Remove empty auto or manual groups</string>
+    <string name="minab_smart_dedup_sub">Merge duplicates while keeping all groups &amp; stars</string>
+    <string name="minab_smart_dead_sub">Inspect servers that repeatedly fail tests</string>
+    <string name="minab_smart_failed_sub">Clean failed servers without touching untested ones</string>
+    <string name="minab_smart_dedup_confirm">Merge %1$d duplicate config(s)? Their group memberships and favorites will be preserved on the best-tested server.</string>
+    <string name="minab_redetect_cancelled">IP detection stopped (%1$d updated).</string>
+
+    <string name="minab_clean_empty_title">Clean empty groups</string>
+    <string name="minab_clean_empty_pill_fmt">Clean empty (%1$d)</string>
+    <string name="minab_clean_empty_action">Clean</string>
+    <string name="minab_no_empty_groups">There are no empty groups to clean.</string>
+    <string name="minab_empty_groups_cleaned">Removed %1$d empty group(s).</string>
+    <string name="minab_clean_empty_msg_auto">Remove %1$d empty automatic country group(s)?</string>
+    <string name="minab_clean_empty_msg_manual">Only %1$d empty manually-created group(s) remain. Check the box below if you also want to delete empty manual groups.</string>
+    <string name="minab_clean_empty_msg_both">Remove %1$d empty automatic group(s). You also have %2$d empty manually-created group(s).</string>
+    <string name="minab_clean_empty_include_manual">Also delete %1$d empty manual group(s)</string>
+    <string name="minab_clean_empty_none_selected">No empty groups selected for removal.</string>
+
+    <string name="minab_no_inactive">No failed servers found to delete.</string>
+    <string name="minab_delete_failed_msg_only">Delete %1$d server(s) that failed their latest Ping or Real Test? Working and untested servers are safe.</string>
+    <string name="minab_delete_failed_msg_none_tested">No failed servers found. %1$d server(s) have not been tested yet.</string>
+    <string name="minab_delete_failed_msg_with_untested">Delete %1$d failed server(s)? %2$d untested server(s) are protected by default.</string>
+    <string name="minab_delete_failed_include_untested">Also delete %1$d untested server(s)</string>
+
+    <string name="minab_dead_servers_title">Never-working servers</string>
+    <string name="minab_dead_servers_safe_hint">Only shows servers with 0 passes across recorded tests. Untested or working servers never appear here.</string>
+    <string name="minab_dead_filter_2fails">2+ fails</string>
+    <string name="minab_dead_filter_3fails">3+ fails</string>
+    <string name="minab_dead_filter_2nets">2+ networks</string>
+    <string name="minab_dead_found_count">%1$d persistently failing server(s)</string>
+    <string name="minab_dead_servers_empty">No consistently failing servers match this filter yet.</string>
+    <string name="minab_dead_badge_fmt">%1$d fails · %2$d net(s)</string>
+    <string name="minab_dead_delete_confirm">Permanently delete %1$d never-working server(s)?</string>
+    <string name="minab_dead_deleted_toast">Deleted %1$d never-working server(s).</string>
+
+    <string name="minab_openvpn_log_summary">Live OpenVPN engine connection events</string>
+    <string name="minab_diag_title">Diagnostics &amp; Debug Logs</string>
+    <string name="minab_diag_local_only_banner">100% local &amp; private: Minab never uploads logs or credentials. Logs stay on your device unless you save or share them.</string>
+    <string name="minab_diag_github_title">Report bugs or open an issue on GitHub</string>
+    <string name="minab_diag_github_url">https://github.com/meiyou313/Minab-Children-OpenVPN/issues</string>
+    <string name="minab_diag_github_howto">How to report an issue:\n1. Tap Download .txt (or Share .txt) below.\n2. Open the GitHub Issues link above and describe what happened.\n3. Attach the saved Minab-DebugLog .txt file.\n\nNo passwords, private keys, or certificates are ever included.</string>
+    <string name="minab_diag_tab_overview">Overview</string>
+    <string name="minab_diag_tab_crashes">Crashes</string>
+    <string name="minab_diag_tab_applog">App Log</string>
+    <string name="minab_diag_tab_ovpnlog">OpenVPN Log</string>
+    <string name="minab_diag_download_txt">Download .txt</string>
+    <string name="minab_diag_share_txt">Share .txt</string>
+    <string name="minab_diag_copy">Copy</string>
+    <string name="minab_diag_copied">Copied to clipboard</string>
+    <string name="minab_diag_saved_toast">Saved debug log .txt</string>
+    <string name="minab_diag_save_failed">Could not save debug log file</string>
+    <string name="minab_diag_clear_confirm">Clear saved crash traces and app breadcrumbs?</string>
+    <string name="minab_diag_empty_applog">No recent app events recorded yet.</string>
+    <string name="minab_diag_empty_ovpnlog">No OpenVPN engine log entries yet — connect to a server first.</string>
+    <string name="minab_diag_open_center">Open Diagnostics</string>
+    <string name="minab_diag_pending_crash_msg">Minab closed due to an unexpected error in the last session. You can inspect or export the local crash log in Diagnostics.</string>
+    <string name="minab_diag_pending_unexpected_msg">The previous session ended unexpectedly before closing cleanly. You can review local event breadcrumbs in Diagnostics.</string>
+
+    <string name="minab_faq_search_hint">Search questions, answers or #tags…</string>
+    <string name="minab_faq_cat_start">Getting Started</string>
+    <string name="minab_faq_cat_testing">Testing &amp; Speed</string>
+    <string name="minab_faq_cat_groups">Groups &amp; Backups</string>
+    <string name="minab_faq_cat_troubleshoot">VPN &amp; Privacy</string>
+    <string name="minab_faq_filtering_tag">Filtered by tag:</string>
+    <string name="minab_faq_no_results">No matching FAQ items found. Try another keyword or clear filters.</string>
+    <string name="minab_faq_count_fmt">Showing %1$d of %2$d topics</string>
+
+    <string name="minab_faq_v98_import_title">How do I import many .ovpn files or a ZIP archive?</string>
+    <string name="minab_faq_v98_import_body">Tap the &lt;b&gt;+&lt;/b&gt; button in the top bar. You can pick multiple &lt;b&gt;.ovpn&lt;/b&gt; files, a &lt;b&gt;.zip&lt;/b&gt; archive, a remote download link, or a Minab backup ZIP.&lt;br/&gt;&lt;br/&gt;Configs are committed in one reliable batch first, followed by country detection via IP lookup. If GeoIP is slow on a restricted network, tap &lt;b&gt;Skip IP detection&lt;/b&gt; anytime without losing any imported configs. Backups also show a scope/date preview before restoring.</string>
+    <string name="minab_faq_v98_creds_title">How does \"Set User/Pass\" work across groups and selected configs?</string>
+    <string name="minab_faq_v98_creds_body">Tap &lt;b&gt;Set User/Pass&lt;/b&gt; in Configs or during Bulk Import. A &lt;b&gt;green banner&lt;/b&gt; confirms the exact subset affected (Selected configs, a specific group, or a single server). When targeting &lt;b&gt;ALL&lt;/b&gt; servers with no filter or selection active, an &lt;b&gt;amber warning banner&lt;/b&gt; prevents accidental overwrites.&lt;br/&gt;&lt;br/&gt;Use the eye icon to toggle password visibility, tap &lt;b&gt;Fill saved User/Pass&lt;/b&gt; when desired, and optionally check &lt;b&gt;Save as default&lt;/b&gt; for future imports.</string>
+    <string name="minab_faq_v98_multigroup_title">How do Unique Multi-Group Profiles work? Do favorites sync?</string>
+    <string name="minab_faq_v98_multigroup_body">Each server is stored once (unique), instead of making copies when you add it to another group. Assigning a server to custom groups (via &lt;b&gt;Add to group&lt;/b&gt; or &lt;b&gt;Manage groups&lt;/b&gt;) shows &lt;b&gt;[Group1 · Group2]&lt;/b&gt; under the server name.&lt;br/&gt;&lt;br/&gt;Because there is only one unique profile, stars (★), Ping/Real test results, and credentials always stay in sync across Favorites, All, and every custom group. Inside a group, deleting offers a 3-way choice: &lt;b&gt;Remove from group&lt;/b&gt; (keeps it elsewhere) or &lt;b&gt;Delete permanently&lt;/b&gt;.</string>
+    <string name="minab_faq_v98_dedup_empty_title">Will \"Remove duplicates\" delete servers I curated in a custom group?</string>
+    <string name="minab_faq_v98_dedup_empty_body">No. When removing duplicate host endpoints, Minab picks the healthiest keeper (connected, starred, or best Real/Ping score) and &lt;b&gt;merges all group memberships and favorites&lt;/b&gt; from removed duplicates onto that keeper before deleting extras.&lt;br/&gt;&lt;br/&gt;To remove unused groups, open &lt;b&gt;Clean empty groups&lt;/b&gt; inside Smart Tools (✨) or Manage Categories: it removes empty auto country groups by default, and includes an optional checkbox if you also want to clean empty manual groups.</string>
+    <string name="minab_faq_v98_tests_title">What is the difference between Ping Test and Real Test?</string>
+    <string name="minab_faq_v98_tests_body">&lt;b&gt;Ping Test&lt;/b&gt; performs fast TCP/OpenVPN handshake probes to measure latency and reachability.&lt;br/&gt;&lt;b&gt;Real Test&lt;/b&gt; connects through each candidate server in turn and loads your configured test URL (Settings icon next to Real Test) to verify true end-to-end internet access.&lt;br/&gt;&lt;br/&gt;Both tests preserve existing results on servers you didn\'t test, keep Ping (left) and Real (right) badge columns aligned, and Real Test keeps running cleanly if you switch tabs or lock the screen.</string>
+    <string name="minab_faq_v98_dead_servers_title">What is \"Never-working servers\" and does \"Delete failed\" touch untested servers?</string>
+    <string name="minab_faq_v98_dead_servers_body">&lt;b&gt;Never-working servers&lt;/b&gt; tracks pass/fail history per server across test runs and mobile/Wi-Fi networks. Servers that fail repeatedly (&lt;b&gt;2+ fails&lt;/b&gt;, &lt;b&gt;3+ fails&lt;/b&gt;, or &lt;b&gt;2+ networks&lt;/b&gt;) with zero passes appear here so you can clean dead configs safely.&lt;br/&gt;&lt;br/&gt;Untested servers and any server that has passed even once never appear in Dead Servers, and &lt;b&gt;Delete inactive/failed&lt;/b&gt; protects untested servers by default unless you check the optional box.</string>
+    <string name="minab_faq_v98_history_title">How does Test History work?</string>
+    <string name="minab_faq_v98_history_body">Every completed Ping or Real test saves a snapshot tagged with your network (e.g., Wi-Fi name or carrier) inside Test History (clock icon). You can filter snapshots by network, rename networks, connect directly to any working server from a past run, or apply old results back to your list.</string>
+    <string name="minab_faq_v98_smarttools_title">Where are Re-detect IP, Clean empty, Dead servers and Smart Tools (✨)?</string>
+    <string name="minab_faq_v98_smarttools_body">On the Configs tab, tap the &lt;b&gt;✨&lt;/b&gt; Smart Tools icon in the top bar (also accessible via the wrench icon on Home). A small &lt;b&gt;green dot&lt;/b&gt; appears on ✨ whenever there are several uncategorized servers, empty automatic groups, duplicate endpoints, or persistently failing dead servers waiting to be cleaned.</string>
+    <string name="minab_faq_v98_backup_share_title">How do Backups &amp; Shares work? Are passwords included or Windows-compatible?</string>
+    <string name="minab_faq_v98_backup_share_body">Backups use standardized names like &lt;b&gt;Minab-Backup_UnitedStates_18cfg_2026.11.27_16.30.zip&lt;/b&gt; (and single shares export directly as &lt;b&gt;.ovpn&lt;/b&gt;). Every ZIP contains &lt;b&gt;Minab-Info.txt&lt;/b&gt; and clean cross-platform &lt;b&gt;.ovpn&lt;/b&gt; files that work seamlessly in OpenVPN Connect on Windows, macOS, and Linux — &lt;b&gt;minab-backup.json&lt;/b&gt; is safely ignored by other OpenVPN apps.&lt;br/&gt;&lt;br/&gt;&lt;b&gt;Security:&lt;/b&gt; Usernames and passwords are &lt;b&gt;never&lt;/b&gt; exported in backups or shares. Restoring a partial/group backup preserves your existing app settings and merges favorites.</string>
+    <string name="minab_faq_v98_best_failover_title">How do Best Server and Auto-failover work?</string>
+    <string name="minab_faq_v98_best_failover_body">&lt;b&gt;Best server&lt;/b&gt; picks the fastest verified server in your active filter/group (prioritizing Real Test speed, then Ping). When &lt;b&gt;Auto-failover&lt;/b&gt; is enabled in Settings, Minab automatically switches up to 3 backup servers if an active connection unexpectedly drops.</string>
+    <string name="minab_faq_v98_ip_widget_perapp_title">What extras are included (IP check, Widgets, Per-app VPN)?</string>
+    <string name="minab_faq_v98_ip_widget_perapp_body">Home shows your public IP and country flag before and after connecting (with 1-tap ping retest). Three home-screen widgets (Mini Orb, Compact Toggle, and Dashboard) let you toggle or connect to Best Server without opening the app. Per-app VPN in Settings lets you exclude or route only selected apps through VPN.</string>
+    <string name="minab_faq_v98_disconnect_notif_title">What changed with Manual Disconnect and Notification taps?</string>
+    <string name="minab_faq_v98_disconnect_notif_body">Stopping a VPN manually (from the orb, notification Cancel button, or Quick Settings tile) now immediately cancels Auto-failover and background keep-alive timers so it stays disconnected.&lt;br/&gt;Tapping the active OpenVPN notification also opens straight to the &lt;b&gt;Home&lt;/b&gt; tab so you can inspect IP/speed or switch servers right away.</string>
+    <string name="minab_faq_v98_battery_title">My VPN disconnects when the screen turns off. How do I prevent that?</string>
+    <string name="minab_faq_v98_battery_body">In Settings -&gt; Connection, check whether \"Pause VPN when screen is off\" is enabled. Also exclude Minab OpenVPN from Android battery optimization (Unrestricted battery usage in system app info) and enable \"Seamless Tunnel\" / Persistent Tun in Settings if supported by your device.</string>
+    <string name="minab_faq_v98_diagnostics_title">Do Crash Reports or Debug Logs upload anything automatically?</string>
+    <string name="minab_faq_v98_diagnostics_body">&lt;b&gt;No — zero telemetry.&lt;/b&gt; All crash traces, app breadcrumbs, and OpenVPN engine logs remain strictly on your device. Open &lt;b&gt;Settings -&gt; Help &amp; Diagnostics -&gt; Diagnostics &amp; Debug Logs&lt;/b&gt; (where the OpenVPN Connection Log also lives) to view logs locally, download or share a &lt;b&gt;.txt&lt;/b&gt; file, or report bugs on GitHub Issues.</string>
 
 </resources>

@@ -144,64 +144,6 @@
                 android:text="@string/minab_configs_share_short"
                 android:textSize="10.5sp" />
         </LinearLayout>
-
-        <!-- Row 3: Quick utilities (Select all, Re-detect IP, Clean up) -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/minab_configs_select_all"
-                style="@style/Minab.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="34dp"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:minHeight="34dp"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:singleLine="true"
-                android:text="@string/minab_select_all"
-                android:textSize="10sp" />
-
-            <Button
-                android:id="@+id/minab_configs_redetect_ip"
-                style="@style/Minab.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="34dp"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:drawableStart="@drawable/ic_minab_globe_refresh"
-                android:drawablePadding="4dp"
-                android:drawableTint="@color/minab_teal"
-                android:ellipsize="end"
-                android:minHeight="34dp"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:singleLine="true"
-                android:text="@string/minab_redetect_btn"
-                android:textSize="10sp" />
-
-            <Button
-                android:id="@+id/minab_configs_dedup"
-                style="@style/Minab.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="34dp"
-                android:layout_weight="1"
-                android:drawableStart="@drawable/ic_minab_tools"
-                android:drawablePadding="4dp"
-                android:drawableTint="@color/minab_teal"
-                android:ellipsize="end"
-                android:minHeight="34dp"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:singleLine="true"
-                android:text="@string/minab_configs_cleanup_short"
-                android:textSize="10sp" />
-        </LinearLayout>
     </LinearLayout>
 
     <!-- Inline Real test settings panel -->
@@ -279,8 +221,8 @@
                 android:paddingStart="6dp"
                 android:paddingEnd="6dp"
                 android:singleLine="true"
-                android:text="@string/minab_copy_selected"
-                android:textSize="11sp" />
+                android:text="@string/minab_add_to_group_short"
+                android:textSize="10.5sp" />
 
             <Button
                 android:id="@+id/minab_configs_move_selected"
@@ -356,6 +298,21 @@
                 android:tint="@color/minab_text_secondary"
                 android:visibility="gone" />
         </FrameLayout>
+
+        <Button
+            android:id="@+id/minab_configs_select_all"
+            style="@style/Minab.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:layout_marginStart="6dp"
+            android:ellipsize="end"
+            android:minWidth="0dp"
+            android:minHeight="38dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:text="@string/minab_select_all"
+            android:textSize="10.5sp" />
 
         <Button
             android:id="@+id/minab_configs_btn_sort"

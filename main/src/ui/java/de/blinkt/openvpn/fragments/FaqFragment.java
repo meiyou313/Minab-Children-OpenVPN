@@ -6,206 +6,307 @@
 package de.blinkt.openvpn.fragments;
 
 import android.content.Context;
-import android.os.Build;
+import android.graphics.Typeface;
 import android.os.Bundle;
-
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.StaggeredGridLayoutManager;
-import android.util.DisplayMetrics;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
-import java.util.Vector;
+import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 import de.blinkt.openvpn.R;
 
 public class FaqFragment extends Fragment {
-    static class FAQEntry {
 
-        public FAQEntry(int startVersion, int endVersion, int title, int description) {
-            this.startVersion = startVersion;
-            this.endVersion = endVersion;
-            this.description = description;
-            this.title = title;
+    public static final int CAT_ALL = 0;
+    public static final int CAT_START = 1;
+    public static final int CAT_TESTING = 2;
+    public static final int CAT_GROUPS = 3;
+    public static final int CAT_TROUBLESHOOT = 4;
+
+    public static final class FAQEntry {
+        public final int categoryId;
+        public final int titleRes;
+        public final int descriptionRes;
+        public final String[] tags;
+
+        public FAQEntry(int categoryId, int titleRes, int descriptionRes, String... tags) {
+            this.categoryId = categoryId;
+            this.titleRes = titleRes;
+            this.descriptionRes = descriptionRes;
+            this.tags = tags;
         }
-
-        final int startVersion;
-        final int endVersion;
-        final int description;
-        final int title;
-
-        public boolean runningVersion() {
-            if (Build.VERSION.SDK_INT >= startVersion) {
-                if (Build.VERSION.SDK_INT <= endVersion)
-                    return true;
-
-                if (endVersion == -1)
-                    return true;
-
-                String release = Build.VERSION.RELEASE;
-                boolean isOlderThan443 =  !release.startsWith("4.4.3")  && !release.startsWith("4.4.4") &&
-                        !release.startsWith("4.4.5") && !release.startsWith("4.4.6");
-
-                boolean isOlderThan442 = isOlderThan443 && !release.startsWith("4.4.2");
-
-
-                if(Build.VERSION.SDK_INT== Build.VERSION_CODES.KITKAT) {
-                    if (endVersion == -441 && isOlderThan442)
-                        return true;
-
-                    if (endVersion == -442 && isOlderThan443)
-                        return true;
-                } else if (endVersion == -441 || endVersion == -442) {
-                    return Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT;
-                }
-
-
-            }
-            return false;
-        }
-
-        public String getVersionsString(Context c) {
-            if (startVersion == Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-                if (endVersion == -1)
-                    return null;
-                else
-                    return c.getString(R.string.version_upto, getAndroidVersionString(c, endVersion));
-            }
-
-            if (endVersion == -1)
-                return c.getString(R.string.version_and_later, getAndroidVersionString(c, startVersion));
-
-
-            String startver = getAndroidVersionString(c, startVersion);
-
-            if (endVersion == startVersion)
-                return startver;
-
-            return String.format("%s - %s", startver, getAndroidVersionString(c, endVersion));
-        }
-
-
-        private String getAndroidVersionString(Context c, int versionCode) {
-            switch (versionCode) {
-                case Build.VERSION_CODES.ICE_CREAM_SANDWICH:
-                    return "4.0 (Ice Cream Sandwich)";
-                case -441:
-                    return "4.4.1 (KitKat)";
-                case -442:
-                    return "4.4.2 (KitKat)";
-                case Build.VERSION_CODES.JELLY_BEAN_MR2:
-                    return "4.3 (Jelly Bean MR2)";
-                case Build.VERSION_CODES.KITKAT:
-                    return "4.4 (KitKat)";
-                case Build.VERSION_CODES.LOLLIPOP:
-                    return "5.0 (Lollipop)";
-                default:
-                    return "API " + versionCode;
-            }
-        }
-
-
     }
 
-    private static FAQEntry[] faqitemsVersionSpecific = {
+    public static int categoryTitleRes(int categoryId) {
+        switch (categoryId) {
+            case CAT_START:
+                return R.string.minab_faq_cat_start;
+            case CAT_TESTING:
+                return R.string.minab_faq_cat_testing;
+            case CAT_GROUPS:
+                return R.string.minab_faq_cat_groups;
+            case CAT_TROUBLESHOOT:
+                return R.string.minab_faq_cat_troubleshoot;
+            default:
+                return R.string.minab_all_tab;
+        }
+    }
 
-            // Minab Beta v0.8 — the FAQ is Minab only now: the
-            // generic upstream ics-openvpn entries (TAP mode,
-            // remote API, kill switch, NCP, Samsung quirks, TLS
-            // alerts, routing details, battery, shortcuts, log
-            // copying, proxy/CIDR notes) described the upstream
-            // app, not this one, so they are gone. What is left
-            // answers the questions this app's users actually ask.
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_bulk_title, R.string.minab_faq_bulk),
+    private static final List<FAQEntry> FAQ_ITEMS = new ArrayList<>();
+    static {
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_START,
+                R.string.minab_faq_v98_import_title,
+                R.string.minab_faq_v98_import_body,
+                "#import", "#zip", "#geoip"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_START,
+                R.string.minab_faq_v98_creds_title,
+                R.string.minab_faq_v98_creds_body,
+                "#credentials", "#userpass", "#security"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_GROUPS,
+                R.string.minab_faq_v98_multigroup_title,
+                R.string.minab_faq_v98_multigroup_body,
+                "#groups", "#favorites", "#unique"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_GROUPS,
+                R.string.minab_faq_v98_dedup_empty_title,
+                R.string.minab_faq_v98_dedup_empty_body,
+                "#duplicates", "#cleanup", "#groups"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_TESTING,
+                R.string.minab_faq_v98_tests_title,
+                R.string.minab_faq_v98_tests_body,
+                "#ping", "#realtest", "#test"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_TESTING,
+                R.string.minab_faq_v98_dead_servers_title,
+                R.string.minab_faq_v98_dead_servers_body,
+                "#deadservers", "#cleanup", "#failed"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_TESTING,
+                R.string.minab_faq_v98_history_title,
+                R.string.minab_faq_v98_history_body,
+                "#history", "#network"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_START,
+                R.string.minab_faq_v98_smarttools_title,
+                R.string.minab_faq_v98_smarttools_body,
+                "#smarttools", "#cleanup"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_GROUPS,
+                R.string.minab_faq_v98_backup_share_title,
+                R.string.minab_faq_v98_backup_share_body,
+                "#backup", "#share", "#windows", "#security"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_TESTING,
+                R.string.minab_faq_v98_best_failover_title,
+                R.string.minab_faq_v98_best_failover_body,
+                "#best", "#failover"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_START,
+                R.string.minab_faq_v98_ip_widget_perapp_title,
+                R.string.minab_faq_v98_ip_widget_perapp_body,
+                "#ipcheck", "#perapp", "#widget"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_TROUBLESHOOT,
+                R.string.minab_faq_v98_disconnect_notif_title,
+                R.string.minab_faq_v98_disconnect_notif_body,
+                "#disconnect", "#notification", "#tile"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_TROUBLESHOOT,
+                R.string.minab_faq_v98_battery_title,
+                R.string.minab_faq_v98_battery_body,
+                "#battery", "#background"
+        ));
+        FAQ_ITEMS.add(new FAQEntry(
+                CAT_TROUBLESHOOT,
+                R.string.minab_faq_v98_diagnostics_title,
+                R.string.minab_faq_v98_diagnostics_body,
+                "#logs", "#diagnostics", "#privacy"
+        ));
+    }
 
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_groups_title, R.string.minab_faq_groups),
+    private List<FaqViewAdapter.BoundFaqItem> allBound = new ArrayList<>();
+    private FaqViewAdapter adapter;
+    private LinearLayout categoryChips;
+    private View activeTagBar;
+    private TextView activeTagChip;
+    private TextView resultCountView;
+    private TextView emptyView;
+    private EditText searchEdit;
+    private ImageButton searchClear;
 
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_ping_title, R.string.minab_faq_ping),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_real_title, R.string.minab_faq_real),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_data_title, R.string.minab_faq_data),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_copymove_title, R.string.minab_faq_copymove),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_update_title, R.string.minab_faq_update),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_security_title, R.string.minab_faq_security),
-
-            // Minab Beta v0.9 — the new features, each as its own
-            // question with a complete answer.
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_best_title, R.string.minab_faq_best),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_failover_title, R.string.minab_faq_failover),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_ip_title, R.string.minab_faq_ip),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_search_title, R.string.minab_faq_search),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_widget_title, R.string.minab_faq_widget),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_perapp_title, R.string.minab_faq_perapp),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_link_title, R.string.minab_faq_link),
-
-            new FAQEntry(Build.VERSION_CODES.ICE_CREAM_SANDWICH, -1, R.string.minab_faq_backup_title, R.string.minab_faq_backup),
-    };
-
-
-    private RecyclerView mRecyclerView;
-
+    private int selectedCategory = CAT_ALL;
+    private String selectedTag = null;
+    private String searchQuery = "";
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.faq, container, false);
+    public View onCreateView(
+            @NonNull LayoutInflater inflater,
+            ViewGroup container,
+            Bundle savedInstanceState) {
+        View root = inflater.inflate(R.layout.faq, container, false);
+        final Context ctx = requireContext();
 
-        DisplayMetrics displaymetrics = new DisplayMetrics();
-        getActivity().getWindowManager().getDefaultDisplay().getMetrics(displaymetrics);
-        int dpWidth = (int) (displaymetrics.widthPixels / getResources().getDisplayMetrics().density);
+        categoryChips = root.findViewById(R.id.faq_category_chips);
+        activeTagBar = root.findViewById(R.id.faq_active_tag_bar);
+        activeTagChip = root.findViewById(R.id.faq_active_tag_chip);
+        resultCountView = root.findViewById(R.id.faq_result_count);
+        emptyView = root.findViewById(R.id.faq_empty);
+        searchEdit = root.findViewById(R.id.faq_search);
+        searchClear = root.findViewById(R.id.faq_search_clear);
+        RecyclerView recyclerView = root.findViewById(R.id.faq_recycler_view);
 
-        //better way but does not work on 5.0
-        //int dpWidth = (int) (container.getWidth()/getResources().getDisplayMetrics().density);
-        int columns = dpWidth / 360;
-        columns = Math.max(1, columns);
+        recyclerView.setLayoutManager(new LinearLayoutManager(ctx));
+        Utils.applyInsetListener(recyclerView);
 
+        allBound = FaqViewAdapter.bindAll(ctx, FAQ_ITEMS);
+        adapter = new FaqViewAdapter(ctx, null, tag -> {
+            selectedTag = tag.equals(selectedTag) ? null : tag;
+            applyFilter();
+        });
+        recyclerView.setAdapter(adapter);
 
-        mRecyclerView = v.findViewById(R.id.faq_recycler_view);
+        activeTagChip.setOnClickListener(v -> {
+            selectedTag = null;
+            applyFilter();
+        });
 
-        // use this setting to improve performance if you know that changes
-        // in content do not change the layout size of the RecyclerView
-        mRecyclerView.setHasFixedSize(true);
+        searchClear.setOnClickListener(v -> searchEdit.setText(""));
+        searchEdit.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
-        mRecyclerView.setLayoutManager(new StaggeredGridLayoutManager(columns, StaggeredGridLayoutManager.VERTICAL));
+            @Override
+            public void afterTextChanged(Editable s) {
+                searchQuery = s == null ? "" : s.toString().trim();
+                searchClear.setVisibility(searchQuery.isEmpty() ? View.GONE : View.VISIBLE);
+                applyFilter();
+            }
+        });
 
-        mRecyclerView.setAdapter(new FaqViewAdapter(getActivity(), getFAQEntries()));
-
-        Utils.applyInsetListener(v);
-
-        return v;
+        renderCategoryChips(ctx);
+        applyFilter();
+        return root;
     }
 
+    private void renderCategoryChips(Context ctx) {
+        if (categoryChips == null) return;
+        categoryChips.removeAllViews();
+        int[] cats = {CAT_ALL, CAT_START, CAT_TESTING, CAT_GROUPS, CAT_TROUBLESHOOT};
+        float density = ctx.getResources().getDisplayMetrics().density;
+        int padH = (int) (11f * density);
+        int padV = (int) (5f * density);
+        int marginEnd = (int) (6f * density);
+        Typeface vazir = ResourcesCompat.getFont(ctx, R.font.vazirmatn);
+        int tealDark = ContextCompat.getColor(ctx, R.color.minab_teal_dark);
+        int chipText = ContextCompat.getColor(ctx, R.color.minab_chip_text);
 
-
-    private FAQEntry[] getFAQEntries() {
-        Vector<FAQEntry> faqItems = new Vector<>();
-
-        for (FAQEntry fe : faqitemsVersionSpecific) {
-            if (fe.runningVersion())
-                faqItems.add(fe);
+        for (final int catId : cats) {
+            boolean active = (selectedCategory == catId);
+            TextView pill = new TextView(ctx);
+            pill.setText(getString(categoryTitleRes(catId)));
+            pill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
+            pill.setBackgroundResource(active ? R.drawable.minab_chip_bg_selected : R.drawable.minab_chip_bg);
+            pill.setTextColor(active ? tealDark : chipText);
+            if (vazir != null) pill.setTypeface(vazir, active ? Typeface.BOLD : Typeface.NORMAL);
+            pill.setPadding(padH, padV, padH, padV);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMarginEnd(marginEnd);
+            pill.setLayoutParams(lp);
+            pill.setOnClickListener(v -> {
+                selectedCategory = catId;
+                renderCategoryChips(ctx);
+                applyFilter();
+            });
+            categoryChips.addView(pill);
         }
-        for (FAQEntry fe : faqitemsVersionSpecific) {
-            if (!fe.runningVersion())
-                faqItems.add(fe);
-        }
-
-        return faqItems.toArray(new FAQEntry[faqItems.size()]);
     }
 
+    private void applyFilter() {
+        if (adapter == null) return;
+        if (selectedTag != null) {
+            activeTagBar.setVisibility(View.VISIBLE);
+            activeTagChip.setText(selectedTag + "  ×");
+        } else {
+            activeTagBar.setVisibility(View.GONE);
+        }
+
+        String q = searchQuery.toLowerCase(Locale.getDefault());
+        List<FaqViewAdapter.BoundFaqItem> filtered = new ArrayList<>();
+        for (FaqViewAdapter.BoundFaqItem item : allBound) {
+            if (selectedCategory != CAT_ALL && item.categoryId != selectedCategory) {
+                continue;
+            }
+            if (selectedTag != null) {
+                boolean hasTag = false;
+                for (String t : item.tags) {
+                    if (selectedTag.equalsIgnoreCase(t)) {
+                        hasTag = true;
+                        break;
+                    }
+                }
+                if (!hasTag) continue;
+            }
+            if (!q.isEmpty()) {
+                boolean match = item.titleLower.contains(q)
+                        || item.bodyPlainLower.contains(q)
+                        || item.categoryLower.contains(q);
+                if (!match) {
+                    for (String t : item.tags) {
+                        if (t.toLowerCase(Locale.getDefault()).contains(q)) {
+                            match = true;
+                            break;
+                        }
+                    }
+                }
+                if (!match) continue;
+            }
+            filtered.add(item);
+        }
+
+        adapter.setItems(filtered);
+        if (filtered.isEmpty()) {
+            emptyView.setVisibility(View.VISIBLE);
+        } else {
+            emptyView.setVisibility(View.GONE);
+        }
+        resultCountView.setText(getString(R.string.minab_faq_count_fmt, filtered.size(), allBound.size()));
+    }
 }

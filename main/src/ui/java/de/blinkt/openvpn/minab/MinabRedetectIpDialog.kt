@@ -12,13 +12,13 @@
 
 package de.blinkt.openvpn.minab
 
-import android.app.AlertDialog
 import android.content.Context
 import android.widget.Toast
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
 import de.blinkt.openvpn.core.ProfileManager
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 object MinabRedetectIpDialog {
     private val EXECUTOR = Executors.newSingleThreadExecutor()
@@ -84,15 +84,15 @@ object MinabRedetectIpDialog {
     private fun runRedetect(context: Context, targetList: List<VpnProfile>) {
         if (targetList.isEmpty()) return
         val appCtx = context.applicationContext
-        val progressDialog = AlertDialog.Builder(context)
-            .setTitle(R.string.minab_redetect_title)
-            .setMessage(context.getString(R.string.minab_import_categorising, 0, targetList.size))
-            .setCancelable(false)
-            .create()
-        try {
-            progressDialog.show()
-        } catch (_: Exception) {
-        }
+        val cancelled = AtomicBoolean(false)
+        val progressCtrl = MinabDialogs.showProgressDialog(
+            context = context,
+            title = context.getString(R.string.minab_redetect_title),
+            initialMessage = context.getString(R.string.minab_import_categorising, 0, targetList.size),
+            determinate = true,
+            cancelable = true,
+            onCancel = { cancelled.set(true) }
+        )
 
         EXECUTOR.execute {
             var updated = 0
@@ -101,13 +101,20 @@ object MinabRedetectIpDialog {
                 AutoCategory.detectCategoriesForProfiles(
                     appCtx,
                     targetList,
-                    true
+                    true,
+                    cancelled
                 ) { profile, code, countryName, done, tot ->
+                    if (cancelled.get()) return@detectCategoriesForProfiles
                     if (!code.isNullOrBlank()) {
                         MinabServerCountry.put(appCtx, profile.getUUIDString(), code)
                     }
                     if (!countryName.isNullOrBlank()) {
-                        profile.setCategory(countryName)
+                        val currentPrimary = profile.getCategory()
+                        if (CategoryStore.isManualCategory(appCtx, currentPrimary)) {
+                            profile.addToGroup(countryName)
+                        } else {
+                            profile.setCategory(countryName)
+                        }
                         CategoryStore.addCategory(appCtx, countryName)
                         try {
                             ProfileManager.saveProfile(appCtx, profile)
@@ -115,29 +122,23 @@ object MinabRedetectIpDialog {
                         }
                         updated++
                     }
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        try {
-                            if (progressDialog.isShowing) {
-                                progressDialog.setMessage(
-                                    appCtx.getString(R.string.minab_import_categorising, done, tot)
-                                )
-                            }
-                        } catch (_: Exception) {
-                        }
-                    }
+                    progressCtrl.update(
+                        message = appCtx.getString(R.string.minab_import_categorising, done, tot),
+                        progress = done,
+                        max = tot.coerceAtLeast(1)
+                    )
                 }
             } catch (_: Exception) {
             }
             val finalUpdated = updated
+            val wasCancelled = cancelled.get()
             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                try {
-                    if (progressDialog.isShowing) progressDialog.dismiss()
-                } catch (_: Exception) {
-                }
+                progressCtrl.dismiss()
                 MinabProfileBus.notifyChanged()
                 Toast.makeText(
                     appCtx,
-                    appCtx.getString(R.string.minab_redetect_done, finalUpdated, total),
+                    if (wasCancelled) appCtx.getString(R.string.minab_redetect_cancelled, finalUpdated)
+                    else appCtx.getString(R.string.minab_redetect_done, finalUpdated, total),
                     Toast.LENGTH_LONG
                 ).show()
             }

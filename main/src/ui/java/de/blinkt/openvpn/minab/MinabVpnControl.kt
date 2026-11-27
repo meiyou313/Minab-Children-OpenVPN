@@ -64,6 +64,7 @@ object MinabVpnControl {
     fun disconnect(context: Context) {
         MinabFailover.noteUserDisconnect()
         val appContext = context.applicationContext
+        MinabDisconnectSignal.markUserDisconnect(appContext)
         val intent = Intent(appContext, OpenVPNService::class.java)
         intent.action = OpenVPNService.START_SERVICE
         try {
@@ -102,6 +103,19 @@ object MinabVpnControl {
         val realBlocked = profile.mLastRealMs == -1L &&
             !profile.mLastRealResult.isNullOrEmpty()
         return !realBlocked
+    }
+
+    /** True when the server has at least one Ping or Real test result recorded. */
+    fun isTested(profile: VpnProfile): Boolean {
+        return profile.mLastRealTime > 0 ||
+            profile.mLastPingTime > 0 ||
+            !profile.mLastRealResult.isNullOrEmpty() ||
+            !profile.mLastPingResult.isNullOrEmpty()
+    }
+
+    /** True only when the server WAS tested and failed/blocked (never true for untested servers). */
+    fun isFailed(profile: VpnProfile): Boolean {
+        return isTested(profile) && !isHealthy(profile)
     }
 
     /** Profiles ranked best-first for "best server" / failover.

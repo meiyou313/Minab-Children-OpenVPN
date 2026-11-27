@@ -51,7 +51,9 @@ package de.blinkt.openvpn.minab
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -59,6 +61,7 @@ import android.os.SystemClock
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import de.blinkt.openvpn.R
+import de.blinkt.openvpn.activities.MainActivity
 import de.blinkt.openvpn.core.ConnectionStatus
 import de.blinkt.openvpn.core.Preferences
 import de.blinkt.openvpn.core.VpnStatus
@@ -98,6 +101,10 @@ object MinabFailover {
 
     private val failoverRunnable = Runnable { runFailover() }
 
+    init {
+        MinabDisconnectSignal.setListener { noteUserDisconnect() }
+    }
+
     @JvmStatic
     fun isEnabled(context: Context): Boolean {
         return try {
@@ -113,6 +120,7 @@ object MinabFailover {
      * pending flag and cancels any switch already scheduled: the
      * drop that follows is the user's own doing, not a failure.
      */
+    @Synchronized
     @JvmStatic
     fun noteUserDisconnect() {
         userDisconnectAt = SystemClock.elapsedRealtime()
@@ -130,9 +138,16 @@ object MinabFailover {
      * listener). Must be called on the main thread (VpnStatus posts
      * state updates there).
      */
+    @Synchronized
     @JvmStatic
     fun onStateChanged(context: Context, level: ConnectionStatus?) {
         appContext = context.applicationContext
+        if (RealTester.isRunning()) {
+            lastConnectedUuid = null
+            handler.removeCallbacks(failoverRunnable)
+            failoverPending = false
+            return
+        }
         if (level == ConnectionStatus.LEVEL_CONNECTED) {
             val now = SystemClock.elapsedRealtime()
             if (now - lastAttemptAt > STABLE_RESET_MS) {
@@ -173,6 +188,7 @@ object MinabFailover {
         handler.postDelayed(failoverRunnable, FAILOVER_DELAY_MS)
     }
 
+    @Synchronized
     private fun runFailover() {
         failoverPending = false
         val context = appContext ?: return
@@ -238,10 +254,18 @@ object MinabFailover {
                 )
                 manager.createNotificationChannel(channel)
             }
+            val openIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra("PAGE", "home")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            val openPending = PendingIntent.getActivity(
+                context, 9002, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_minab)
                 .setContentTitle(context.getString(R.string.app))
                 .setContentText(message)
+                .setContentIntent(openPending)
                 .setAutoCancel(true)
                 .build()
             manager.notify(NOTIFICATION_ID, notification)

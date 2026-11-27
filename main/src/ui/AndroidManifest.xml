@@ -70,6 +70,12 @@
             android:exported="false"
             android:label="@string/minab_per_app_vpn" />
 
+        <!-- Minab Beta v0.9.8 — local-only diagnostics & debug log center. -->
+        <activity
+            android:name=".activities.MinabDiagnosticsActivity"
+            android:exported="false"
+            android:label="@string/minab_diag_title" />
+
         <!-- Minab Beta v0.9.7 — home-screen widgets (2×1 Quick Toggle, 1×1 Mini Orb, 4×2 Dashboard). -->
         <receiver
             android:name=".minab.MinabWidgetProvider"

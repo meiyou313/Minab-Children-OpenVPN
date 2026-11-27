@@ -119,6 +119,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     private DeviceStateReceiver mDeviceStateReceiver;
     private boolean mDisplayBytecount = false;
     private boolean mStarting = false;
+    private volatile boolean mUserStopped = false;
     private long mConnecttime;
     private OpenVPNManagement mManagement;
     private final IBinder mBinder = new IOpenVPNServiceInternal.Stub() {
@@ -265,8 +266,8 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
 
     private void endVpnService() {
-        if (!isVpnAlwaysOnEnabled() && !isAlwaysActiveEnabled()) {
-            /* if we should be an always on VPN, keep the timer running */
+        if (mUserStopped || (!isVpnAlwaysOnEnabled() && !isAlwaysActiveEnabled())) {
+            /* if we should be an always on VPN, keep the timer running unless user explicitly stopped */
             keepVPNAlive.unscheduleKeepVPNAliveJobService(this);
         }
         synchronized (mProcessLock) {
@@ -463,18 +464,11 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     }
 
     PendingIntent getGraphPendingIntent() {
-        // Let the configure Button show the Log
-
-
         Intent intent = new Intent();
-        intent.setComponent(new ComponentName(this, getPackageName() + ".activities.MainActivity"));
-
-        intent.putExtra("PAGE", "graph");
-        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-        PendingIntent startLW = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
-        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-        return startLW;
-
+        intent.setComponent(new ComponentName(this, "de.blinkt.openvpn.activities.MainActivity"));
+        intent.putExtra("PAGE", "home");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     synchronized void registerDeviceStateReceiver(DeviceStateReceiver newDeviceStateReceiver) {
@@ -511,10 +505,24 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
     @Override
     public boolean stopVPN(boolean replaceConnection) throws RemoteException {
-        if (getManagement() != null)
-            return getManagement().stopVPN(replaceConnection);
-        else
+        if (!replaceConnection) {
+            mUserStopped = true;
+            keepVPNAlive.unscheduleKeepVPNAliveJobService(this);
+            ProfileManager.setConnectedVpnProfileDisconnected(this);
+        }
+        OpenVPNManagement mgmt = getManagement();
+        if (mgmt != null) {
+            return mgmt.stopVPN(replaceConnection);
+        } else if (!replaceConnection) {
+            mCommandHandler.post(() -> {
+                mStarting = false;
+                forceStopOpenVpnProcess();
+                endVpnService();
+            });
+            return true;
+        } else {
             return false;
+        }
     }
 
     @Override
@@ -544,6 +552,13 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             return START_REDELIVER_INTENT;
         }
 
+        if (intent != null && intent.hasExtra(EXTRA_PROFILEUUID)) {
+            mUserStopped = false;
+        } else if (mUserStopped) {
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+
 
         // Always show notification here to avoid problem with startForeground timeout
         VpnStatus.logInfo(R.string.building_configuration);
@@ -558,7 +573,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         /* start the OpenVPN process itself in a background thread */
         mCommandHandler.post(() -> startOpenVPN(intent, startId));
 
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     private boolean foregroundNotificationVisible() {
@@ -652,6 +667,10 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
 
     private void startOpenVPN(Intent intent, int startId) {
+        if (mUserStopped && (intent == null || !intent.hasExtra(EXTRA_PROFILEUUID))) {
+            stopSelf(startId);
+            return;
+        }
         VpnProfile vp = fetchVPNProfile(intent);
         if (vp == null) {
             stopSelf(startId);
@@ -1491,7 +1510,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
                 nbuilder.setContentText(challenge);
 
                 intent = new Intent();
-                intent.setComponent(new ComponentName(this, getPackageName() + ".activities.CredentialsPopup"));
+                intent.setComponent(new ComponentName(this, "de.blinkt.openvpn.activities.CredentialsPopup"));
 
                 intent.putExtra(EXTRA_CHALLENGE_TXT, challenge);
 
