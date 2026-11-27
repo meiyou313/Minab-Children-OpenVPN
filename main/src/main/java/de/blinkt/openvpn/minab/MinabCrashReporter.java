@@ -56,7 +56,6 @@ import java.util.concurrent.Executors;
 
 import de.blinkt.openvpn.BuildConfig;
 import de.blinkt.openvpn.R;
-import de.blinkt.openvpn.activities.MinabDiagnosticsActivity;
 import de.blinkt.openvpn.core.LogItem;
 import de.blinkt.openvpn.core.ProfileManager;
 import de.blinkt.openvpn.core.VpnStatus;
@@ -275,7 +274,7 @@ public final class MinabCrashReporter {
     public static void showReportDialog(final Activity activity, final int iconResId) {
         if (activity == null || activity.isFinishing()) return;
         try {
-            activity.startActivity(new Intent(activity, MinabDiagnosticsActivity.class));
+            MinabUiBridge.openDiagnostics(activity);
         } catch (Exception ignored) {
         }
     }
@@ -291,22 +290,15 @@ public final class MinabCrashReporter {
             String preview = TextUtils.isEmpty(crash)
                     ? activity.getString(R.string.minab_diag_pending_unexpected_msg)
                     : activity.getString(R.string.minab_diag_pending_crash_msg);
-            MinabDialogs.showConfirmJava(
+            if (!MinabUiBridge.showPendingCrashDialog(
                     activity,
                     activity.getString(R.string.minab_diag_title),
                     preview,
-                    activity.getString(R.string.minab_diag_open_center),
-                    activity.getString(R.string.minab_test_dismiss_btn),
                     !TextUtils.isEmpty(crash),
-                    true,
-                    () -> {
-                        try {
-                            activity.startActivity(new Intent(activity, MinabDiagnosticsActivity.class));
-                        } catch (Exception ignored) {
-                        }
-                    },
                     () -> clearReports(ctx)
-            );
+            )) {
+                clearReports(ctx);
+            }
         } catch (Exception ignored) {
             try {
                 clearReports(ctx);

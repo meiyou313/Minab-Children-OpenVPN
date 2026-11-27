@@ -340,7 +340,7 @@ public final class MinabBackup {
             JSONObject settings = new JSONObject();
             SharedPreferences minabPrefs =
                     context.getSharedPreferences("MinabPrefs", Context.MODE_PRIVATE);
-            settings.put("sortMode", minabPrefs.getInt("minab_sort_mode_v2", MinabProfileBus.SORT_REAL));
+            settings.put("sortMode", minabPrefs.getInt("minab_sort_mode_v2", 2));
             SharedPreferences defPrefs = Preferences.getDefaultSharedPreferences(context);
             settings.put("showSpeed", defPrefs.getBoolean("minab_show_speed_notification", true));
             settings.put("failover", defPrefs.getBoolean("minab_failover", true));
@@ -602,7 +602,7 @@ public final class MinabBackup {
                 SharedPreferences.Editor minabEdit = minabPrefs.edit();
                 if (settings.has("sortMode")) {
                     minabEdit.putInt("minab_sort_mode_v2",
-                            settings.optInt("sortMode", MinabProfileBus.SORT_REAL));
+                            settings.optInt("sortMode", 2));
                 }
                 minabEdit.apply();
                 SharedPreferences defPrefs = Preferences.getDefaultSharedPreferences(context);

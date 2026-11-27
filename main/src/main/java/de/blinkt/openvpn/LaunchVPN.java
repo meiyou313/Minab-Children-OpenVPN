@@ -9,6 +9,7 @@ import static de.blinkt.openvpn.core.OpenVPNService.EXTRA_START_REASON;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -16,13 +17,16 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.net.VpnService;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.text.InputType;
 import android.text.TextUtils;
+import android.text.method.PasswordTransformationMethod;
+import android.widget.EditText;
 
-import de.blinkt.openvpn.minab.MinabDialogs;
-import de.blinkt.openvpn.minab.SharedCredentials;
+import de.blinkt.openvpn.minab.MinabUiBridge;
 
 import java.io.IOException;
 
@@ -169,45 +173,63 @@ public class LaunchVPN extends Activity {
         if (type == R.string.password) {
             String initUser = mSelectedProfile.mUsername == null ? "" : mSelectedProfile.mUsername;
             String initPass = mSelectedProfile.mPassword == null ? "" : mSelectedProfile.mPassword;
-            MinabDialogs.showCredentialsJava(
+            if (MinabUiBridge.showPasswordPrompt(
                     this,
                     getString(R.string.pw_request_dialog_title, getString(type)),
                     getString(R.string.pw_request_dialog_prompt, mSelectedProfile.mName),
-                    false,
-                    true,
-                    false,
                     initUser,
                     initPass,
-                    getString(android.R.string.ok),
-                    getString(android.R.string.cancel),
                     (username, password, saveAsDefault) -> {
                         mSelectedProfile.mUsername = username;
                         mSelectedProfile.mPassword = password;
                         mSelectedProfile.addChangeLogEntry("saved password");
                         ProfileManager.saveProfile(LaunchVPN.this, mSelectedProfile);
-                        if (saveAsDefault) {
-                            SharedCredentials.save(LaunchVPN.this, username, password);
-                        }
                         Intent intent = new Intent(LaunchVPN.this, OpenVPNStatusService.class);
                         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
                     },
                     onCancelled
-            );
+            )) {
+                return;
+            }
         } else {
-            MinabDialogs.showSecretInputJava(
+            if (MinabUiBridge.showSecretPrompt(
                     this,
                     getString(R.string.pw_request_dialog_title, getString(type)),
                     getString(R.string.pw_request_dialog_prompt, mSelectedProfile.mName),
                     getString(type),
-                    getString(android.R.string.ok),
                     secret -> {
                         mTransientCertOrPKCS12PW = secret;
                         Intent intent = new Intent(LaunchVPN.this, OpenVPNStatusService.class);
                         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
                     },
                     onCancelled
-            );
+            )) {
+                return;
+            }
         }
+
+        // Fallback for non-UI (skeleton) flavor builds
+        final EditText entry = new EditText(this);
+        entry.setSingleLine();
+        entry.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        entry.setTransformationMethod(new PasswordTransformationMethod());
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.pw_request_dialog_title, getString(type)))
+                .setMessage(getString(R.string.pw_request_dialog_prompt, mSelectedProfile.mName))
+                .setView(entry)
+                .setPositiveButton(android.R.string.ok, (d, which) -> {
+                    String pw = entry.getText().toString();
+                    if (type == R.string.password) {
+                        mTransientAuthPW = pw;
+                    } else {
+                        mTransientCertOrPKCS12PW = pw;
+                    }
+                    Intent intent = new Intent(LaunchVPN.this, OpenVPNStatusService.class);
+                    bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+                })
+                .setNegativeButton(android.R.string.cancel, (d, which) -> onCancelled.run())
+                .setOnCancelListener(d -> onCancelled.run())
+                .show();
     }
 
     @Override
@@ -253,17 +275,20 @@ public class LaunchVPN extends Activity {
     }
 
     void showConfigErrorDialog(int vpnok) {
-        MinabDialogs.showConfirmJava(
+        if (MinabUiBridge.showConfigError(
                 this,
                 getString(R.string.config_error_found),
                 getString(vpnok),
-                getString(android.R.string.ok),
-                "",
-                true,
-                true,
-                this::finish,
                 this::finish
-        );
+        )) {
+            return;
+        }
+        AlertDialog.Builder d = new AlertDialog.Builder(this)
+                .setTitle(R.string.config_error_found)
+                .setMessage(vpnok)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> finish())
+                .setOnCancelListener(dialog -> finish());
+        d.show();
     }
 
     void launchVPN() {
