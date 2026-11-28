@@ -47,6 +47,9 @@
     <color name="minab_ping_fast">#0DB37C</color>
     <color name="minab_ping_slow">#F08C00</color>
     <color name="minab_ping_fail">#8B8D98</color>
+    <color name="minab_badge_stale_bg">#E5E7EB</color>
+    <color name="minab_badge_stale_border">#CBD5E1</color>
+    <color name="minab_badge_stale_text">#64748B</color>
     <!-- PowerOrb (Namaki overview page): glow = accent at ~20%,
          ring = accent at ~45%, disc edge = white at 40%. -->
     <color name="minab_orb_glow">#335B5BD6</color>

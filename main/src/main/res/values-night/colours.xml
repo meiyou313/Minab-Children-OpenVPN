@@ -30,4 +30,7 @@
     <color name="minab_danger_tint">#24F87171</color>
     <color name="minab_danger_border">#80F87171</color>
     <color name="minab_connect_blocker_pill_bg">#E60B0D18</color>
+    <color name="minab_badge_stale_bg">#272B3A</color>
+    <color name="minab_badge_stale_border">#3D4359</color>
+    <color name="minab_badge_stale_text">#94A3B8</color>
 </resources>

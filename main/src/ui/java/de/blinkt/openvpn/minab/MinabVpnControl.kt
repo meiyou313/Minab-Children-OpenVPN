@@ -140,32 +140,45 @@ object MinabVpnControl {
         } catch (e: Exception) {
             return emptyList()
         }
+        val staleReal = MinabStaleResults.getRealStaleSet(context)
+        val stalePing = MinabStaleResults.getPingStaleSet(context)
         val candidates = all.filter { !excludeUuids.contains(it.getUUIDString()) }
             .filter { !healthyOnly || isHealthy(it) }
-        val byReal = candidates.filter { it.mLastRealMs > 0 }.sortedBy { it.mLastRealMs }
-        val byPing = candidates.filter { it.mLastRealMs <= 0 && it.mLastPingMs > 0 }
-            .sortedBy { it.mLastPingMs }
-        val rest = candidates.filter { it.mLastRealMs <= 0 && it.mLastPingMs <= 0 }
-            .sortedBy { it.mName ?: "" }
-        return byReal + byPing + rest
+        return rankCandidatesFreshFirst(candidates, staleReal, stalePing)
     }
 
-    /** The single best server (best real test, else best ping), or null when none exists. */
+    /** The single best server (fresh Real > stale Real > fresh Ping > stale Ping), or null when none exists. */
     fun bestProfile(context: Context, profiles: List<VpnProfile>? = null): VpnProfile? {
         val ranked = if (profiles == null) {
             bestServers(context)
         } else {
-            val byReal = profiles.filter { it.mLastRealMs > 0 }.sortedBy { it.mLastRealMs }
-            val byPing = profiles.filter { it.mLastRealMs <= 0 && it.mLastPingMs > 0 }
-                .sortedBy { it.mLastPingMs }
-            val rest = profiles.filter { it.mLastRealMs <= 0 && it.mLastPingMs <= 0 }
-                .sortedBy { it.mName ?: "" }
-            byReal + byPing + rest
+            rankCandidatesFreshFirst(
+                profiles,
+                MinabStaleResults.getRealStaleSet(context),
+                MinabStaleResults.getPingStaleSet(context)
+            )
         }
         // "Best" only means something when at least one server was
         // actually tested; an untested list has no best server.
-        val tested = ranked.firstOrNull { it.mLastRealMs > 0 || it.mLastPingMs > 0 }
-        return tested
+        return ranked.firstOrNull { it.mLastRealMs > 0 || it.mLastPingMs > 0 }
+    }
+
+    private fun rankCandidatesFreshFirst(
+        candidates: List<VpnProfile>,
+        staleReal: Set<String>,
+        stalePing: Set<String>
+    ): List<VpnProfile> {
+        val freshReal = candidates.filter { it.mLastRealMs > 0 && !staleReal.contains(it.getUUIDString()) }
+            .sortedBy { it.mLastRealMs }
+        val oldReal = candidates.filter { it.mLastRealMs > 0 && staleReal.contains(it.getUUIDString()) }
+            .sortedBy { it.mLastRealMs }
+        val freshPing = candidates.filter { it.mLastRealMs <= 0 && it.mLastPingMs > 0 && !stalePing.contains(it.getUUIDString()) }
+            .sortedBy { it.mLastPingMs }
+        val oldPing = candidates.filter { it.mLastRealMs <= 0 && it.mLastPingMs > 0 && stalePing.contains(it.getUUIDString()) }
+            .sortedBy { it.mLastPingMs }
+        val rest = candidates.filter { it.mLastRealMs <= 0 && it.mLastPingMs <= 0 }
+            .sortedBy { it.mName ?: "" }
+        return freshReal + oldReal + freshPing + oldPing + rest
     }
 
     /** The profile the orb / widget connects: last-used, else first. */

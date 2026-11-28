@@ -262,6 +262,7 @@ object MinabProfileBus {
             pm.removeProfile(context, dup)
         }
         MinabServerStats.removeStatsForUuids(context, removedUuids)
+        MinabStaleResults.removeForUuids(context, removedUuids)
         return plan.toRemove.size
     }
 
@@ -294,24 +295,55 @@ object MinabProfileBus {
         return findFailedProfiles(profiles)
     }
 
-    /** Unified comparator used on both Home and Configs (favorites-first optional). */
+    /** Unified comparator used on both Home and Configs (fresh results rank ahead of stale ones). */
     fun sortProfiles(
         profiles: List<VpnProfile>,
         sortMode: Int,
         favorites: Set<String>,
         favoritesFirst: Boolean
+    ): List<VpnProfile> = sortProfiles(profiles, sortMode, favorites, favoritesFirst, emptySet(), emptySet())
+
+    fun sortProfiles(
+        profiles: List<VpnProfile>,
+        sortMode: Int,
+        favorites: Set<String>,
+        favoritesFirst: Boolean,
+        stalePingUuids: Set<String>,
+        staleRealUuids: Set<String>
     ): List<VpnProfile> {
+        fun realTier(p: VpnProfile): Int {
+            val uuid = p.getUUIDString()
+            return when {
+                p.mLastRealMs > 0 && !staleRealUuids.contains(uuid) -> 0
+                p.mLastRealMs > 0 -> 1
+                p.mLastPingMs > 0 && !stalePingUuids.contains(uuid) -> 2
+                p.mLastPingMs > 0 -> 3
+                else -> 4
+            }
+        }
+
+        fun pingTier(p: VpnProfile): Int {
+            val uuid = p.getUUIDString()
+            return when {
+                p.mLastPingMs > 0 && !stalePingUuids.contains(uuid) -> 0
+                p.mLastPingMs > 0 -> 1
+                else -> 2
+            }
+        }
+
         val baseComparator: Comparator<VpnProfile> = when (sortMode) {
-            SORT_PING -> compareBy<VpnProfile> {
-                if (it.mLastPingMs > 0) it.mLastPingMs else Long.MAX_VALUE
-            }.thenBy { it.mName ?: "" }
+            SORT_PING -> compareBy<VpnProfile> { pingTier(it) }
+                .thenBy { if (it.mLastPingMs > 0) it.mLastPingMs else Long.MAX_VALUE }
+                .thenBy { it.mName ?: "" }
 
             SORT_LRU -> compareByDescending<VpnProfile> { it.mLastUsed }
                 .thenBy { it.mName ?: "" }
 
             SORT_COUNTRY -> compareBy<VpnProfile> {
                 CategoryStore.normalise(it.getCategory())
-            }.thenBy { if (it.mLastRealMs > 0) it.mLastRealMs else Long.MAX_VALUE }
+            }.thenBy { realTier(it) }
+                .thenBy { if (it.mLastRealMs > 0) it.mLastRealMs else Long.MAX_VALUE }
+                .thenBy { pingTier(it) }
                 .thenBy { if (it.mLastPingMs > 0) it.mLastPingMs else Long.MAX_VALUE }
                 .thenBy { it.mName ?: "" }
 
@@ -320,11 +352,10 @@ object MinabProfileBus {
             }
 
             // SORT_REAL (Default & Recommended)
-            else -> compareBy<VpnProfile> {
-                if (it.mLastRealMs > 0) it.mLastRealMs else Long.MAX_VALUE
-            }.thenBy {
-                if (it.mLastPingMs > 0) it.mLastPingMs else Long.MAX_VALUE
-            }.thenBy { it.mName ?: "" }
+            else -> compareBy<VpnProfile> { realTier(it) }
+                .thenBy { if (it.mLastRealMs > 0) it.mLastRealMs else Long.MAX_VALUE }
+                .thenBy { if (it.mLastPingMs > 0) it.mLastPingMs else Long.MAX_VALUE }
+                .thenBy { it.mName ?: "" }
         }
         return if (favoritesFirst) {
             profiles.sortedWith(

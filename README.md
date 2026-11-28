@@ -1,339 +1,93 @@
-# Minab — Minab Beta v0.9
+# Minab OpenVPN (Android)
 
-Android-only OpenVPN client, based on **ics-openvpn** (OpenVPN for
-Android by Arne Schwabe, GPLv2). This repository is **public on
-purpose**: the base is GPLv2 and its author requires anyone building on
-it to publish their source (see the upstream note below).
+[![Release](https://img.shields.io/github/v/release/meiyou313/Minab-Children-OpenVPN?include_prereleases&label=Release&color=5B5BD6)](https://github.com/meiyou313/Minab-Children-OpenVPN/releases)
+[![Android CI](https://github.com/meiyou313/Minab-Children-OpenVPN/actions/workflows/build-android.yml/badge.svg)](https://github.com/meiyou313/Minab-Children-OpenVPN/actions/workflows/build-android.yml)
+[![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)](doc/LICENSE.txt)
 
-- App name: **Minab OpenVPN**
-- Package (applicationId): `com.minab.children`
-  (the internal Java package stays `de.blinkt.openvpn` — `VpnProfile`
-  is Java-serialised and its class name must not change, or profiles
-  saved by older versions would stop loading)
-- Repo: `https://github.com/meiyou313/Minab-Children-OpenVPN` (public)
-- Version: **Minab debug Beta v0.9** — `versionName = "0.9-beta"`, `versionCode = 10`, tag `v0.9`
-  (v0.8: tag `v0.8`, `versionName = "0.8-beta"`, `versionCode = 9`;
-  v0.7: tag `v0.7`, `versionName = "0.7-beta"`, `versionCode = 8`;
-  v0.6: tag `v0.6`, `versionName = "0.6-beta"`, `versionCode = 7`;
-  v0.5.1: tag `v0.5.1`, `versionName = "0.5.1-beta"`, `versionCode = 6`;
-  v0.5: tag `v0.5`, `versionName = "0.5-beta"`, `versionCode = 5`;
-  v0.4: tag `v0.4`, `versionName = "0.4-beta"`, `versionCode = 4`;
-  v0.3: tag `v0.3`, `versionName = "0.3-beta"`, `versionCode = 3`;
-  v0.2: tag `v0.2`, `versionName = "0.2-beta"`, `versionCode = 2`;
-  v0.1: tag `v0.1`, `versionName = "0.1-beta"`, `versionCode = 1`)
-- Platform: **Android only** (minSdk 23). No Windows / Linux build.
-- Base commit: `schwabe/ics-openvpn` master `660901ce320539aec476bd04bd1999c396d5e778`
-- Completely separate from the Namaki / Mozilla-VPN project: no Namaki
-  code, no Namaki signing key, no shared repo. (v0.3 only takes its
-  *look* — indigo seed, Vazirmatn font, PowerOrb home, grouped server
-  card — rebuilt natively in Android XML/Java.)
+**Minab OpenVPN** is a modern, streamlined Android OpenVPN client built on top of [**ics-openvpn**](https://github.com/schwabe/ics-openvpn) (Arne Schwabe, GPLv2), designed for fast multi-server management, smart reachability diagnostics, clean backup/sharing, and zero-telemetry privacy.
 
-## What changed in v0.9
+> **میناب اوپن‌وی‌پی‌ان** یک کلاینت رایگان، متن‌باز و بدون تبلیغات برای اندروید (بر پایه `ics-openvpn`) است که برای مدیریت ساده ده‌ها کانفیگ `.ovpn` و `.zip`، پینگ و ریل‌تست هوشمند، گروه‌بندی خودکار بر اساس IP کشورها، اشتراک‌گذاری ایمن بدون نام کاربری و رمز، پایش سرعت زنده و عیب‌یابی محلی طراحی شده است.
 
-- **About:** 80–90% shorter — only what the app is, the version
-  (top and bottom), the GitHub links, the thanks to ics-openvpn,
-  and the feature headlines. A **"Check for updates"** button sits
-  at the top of About.
-- **Updates:** when a new version is published, the notice shows
-  on **Home and as a phone notification** (at most once per
-  version; only when the checker positively finds a genuinely
-  newer release).
-- **Configs tab:** the server list now sits **in the same Configs
-  window** (one scroll for the whole page), and the
-  **Delete / Share** buttons are no longer half-cut.
-- **Bulk import:** the top text is rewritten in plain words, and
-  the header is fully visible now (it used to start mid-sentence);
-  the category spinner at the bottom is fully visible too.
-- **FAQ:** the first card's title is no longer clipped at the top;
-  all text is smaller and in Vazirmatn; **8 new Q&As** cover the
-  new features.
-- **Icon:** the launcher icon is now **exactly the pink-backpack
-  photo** (no AI, no redraw, no zoom or crop), fitted inside the
-  adaptive-icon safe zone; the Home header uses the same photo
-  with its background removed.
-- **Best server:** one button connects the fastest healthy server
-  from the last tests (best real-test result, falling back to best
-  ping).
-- **Auto-failover:** when the connected server drops, Minab
-  connects to the next healthy server by itself (up to 3 tries,
-  then it stops and says so). No test runs on the switch — it just
-  switches and shows a message with the new server's name. Works
-  while the app is open; a setting in Settings turns it off.
-- **IP check:** after connecting, the current public IP and
-  country show under the connect button (through the tunnel;
-  "—" when it cannot be checked). There is no speed test anywhere.
-- **Search + favorites:** search servers by name or country on
-  Home, and star servers so they stay at the top.
-- **Widget:** a home-screen widget shows the state and the
-  connected server; tap it to connect or disconnect.
-- **Per-app VPN:** pick which apps go through the VPN and which go
-  direct (in Settings).
-- **Import from a link:** paste a URL to a .ovpn file or a .zip of
-  .ovpn files; Minab downloads and imports it like files picked
-  by hand.
-- **Full backup:** "Back up configs" now also saves the groups,
-  per-profile usernames/passwords, favorites and settings in the
-  same zip, and restoring it (from the bulk import screen) puts
-  everything back exactly. The plain .ovpn-only zip export still
-  works as before.
-- **Ping fix:** a TCP ping now needs a real OpenVPN reply — before,
-  a middlebox answering the handshake made far servers read as
-  1–3 ms while the real test said Blocked. ICMP replies are
-  checked against the target and impossible sub-5 ms values to
-  public servers are dropped. A failed probe never shows as a
-  small green number anymore.
-- **Top-bar "+":** removed — it opened the empty-profile dialog,
-  not an import, and it closed the app. The bulk-import button is
-  the "+" now. The duplicate flow still works, and an empty
-  profile name is refused plainly instead of closing the app.
-- **Real test:** the pre-check retries once on a transient
-  failure, so one lost probe no longer marks a server Blocked.
+---
 
-## What changed in v0.8
+## Project Identity & Metadata
 
-- **Name:** the visible app name is now **Minab OpenVPN**, and the
-  app icon sits next to the name on Home. The GitHub repo is now
-  **Minab Children OpenVPN**
-  (`github.com/meiyou313/Minab-Children-OpenVPN`).
-- **About:** rewritten around this project — the GitHub profile and
-  repo links come first; the thanks to ics-openvpn and OpenVPN are
-  at the end.
-- **Settings:** smaller, more minimal text, and the empty icon space
-  on the left is gone.
-- **FAQ:** rewritten — only questions about this app (bulk import,
-  groups, ping test, real test, data used, copy/move, updates).
-- **Configs tab:** the "Uncategorized" tab moved to the end, just
-  before "+"; ticking configs now shows **Copy** and **Move** next
-  to Delete, to copy or move the selected servers to another group.
-- **Home:** the small ping icon next to each group name is gone.
-  "Ping test" / "Real test" test only the selected group (or
-  everything when "all" is selected). "Test ping" is renamed
-  **"Ping test"** everywhere.
-- **Graph tab:** the Daily / Weekly / Monthly chips are fixed — no
-  more half-cut text.
-- **Tab swiping:** needs a longer drag now, so accidental tab
-  switches are rarer.
-- **Real test, faster:** a dead server is skipped after a ~2 s
-  reachability pre-check (TCP connect for TCP profiles, one
-  OpenVPN reset packet for UDP profiles) instead of burning the
-  full 12 s / 20 s connect wait. The real test itself is unchanged
-  (it still connects each server in turn — Android allows only one
-  VPN tunnel at a time).
+| Item | Details |
+| :--- | :--- |
+| **App Name** | Minab OpenVPN |
+| **Application ID** | `com.minab.children` *(internal Java serialization package stays `de.blinkt.openvpn` for profile compatibility)* |
+| **Current Release** | **Minab Beta v0.9.8.2** — `versionName = "0.9.8.2-beta"`, `versionCode = 29`, tag `v0.9.8.2` |
+| **Platform** | Android `minSdk 23` (Android 6.0+) · `targetSdk 37` · Free & GPLv2 Open Source |
+| **Repository** | [`meiyou313/Minab-Children-OpenVPN`](https://github.com/meiyou313/Minab-Children-OpenVPN) |
+| **Base Upstream Commit** | `schwabe/ics-openvpn` `660901ce320539aec476bd04bd1999c396d5e778` *(OpenVPN 2 + OpenVPN 3 cores)* |
+| **Standalone Origin** | Built natively in Android Java/Kotlin/XML — ships **zero VPN servers and zero accounts**; bring your own `.ovpn` profiles |
 
-## What changed in v0.4
+---
 
-- **Notification permission:** asked at first launch. If declined,
-  only a minimal one-line banner is shown (tap to re-ask, or open
-  the app settings when the system dialog is blocked). The huge
-  stock banner is gone.
-- **Action buttons:** Bulk import / Test ping are full-size (48dp
-  height, 24dp icons) and no longer cut off at the bottom edge.
-  Below them, group tabs: one tab per country group (assigned
-  automatically on import), a "+" tab to create a group, and a small
-  ping icon next to each group name that pings just that group.
-- **Smaller connect button:** the PowerOrb shrank ~20% (200/149/
-  118dp instead of 250/186/148dp).
-- **Stay on Home while connecting:** tapping connect no longer
-  auto-opens the log page.
-- **New CONFIGS tab** (between Home and Graph): delete configs,
-  change username/password for one group or for all at once, rename
-  configs, and back up all configs to a zip.
-- **Speed in notification:** new setting (on by default) shows
-  download/upload speed in the VPN notification after connecting.
-- **Bottom tab bar:** the main tabs moved to the bottom, smaller
-  and more minimal. The first tab is now HOME (was PROFILES).
-- **Update notice:** Minab checks GitHub releases on launch
-  (cached 24 h) and shows a small banner on Home when a newer
-  version exists; Settings and About have a manual check too.
-- **One permanent signing key:** v0.4+ are all signed with the same
-  key, so they install over each other. v0.4 itself needs a
-  ONE-TIME uninstall of v0.1–v0.3 (different key — see "Signing").
-- **Minab's own words:** the home subtitle, About page and FAQ now
-  describe Minab (bulk import, groups, bulk ping) instead of
-  generic OpenVPN wording.
+## Key Features Beyond Stock ics-openvpn
 
-## What changed in v0.3
+### 1. Visual Experience, Animated Power Orb & Zero-Lag Halos
+- **Animated Hardware-Accelerated Orb (`MinabConnectOrbView`)**: Distinct visual animations and palettes for **Disconnected**, **Connecting** (radar sweep), **Connected** (emerald shockwave + spring pop), **Disconnecting** (coral inward pulse), and **Testing** (dimmed lock).
+- **Zero-Lag Row Halos**: Server rows in both **Home** and **Configs** light up immediately when **Testing**, **Connecting**, **Connected**, or **Disconnecting**, and tapping Disconnect during a slow handshake enforces a clean **450 ms** termination watchdog without ghost reconnects.
+- **Vazirmatn Typography, Themes & 9 Languages**: Supports System/Day/Night themes and Persian, English, Arabic, Turkish, Russian, German, French, Chinese, or System default.
+- **Three Home-Screen Widgets**: 1×1 Mini Power Orb, 2×1 Compact Quick Toggle, and 4×2 Status & Live Speed Dashboard with 1-tap Best Server connect.
 
-- **Name:** the visible app name is now just **Minab**. The package
-  (`com.minab.children`) and the internal Java package are unchanged,
-  so v0.3 installs over v0.2 without an uninstall.
-- **Namaki-style home, rebuilt natively:** indigo seed `#5B5BD6`,
-  Vazirmatn font, gradient background (`#E9EEFF` → `#F9FAFF`, night:
-  Midnight `#141B3D` → `#070A18`), a large circular connect button
-  with three concentric rings (the PowerOrb — tap it to connect the
-  selected / last-used profile, or disconnect while connected), and
-  the server list as one grouped card (shadowless, 16dp corners,
-  thin border, rows separated by divider lines) with a coloured ping
-  pill per profile (green < 100 ms, amber 100–299 ms, grey slower /
-  Timeout / Failed). Bulk import, Test ping, category chips and ping
-  badges stay visible on the home screen.
-- **Bulk import, bug fix 1:** live progress — a progress bar plus
-  "Imported X of N…" while the import runs (was one static
-  "Importing…" line); auto-categorisation now runs in batches with
-  no ~1 s pause per profile (offline heuristic for all profiles at
-  once, then the online lookup in chunks of 8 in parallel); and the
-  last import summary (selected / imported / duplicates skipped /
-  failed, with failed names) is stored and shown again when the user
-  comes back to the screen (was only a transient Toast).
-- **Shared credentials, bug fix 2:** the bulk-import screen now has
-  a real **Apply** button. It saves the username/password
-  (EncryptedSharedPreferences, Android Keystore) and writes them
-  into **all** profiles that need a username/password — already
-  imported ones included — so connecting no longer asks per profile.
-  Profiles imported later get the saved credentials automatically.
-  The fields are pre-filled from the saved values.
+### 2. Unique Multi-Group Server Architecture (`MinabProfileBus`)
+- **Single Source of Truth**: Each imported config is stored once (never cloned when copied to custom groups) and can belong to **multiple groups simultaneously** (`[UnitedStates · Favorites · Custom]`).
+- **Synced Everywhere**: Starred status (★), Ping/Real badges, and credentials stay synchronized across **Home**, **Configs**, **All**, **Favorites**, **Active**, **Inactive**, and custom groups.
+- **Clean In-Group Deletion**: Deleting inside a custom group offers a 3-way dialog: **Remove from `<group>`** (keeps it elsewhere) or **Delete permanently**.
+- **Smart Deduplication**: `Remove duplicates` keeps the best keeper (connected, starred, manual group, fastest score) and **merges all group memberships and favorites** onto it before removing duplicate endpoints.
 
-## What changed in v0.2
+### 3. Smart Two-Stage Diagnostics (`PingTester` & `RealTester`)
+- **Stage 1 — Parallel Ping Test**: Runs ICMP + TCP OpenVPN-reset probes (8 concurrent threads, ~3 s timeout) with middlebox anti-spoof validation, skipping `VpnService` so an active tunnel isn't disrupted.
+- **Stage 2 — End-to-End Real Test**: Connects ranked candidates in turn and fetches your chosen target URL (e.g., `https://api.telegram.org/`, `google.com/generate_204`, `cloudflare.com`, or custom URL) with selectable per-server timeout (default `20s`) and target healthy count (default `10`). Stays alive across tab switches and screen locks.
+- **Smart Test Clearing & Muted-Gray Restore (`v0.9.8.2`)**: Starting a Ping or Real test immediately clears previous scores for that test scope so stale and fresh badges never mix; if cancelled or stopped early, untouched servers restore their prior results in **muted small gray pills** ranked cleanly below fresh results.
+- **Network-Aware Test History & Dead Servers**: Snapshots Ping/Real runs tagged by transport/ISP/carrier (`MinabTestHistory`) and surfaces persistently failing **Never-working servers** (`MinabServerStats`) while protecting untested and working configs.
 
-v0.1 already contained the three features below, but their entry
-points were hidden (text-only items in the ⋮ overflow menu, a small
-"All categories" text line, ping results as small grey text under a
-profile name) and users could not find them. v0.2 makes them visible
-and restyles the screens light and minimal (white, teal accent):
+### 4. Bulk Import, GeoIP Grouping & `Set User/Pass`
+- **Multi-File, ZIP & URL Import**: Batch-import `.ovpn`, `.conf`, or `.zip` archives (up to 500 entries) and remote `.ovpn`/`.zip` URLs via `BulkImportActivity`, committing configs atomically with a live progress card and GeoIP country detection (`Skip IP detection` supported).
+- **Scoped Credentials (`Set User/Pass`)**: Clear scope indicators — **green banner** for selected/group targets vs. **amber warning** when modifying `ALL` configs — with password eye toggle, opt-in `Save as default`, and Android Keystore-backed `SharedCredentials` encryption.
 
-- **Bulk import** now has a big teal **"Bulk import"** button at the
-  top of the main screen (the overflow-menu item is kept too).
-- **Ping test** now has a **"Test ping"** button at the top of the
-  main screen, a visible progress row with a Cancel button while it
-  runs, and a coloured pill badge ("24 ms" / "Timeout" / "Failed")
-  next to each tested profile name; the list still re-sorts
-  fastest-first when the test finishes.
-- **Categories** now show as tappable chips at the top of the list
-  (All + one chip per category + a Manage chip for
-  create/rename/delete), instead of the single "All categories" line.
-  Long-press → Assign category still works.
+### 5. Zero-Credential Cross-Platform Backups & Shares (`MinabBackup`)
+- **Standardized Dated Filenames**: `Minab-Backup_<Scope>_<N>cfg_yyyy.MM.dd_HH.mm.zip`, `Minab-Share_<Scope>_<N>cfg_yyyy.MM.dd_HH.mm.zip`, and `<Name>_yyyy.MM.dd_HH.mm.ovpn`.
+- **Zero Credentials Guaranteed**: Usernames and passwords are **never** written to any exported `.ovpn`, `.zip`, or `minab-backup.json`.
+- **Cross-Platform Clean `.ovpn` + `Minab-Info.txt`**: Exports work directly in OpenVPN Connect on Windows, macOS, Linux desktop, and iOS; full/group backups preserve multi-group memberships and favorites without overwriting existing partial settings.
 
+### 6. Live Analytics, Local Diagnostics Center & Accordion FAQ
+- **Live IP & Speed Dashboard**: Displays public IP + country flag before/after connecting, live session speed/duration on Home, and Daily/Weekly/Monthly traffic charts in **Graph**.
+- **Per-App Split Tunneling & Auto-Failover**: Route all except chosen apps or only chosen apps, plus optional Auto-Failover (up to 3 verified backup servers on unexpected drops).
+- **Strictly Local Diagnostics Center**: `Settings → Help & Diagnostics → Diagnostics & Debug Logs` displays crashes, breadcrumbs, app logs, and OpenVPN logs locally with `.txt` Download/Share/Copy. Zero automatic uploads.
+- **Modern Searchable FAQ**: Real-time search, category pills, and clickable `#hashtags`.
 
-## What Minab adds on top of stock ics-openvpn
+---
 
-Stock ics-openvpn imports `.ovpn` files one by one and has no bulk
-ping. Minab adds three features, without changing the stock
-connect / disconnect flow:
+## Architecture & Build Flavors
 
-### 1. Bulk import — many configs at once, one username/password for all
-- Main screen, big teal **"Bulk import"** button at the top (since
-  v0.2; the overflow-menu item **Bulk import (.ovpn / .zip)** still
-  exists too) → pick many `.ovpn` / `.conf`
-  files at once (`ACTION_OPEN_DOCUMENT` + `EXTRA_ALLOW_MULTIPLE`) or
-  one `.zip` containing them (up to 200 files, 2 MB each).
-- One username field + one password field + **"Apply to all"**
-  checkbox, and since v0.3 a real **"Apply to all profiles"** button.
-  Apply saves the credentials (EncryptedSharedPreferences, Android
-  Keystore — see `SharedCredentials`) and writes them into
-  `VpnProfile.mUsername` / `mPassword` of **every** imported profile
-  that uses `auth-user-pass` — already-imported ones included, not
-  just the batch being imported — exactly the fields the profile
-  editor (`Settings_Basic`) writes, persisted by `ProfileManager`
-  into the profile file (encrypted when upstream profile encryption
-  is enabled). Profiles imported later get the saved credentials
-  automatically, without re-typing. No password is stored in plain
-  SharedPreferences or in any extra file, and the dialog clears the
-  password field when it finishes.
-- Duplicates are skipped, never overwritten: same profile **name +
-  primary remote host:port** as an existing profile counts as a
-  duplicate. The summary shows `Imported: X, duplicates skipped: Y,
-  failed: Z` with the failed file names.
+Minab is built remotely via GitHub Actions (since local environments without the Android NDK/SDK rely on CI):
 
-### 2. Categories — manual + automatic by country
-- Every profile has a category (`VpnProfile.mCategory`, persisted
-  with the profile; old profiles migrate to `"Uncategorized"` in
-  `upgradeProfile()`, profile version 10 → 11, `serialVersionUID`
-  unchanged so old saves still load).
-- Manual (the path that always works): long-press a profile →
-  **Assign category**; or the **Category** field in the profile editor
-  (Basic settings); or the filter bar → **Manage categories**
-  (create / rename / delete; deleting a category moves its profiles
-  back to Uncategorized).
-- Filter: tap a category chip at the top of the profile list (since
-  v0.2; the chips are All + one per category + Manage), or menu →
-  **Filter by category** (All + each category).
-- Automatic (best effort, never blocks an import): on bulk import the
-  app guesses the country from the remote host —
-  1. offline heuristic: a 2-letter country code in the profile/file
-     name or hostname (`us-01…`, `de.ovpn`), then the hostname TLD;
-  2. online: DNS-resolve the host, then `https://ip-api.com/json/<ip>`
-     (3 s timeout, result cached 30 days).
-  Any failure leaves the manual category untouched. Honest limits:
-  the free ip-api.com tier is rate-limited (~45 req/min per IP), so
-  since v0.3 lookups run in chunks of 8 in parallel with no
-  artificial delay (v0.2 paused 1 s per profile); offline or DNS failure
-  means only the heuristic runs; a hostname can point at a CDN /
-  anycast IP whose country is not the country in its name.
+- **Flavor Split**: Both `main/src/main` (shared service/core engine + `:openvpn` service process) and `main/src/ui` / `main/src/skeleton` compile cleanly. All `main → ui` UI callbacks go exclusively through [`MinabUiBridge`](main/src/main/java/de/blinkt/openvpn/minab/MinabUiBridge.java) and [`MinabUiBridgeImpl`](main/src/ui/java/de/blinkt/openvpn/minab/MinabUiBridgeImpl.kt) so `SkeletonOvpn2`, `UiOvpn2`, and `UiOvpn23` all pass CI.
+- **CI Workflows**:
+  - [`.github/workflows/build-android.yml`](.github/workflows/build-android.yml) (**Minab Android**): Builds `./gradlew assembleUiOvpn23Debug` signed with Minab's permanent release keystore on every push and publishes tagged `v*` GitHub Releases.
+  - [`.github/workflows/build.yaml`](.github/workflows/build.yaml) (**Build**): Verifies release compilation & unit tests across `SkeletonOvpn2`, `UiOvpn23`, and `UiOvpn2`.
+- **Signing Key Continuity**: All versions from **`v0.4` onward** (including `0.9.8.x` and future `1.0.0`) share one permanent RSA-2048 release keystore (`alias = minab`, stored securely outside the repository via CI secrets), so updates install cleanly over previous builds.
 
-### 3. Bulk ping — test all profiles, or one category, at once
-- Main screen, **"Ping test"** button at the top (since v0.2; tests
-  the profiles currently shown — all, or the selected category), or
-  menu: **Ping test: all profiles** / **Ping test: this category**,
-  or long-press one profile → **Ping test**.
-- 8 threads in parallel. Per host: first ICMP via
-  `/system/bin/ping -c 1 -W 2`, falling back to TCP-connect timing
-  to the profile's remote host:port (3 s timeout) when ICMP gives no
-  answer. Overall budget ~3 s per host.
-- Each tested row shows a coloured pill badge next to its name
-  (`42 ms` green/amber/grey, `Timeout` / `Failed` grey); while the
-  test runs a progress bar shows "Pinging N profiles… X done" with a
-  **Cancel** button. When finished the list is sorted fastest-first
-  and the result (`mLastPingMs`, `mLastPingTime`, `mLastPingResult`)
-  is saved on the profile. The category stays as small text under
-  the profile name.
-- What the numbers mean: ICMP time is a real ping; the TCP fallback
-  is a connect time, not an ICMP ping — it answers "is this server
-  reachable and how fast does it answer", not a true round-trip.
-  `Timeout` = silent on both; `Failed` = DNS failure / refused.
-- VPN safety: pings use plain sockets and the ping binary from the
-  app process only. They do not touch `VpnService`, do not call
-  `protect()`, and cannot disconnect or break a running tunnel. While
-  a VPN is connected the app warns that the numbers go through the
-  tunnel and may not reflect direct latency.
+---
 
-## Build (GitHub Actions — no local SDK needed)
+## Version History Summary
 
-There is no Android SDK on the machine this was prepared on, so the
-APK is built by CI:
+See [`CHANGELOG.md`](CHANGELOG.md) for the complete changelog per version:
+- **`v0.9.8.2`** (`code 29`): Smart pre-test clearing with muted small gray restoration on cancel/early stop + fresh-first sorting & Best-Server ranking; full documentation overhaul.
+- **`v0.9.8.1`** (`code 28`): Fixed Diagnostics insets NPE crash, zero-lag Testing/Connecting/Disconnecting halos, 450 ms Disconnect watchdog, and elimination of ghost auto-reconnect / false Connected-without-server states.
+- **`v0.9.8`** (`code 27`): Unique Multi-Group profiles, `✨` Smart Tools, Dead Server cleanup, zero-credential cross-platform backups, Diagnostics Center, and Accordion FAQ.
+- **`v0.9.7.x` – `v0.1`** (`codes 1–26`): Dynamic IP grouping, Day/Night themes, 9 languages, animated PowerOrb, 3 home-screen widgets, live Graph analytics, auto-failover, and initial bulk import/ping foundation.
 
-- Workflow: `.github/workflows/build-android.yml` —
-  `ubuntu-24.04`, JDK 17 (Temurin), Android SDK, then
-  `./gradlew assembleUiOvpn23Debug`, APK uploaded as an artifact.
-- Pushing tag `v0.4` publishes the GitHub Release **"Minab Beta v0.4"**
-  (pre-release) with the debug APK attached. (v0.3 used tag `v0.3`.)
-- The upstream workflow (`.github/workflows/build.yaml`) is kept
-  untouched and still runs.
+---
 
-## Signing
+## Attribution & License
 
-**v0.4+ are all signed with ONE permanent keystore** (RSA 2048,
-self-signed, valid to November 2056, alias `minab`), so every version
-from v0.4 onward installs over the previous one. The keystore lives
-OUTSIDE the repo at `~/workspace/minab-keystore/minab-release.p12`
-(with a backup copy `minab-release-backup.p12`, its base64
-`minab-release.p12.b64`, and the passwords in `passwords.txt` in the
-same directory). **Never commit the keystore, its base64, or the
-passwords.**
-
-CI needs four repository secrets (Settings > Secrets and variables >
-Actions): `MINAB_KEYSTORE_BASE64` (the whole `.p12.b64` file),
-`MINAB_KEYSTORE_PASSWORD`, `MINAB_KEY_ALIAS` (`minab`), and
-`MINAB_KEY_PASSWORD`. The workflow FAILS LOUDLY if any of them is
-missing, instead of silently building with a fresh debug key — a
-fresh key per build was why v0.1–v0.3 could not install over each
-other. `main/build.gradle.kts` signs the debug build with the
-keystore whenever the `MINAB_KEYSTORE_BASE64` env var is present;
-without it (a local dev build) the stock debug key is used.
-
-**v0.4 needs a ONE-TIME uninstall of v0.1–v0.3**: its key differs
-from the old per-build debug keys, so Android refuses to install it
-over them. Profiles stored in the old app are lost on uninstall, so
-keep the `.ovpn` files to re-import. Do NOT reuse any other app's
-keystore (in particular not Namaki's) for Minab.
-
-## Attribution & licence
-
-- Base: ics-openvpn / OpenVPN for Android, Copyright (c) Arne
-  Schwabe, GPLv2 — see `doc/LICENSE.txt` and the upstream README
-  below. Minab's own additions are under the same GPLv2.
-- `LICENSE` / `doc/LICENSE.txt` from upstream is kept unchanged.
-- This app is a client only: it ships **no VPN servers and no
-  accounts**. You bring your own `.ovpn` configs / server.
+- **Base Project**: [ics-openvpn / OpenVPN for Android](https://github.com/schwabe/ics-openvpn), Copyright (c) Arne Schwabe, licensed under **GNU GPLv2** (with additional terms in [`doc/LICENSE.txt`](doc/LICENSE.txt)).
+- **Typography**: [Vazirmatn](doc/Vazirmatn-OFL.txt) font (SIL Open Font License 1.1).
+- All Minab additions in this repository are published openly under **GNU GPLv2**.
 
 ---
 

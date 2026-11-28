@@ -2,6 +2,11 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.8.2 — smart test clearing with muted-gray cancel restore & full documentation overhaul:
+- Smart Pre-Test Clearing & Muted-Gray Restore: starting **Ping Test** or **Real Test** immediately clears prior badges for that test scope so old scores never mix with live results (`Ping Test` clears Ping while keeping Real intact; `Real Test` clears Real and also clears Ping whenever stage-1 ping runs). If cancelled or stopped early (after reaching target working servers), untouched servers restore their prior scores as **muted small gray pills** (`minab_badge_stale`, smaller `7.2sp` regular text, subdued opacity in Day & Night modes) so old data stays preserved yet visually unmistakable.
+- Fresh-First Sorting & Best-Server Ranking: live results from the current run always rank ahead of restored muted-gray badges across Home, Configs, and **Connect to best server**.
+- Full Repository & In-App Text Refresh: updated `README.md` (preserving the upstream `ics-openvpn` section verbatim), `Privacy-policy.md`, `SECURITY.md`, `CONTRIBUTING`, `ISSUE_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/*.md`, `PUSH.md`, About feature highlights (`strings.xml` / `values-fa/strings.xml`), and Test FAQ entries to accurately reflect `v0.9.8.2`.
+
 New in v0.9.8.1 — critical stability, instant halos & clean disconnect hotfix:
 - Fixed Diagnostics & Debug Logs crash: resolved an immediate NullPointerException in `BaseActivity.setUpEdgeEdgeInsetsListener` caused by a missing `statusbar_background` view in `minab_diagnostics.xml`, and added null-safe inset guards across all activities.
 - Instant zero-lag row halos & spinner states: implemented `setConnectedVPN(...)` listeners, synchronous main-thread `MinabConnectState` updates for targeted RecyclerView row refreshes, active test indicators during Ping Test and Real Test, and a new coral disconnecting halo (`minab_row_halo_disconnecting`).

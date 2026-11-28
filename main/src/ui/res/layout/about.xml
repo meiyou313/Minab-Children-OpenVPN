@@ -85,7 +85,7 @@
                     android:textColor="@color/minab_teal_dark"
                     android:textSize="10sp"
                     android:textStyle="bold"
-                    tools:text="v0.9.7.1-beta" />
+                    tools:text="v0.9.8.2-beta" />
             </LinearLayout>
 
             <View
@@ -145,7 +145,7 @@
                     android:textSize="10sp"
                     android:textStyle="bold"
                     android:visibility="gone"
-                    tools:text="v0.9.8" />
+                    tools:text="v0.9.8.2" />
             </LinearLayout>
 
             <LinearLayout
@@ -195,7 +195,7 @@
                 android:minHeight="36dp"
                 android:textSize="11.5sp"
                 android:visibility="gone"
-                tools:text="Download v0.9.8" />
+                tools:text="Download v0.9.8.2" />
 
             <Button
                 android:id="@+id/minab_about_assets_btn"

@@ -1,1 +1,18 @@
-See the README.md and doc/README.txt for information about developing and contributing.
+# Contributing to Minab OpenVPN
+
+Thank you for helping improve **Minab OpenVPN**! Minab is licensed under **GNU GPLv2** (built on [ics-openvpn](https://github.com/schwabe/ics-openvpn) by Arne Schwabe), so any distributed modifications must remain public under GPLv2 (`doc/LICENSE.txt` and `doc/README.txt`).
+
+## Architecture Rules for Contributors
+1. **Multi-Flavor Isolation (`main` vs `ui` / `skeleton`)**:
+   - The upstream `Build` workflow verifies **`Release SkeletonOvpn2`**, **`Release UiOvpn2`**, and **`Release UiOvpn23`** alongside Minab's debug release build (`assembleUiOvpn23Debug`).
+   - Java classes under `main/src/main/java` must **never** directly import `ui`-only classes or `main/src/ui/res` resources. Always use [`MinabUiBridge`](main/src/main/java/de/blinkt/openvpn/minab/MinabUiBridge.java) implemented in [`MinabUiBridgeImpl`](main/src/ui/java/de/blinkt/openvpn/minab/MinabUiBridgeImpl.kt) with `@Keep`.
+2. **Profile Compatibility**:
+   - Do not rename Java package `de.blinkt.openvpn` or break `VpnProfile` Java serialization (`serialVersionUID`), so users' saved servers always migrate seamlessly across upgrades.
+3. **Zero Telemetry & Zero Credential Exports**:
+   - Never add analytics/tracking SDKs, and never include usernames, passwords, or private keys in `.ovpn`, `.zip`, or JSON exports.
+4. **Localization & Typography**:
+   - Update both `main/src/main/res/values/strings.xml` and `main/src/main/res/values-fa/strings.xml` for user-facing strings and use `@font/vazirmatn` consistently across UI layouts.
+
+## Submitting Bugs & Pull Requests
+- For bugs, export sanitized logs from **Settings → Help & Diagnostics → Diagnostics & Debug Logs** (no private keys or passwords).
+- Keep pull requests focused, describe the user-visible behavior change, and ensure GitHub Actions (`Minab Android` and `Build`) stay green.

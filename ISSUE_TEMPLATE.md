@@ -1,24 +1,23 @@
-<!-- To make issues more manageable, I would appreciate it if you fill out the following details as applicable: -->
+<!-- Please review README.md & CONTRIBUTING before opening an issue. NEVER post private keys, certificates, usernames, or passwords! -->
 
-<!-- Note to other developers, please read the paragraph Note to developer in the README.md before opening an issue ->
+## App & Device Info
+1. **Minab OpenVPN Version:** *(e.g., `v0.9.8.2-beta`, visible in the About tab)*
+2. **Android Version & Device Model / ROM:** *(e.g., Android 14, Samsung A54 / OneUI)*
+3. **OpenVPN Core Setting:** *(OpenVPN 2 / OpenVPN 3 in Settings, if known)*
+4. **Network Type:** *(Wi-Fi / Mobile carrier)*
 
-# General information
-1. Android Version
-2. Android Vendor/Custom ROM
-3. Device
-4. Version of the app (version number/play store version/self-built)
- 
-# Description of the issue
+## Issue Description & Steps to Reproduce
+Describe what happened, what you expected instead, and step-by-step instructions to reproduce it.
 
-# Log (if applicable)
+## Diagnostics Log (optional — strictly strip secrets!)
+You can export a clean local report from **Settings → Help & Diagnostics → Diagnostics & Debug Logs → Save .txt / Copy**:
 
+```text
+Paste relevant non-sensitive log lines here
 ```
-log contents
-```
 
-# Configuration file
+## Config Snippet (ONLY if needed — remove `<key>`, `<cert>`, `auth-user-pass` secrets!)
 
-```
-add the contents of the configuration file if applicable
-be careful to not post private keys
+```ovpn
+# Redact private certificates, keys, and server credentials before posting
 ```

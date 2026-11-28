@@ -28,6 +28,7 @@ import android.text.Editable
 import android.text.Html
 import android.text.SpannableString
 import android.text.TextWatcher
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
@@ -94,6 +95,7 @@ import de.blinkt.openvpn.minab.MinabRedetectIpDialog
 import de.blinkt.openvpn.minab.MinabServerCountry
 import de.blinkt.openvpn.minab.MinabServerStats
 import de.blinkt.openvpn.minab.MinabSortDialog
+import de.blinkt.openvpn.minab.MinabStaleResults
 import de.blinkt.openvpn.minab.MinabTestCoordinator
 import de.blinkt.openvpn.minab.MinabTestHistory
 import de.blinkt.openvpn.minab.MinabTestHistoryDialog
@@ -125,6 +127,8 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
     private var homeAdapter: HomeRecyclerAdapter? = null
     private var displayedProfiles: MutableList<VpnProfile> = mutableListOf()
     private var cachedFavorites: Set<String> = emptySet()
+    private var cachedStalePing: Set<String> = emptySet()
+    private var cachedStaleReal: Set<String> = emptySet()
 
     // --- Minab Children state ---
     /** Null = show all categories; otherwise only this category is listed. */
@@ -160,6 +164,13 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
     private var realPingOkCount: Int = 0
     @Volatile
     private var realTestCurrentName: String? = null
+
+    private var activePingTargets: List<VpnProfile> = emptyList()
+    private var activePingSnapshots: Map<String, MinabStaleResults.ResultSnapshot> = emptyMap()
+    private var activeRealTargets: List<VpnProfile> = emptyList()
+    private var activeRealSnapshots: Map<String, MinabStaleResults.ResultSnapshot> = emptyMap()
+    private var activeRealClearedPing: Boolean = false
+    private var activeRealStartMs: Long = 0L
 
     private val realCountdownHandler = Handler(Looper.getMainLooper())
     private var realCountdownSeconds: Int = 0
@@ -931,20 +942,28 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         }
     }
 
-    private fun listSignature(ordered: List<VpnProfile>, favorites: Set<String>): String {
+    private fun listSignature(
+        ordered: List<VpnProfile>,
+        favorites: Set<String>,
+        stalePing: Set<String>,
+        staleReal: Set<String>
+    ): String {
         val defaultUuid = defaultVPN?.getUUIDString() ?: ""
-        val sb = StringBuilder(ordered.size * 48)
+        val sb = StringBuilder(ordered.size * 52)
         sb.append(selectedCategory ?: "all").append('|')
             .append(searchQuery).append('|').append(sortMode).append('|')
             .append(defaultUuid).append('|').append(ordered.size)
         for (p in ordered) {
-            sb.append('|').append(p.getUUIDString())
+            val uuid = p.getUUIDString()
+            sb.append('|').append(uuid)
                 .append(',').append(p.mVersion)
                 .append(',').append(p.mLastPingMs)
                 .append(',').append(p.mLastPingResult)
+                .append(',').append(stalePing.contains(uuid))
                 .append(',').append(p.mLastRealMs)
                 .append(',').append(p.mLastRealResult)
-                .append(',').append(favorites.contains(p.getUUIDString()))
+                .append(',').append(staleReal.contains(uuid))
+                .append(',').append(favorites.contains(uuid))
                 .append(',').append(p.mName ?: "")
                 .append(',').append(p.getGroupsDisplayText())
         }
@@ -955,6 +974,8 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         val ctx = requireContext()
         val allvpn: Collection<VpnProfile> = this.pM.getProfiles()
         val favorites = MinabFavorites.getAll(ctx)
+        val stalePing = MinabStaleResults.getPingStaleSet(ctx)
+        val staleReal = MinabStaleResults.getRealStaleSet(ctx)
         val filtered = allvpn.filter { profile ->
             when {
                 selectedCategory == null -> true
@@ -973,17 +994,19 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             val category = profile.getGroupsDisplayText().lowercase()
             name.contains(query) || category.contains(query)
         }
-        val ordered = MinabProfileBus.sortProfiles(searched, sortMode, favorites, true)
+        val ordered = MinabProfileBus.sortProfiles(searched, sortMode, favorites, true, stalePing, staleReal)
 
         updateEmptyStateView(allvpn.isEmpty())
 
-        val signature = listSignature(ordered, favorites)
+        val signature = listSignature(ordered, favorites, stalePing, staleReal)
         if (signature == lastListSignature) {
             rebuildCategoryChips(allvpn)
             return
         }
         lastListSignature = signature
         cachedFavorites = favorites
+        cachedStalePing = stalePing
+        cachedStaleReal = staleReal
         displayedProfiles = ordered.toMutableList()
         homeAdapter?.submitList(displayedProfiles)
         rebuildCategoryChips(allvpn)
@@ -1016,10 +1039,15 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
 
     private fun resortAdapter() {
         if (displayedProfiles.isEmpty()) return
-        val favorites = MinabFavorites.getAll(requireContext())
+        val ctx = requireContext()
+        val favorites = MinabFavorites.getAll(ctx)
+        val stalePing = MinabStaleResults.getPingStaleSet(ctx)
+        val staleReal = MinabStaleResults.getRealStaleSet(ctx)
         cachedFavorites = favorites
+        cachedStalePing = stalePing
+        cachedStaleReal = staleReal
         displayedProfiles = MinabProfileBus.sortProfiles(
-            displayedProfiles, sortMode, favorites, true
+            displayedProfiles, sortMode, favorites, true, stalePing, staleReal
         ).toMutableList()
         lastListSignature = null
         requestListRefresh()
@@ -1924,6 +1952,7 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
                 profile.mLastPingMs = if (result.status == PingTester.Status.OK) result.ms else -1
                 profile.mLastPingTime = result.timestampMs
                 profile.mLastPingResult = result.displayText()
+                MinabStaleResults.clearPingStale(appCtx, profile.getUUIDString())
                 try {
                     ProfileManager.saveProfile(appCtx, profile)
                 } catch (_: Exception) {
@@ -1955,6 +1984,71 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         }
     }
 
+    private fun clearTargetsInMemoryAndSave(
+        targets: List<VpnProfile>,
+        clearPing: Boolean,
+        clearReal: Boolean
+    ) {
+        if (targets.isEmpty() || (!clearPing && !clearReal)) return
+        val appCtx = context?.applicationContext ?: return
+        val uuids = ArrayList<String>(targets.size)
+        for (profile in targets) {
+            uuids.add(profile.getUUIDString())
+            if (clearPing) {
+                profile.mLastPingMs = 0L
+                profile.mLastPingTime = 0L
+                profile.mLastPingResult = ""
+            }
+            if (clearReal) {
+                profile.mLastRealMs = 0L
+                profile.mLastRealTime = 0L
+                profile.mLastRealResult = ""
+            }
+        }
+        if (clearPing) MinabStaleResults.clearPingStaleAll(appCtx, uuids)
+        if (clearReal) MinabStaleResults.clearRealStaleAll(appCtx, uuids)
+        val snapshot = targets.toList()
+        BACKGROUND_EXECUTOR.execute {
+            for (profile in snapshot) {
+                try {
+                    ProfileManager.saveProfile(appCtx, profile)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    private fun restoreUntestedAfterRun(
+        targets: List<VpnProfile>,
+        snapshots: Map<String, MinabStaleResults.ResultSnapshot>,
+        runStartMs: Long,
+        clearedPing: Boolean,
+        clearedReal: Boolean
+    ) {
+        if (targets.isEmpty() || snapshots.isEmpty() || (!clearedPing && !clearedReal)) return
+        val appCtx = context?.applicationContext ?: return
+        val restored = MinabStaleResults.restoreUntested(
+            appCtx, targets, snapshots, runStartMs, clearedPing, clearedReal
+        )
+        if (restored.isNotEmpty()) {
+            val saveList = restored.toList()
+            BACKGROUND_EXECUTOR.execute {
+                for (profile in saveList) {
+                    try {
+                        ProfileManager.saveProfile(appCtx, profile)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
+        lastListSignature = null
+        chipsSignature = null
+        if (isAdded) {
+            populateVpnList()
+            MinabProfileBus.notifyChanged()
+        }
+    }
+
     private fun startPingTest(profiles: List<VpnProfile>) {
         if (profiles.isEmpty()) {
             Toast.makeText(requireContext(), R.string.minab_no_profiles_in_category, Toast.LENGTH_SHORT).show()
@@ -1968,6 +2062,9 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         currentTestNetSnapshot = null
         MinabTestHistory.captureNetworkAsync(requireContext()) { snap -> currentTestNetSnapshot = snap }
         pingRunStartMs = System.currentTimeMillis()
+        activePingTargets = profiles.toList()
+        activePingSnapshots = MinabStaleResults.captureSnapshots(activePingTargets)
+        clearTargetsInMemoryAndSave(activePingTargets, clearPing = true, clearReal = false)
         lastListSignature = null
         populateVpnList()
         if (VpnStatus.isVPNActive()) {
@@ -1977,7 +2074,12 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             if (!isAdded) return@runPingPhase
             MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.HOME_PING, false)
             updateOrbState()
+            val pTargets = activePingTargets
+            val pSnaps = activePingSnapshots
+            activePingTargets = emptyList()
+            activePingSnapshots = emptyMap()
             if (cancelled) {
+                restoreUntestedAfterRun(pTargets, pSnaps, pingRunStartMs, clearedPing = true, clearedReal = false)
                 Toast.makeText(requireContext(), R.string.minab_ping_cancelled, Toast.LENGTH_SHORT).show()
                 testProgressPanel?.hide()
                 MinabProfileBus.notifyChanged()
@@ -1992,6 +2094,7 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
                     pingDoneCount,
                     pingOkCount
                 )
+                restoreUntestedAfterRun(pTargets, pSnaps, pingRunStartMs, clearedPing = true, clearedReal = false)
                 setSortMode(MinabProfileBus.SORT_PING)
                 lastListSignature = null
                 chipsSignature = null
@@ -2055,6 +2158,7 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         result.profile.mLastPingResult = result.displayText()
         val profileToSave = result.profile
         val saveContext = requireContext().applicationContext
+        MinabStaleResults.clearPingStale(saveContext, profileToSave.getUUIDString())
         BACKGROUND_EXECUTOR.execute {
             try {
                 ProfileManager.saveProfile(saveContext, profileToSave)
@@ -2101,11 +2205,16 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
     }
 
     private fun cancelPingTest() {
+        val pTargets = activePingTargets
+        val pSnaps = activePingSnapshots
+        activePingTargets = emptyList()
+        activePingSnapshots = emptyMap()
         pingTester?.cancel()
         pingTester = null
         MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.HOME_PING, false)
+        restoreUntestedAfterRun(pTargets, pSnaps, pingRunStartMs, clearedPing = true, clearedReal = false)
         if (!realTestActive) testProgressPanel?.hide()
-        updateOrbState()
+        if (isAdded) updateOrbState()
     }
 
     // --- Minab Real test ---
@@ -2130,6 +2239,12 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         MinabTestHistory.captureNetworkAsync(requireContext()) { snap -> currentTestNetSnapshot = snap }
 
         RealTester.cancelCurrent()
+        val willRunPing = MinabStaleResults.willRealTestRunPingPhase(requireContext(), profiles)
+        activeRealTargets = profiles.toList()
+        activeRealSnapshots = MinabStaleResults.captureSnapshots(activeRealTargets)
+        activeRealClearedPing = willRunPing
+        activeRealStartMs = System.currentTimeMillis()
+        clearTargetsInMemoryAndSave(activeRealTargets, clearPing = willRunPing, clearReal = true)
         lastListSignature = null
         populateVpnList()
 
@@ -2171,6 +2286,15 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
 
                 override fun onProfileResult(profile: VpnProfile) {
                     if (!isAdded || runId != realTestRunId) return
+                    val appCtx = context?.applicationContext
+                    if (appCtx != null) {
+                        if (profile.mLastRealTime >= activeRealStartMs) {
+                            MinabStaleResults.clearRealStale(appCtx, profile.getUUIDString())
+                        }
+                        if (profile.mLastPingTime >= activeRealStartMs) {
+                            MinabStaleResults.clearPingStale(appCtx, profile.getUUIDString())
+                        }
+                    }
                     if (realPingPhaseActive && profile.mLastPingMs > 0) {
                         realPingOkCount++
                         testProgressPanel?.showRealPingPhase(pingDoneCount, pingTotalCount, realPingOkCount)
@@ -2181,21 +2305,31 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
 
                 override fun onFinished(cancelled: Boolean, working: Int) {
                     if (runId != realTestRunId) return
-                    val runStartMs = realTester?.getRunStartTimeMs() ?: System.currentTimeMillis()
+                    val runStartMs = realTester?.getRunStartTimeMs() ?: activeRealStartMs
                     realTester = null
                     realTestActive = false
                     realPingPhaseActive = false
                     stopRealCountdown()
                     MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.HOME_REAL, false)
-                    if (!isAdded) return
+                    val rTargets = activeRealTargets
+                    val rSnaps = activeRealSnapshots
+                    val rClearedPing = activeRealClearedPing
+                    activeRealTargets = emptyList()
+                    activeRealSnapshots = emptyMap()
+                    if (!isAdded) {
+                        restoreUntestedAfterRun(rTargets, rSnaps, runStartMs, rClearedPing, clearedReal = true)
+                        return
+                    }
                     if (cancelled) {
                         testProgressPanel?.hide()
+                        restoreUntestedAfterRun(rTargets, rSnaps, runStartMs, rClearedPing, clearedReal = true)
                         updateOrbState()
                         MinabProfileBus.notifyChanged()
                         return
                     }
                     if (realTotalCount == 0) {
                         testProgressPanel?.hide()
+                        restoreUntestedAfterRun(rTargets, rSnaps, runStartMs, rClearedPing, clearedReal = true)
                         Toast.makeText(requireContext(), R.string.minab_real_none_to_test, Toast.LENGTH_LONG).show()
                         updateOrbState()
                         MinabProfileBus.notifyChanged()
@@ -2213,6 +2347,7 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
                         realDoneCount,
                         working
                     )
+                    restoreUntestedAfterRun(rTargets, rSnaps, runStartMs, rClearedPing, clearedReal = true)
                     setSortMode(MinabProfileBus.SORT_REAL)
                     lastListSignature = null
                     chipsSignature = null
@@ -2239,6 +2374,11 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         )
         if (!tester.start(profiles)) {
             Toast.makeText(requireContext(), R.string.minab_real_already_running, Toast.LENGTH_SHORT).show()
+            restoreUntestedAfterRun(
+                activeRealTargets, activeRealSnapshots, activeRealStartMs, activeRealClearedPing, clearedReal = true
+            )
+            activeRealTargets = emptyList()
+            activeRealSnapshots = emptyMap()
             return
         }
         realTester = tester
@@ -2249,6 +2389,12 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
     }
 
     private fun cancelRealTest() {
+        val rTargets = activeRealTargets
+        val rSnaps = activeRealSnapshots
+        val rClearedPing = activeRealClearedPing
+        val rStartMs = realTester?.getRunStartTimeMs() ?: activeRealStartMs
+        activeRealTargets = emptyList()
+        activeRealSnapshots = emptyMap()
         realTestRunId++
         realTester?.cancel()
         realTester = null
@@ -2256,8 +2402,9 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         realPingPhaseActive = false
         stopRealCountdown()
         MinabTestCoordinator.setRunning(MinabTestCoordinator.Source.HOME_REAL, false)
+        restoreUntestedAfterRun(rTargets, rSnaps, rStartMs, rClearedPing, clearedReal = true)
         if (pingTester == null) testProgressPanel?.hide()
-        updateOrbState()
+        if (isAdded) updateOrbState()
     }
 
     private fun updateRealStatus() {
@@ -2774,57 +2921,23 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             holder.flag.setImageResource(FlagHelper.flagResForProfile(profile, ctx))
             holder.flag.visibility = View.VISIBLE
 
-            val badge = holder.pingBadge
-            val pingShown = if (profile.mLastPingMs > 0) {
-                badge.text = profile.mLastPingResult.ifEmpty { "${profile.mLastPingMs} ms" }
-                badge.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    R.drawable.ic_minab_badge_ping, 0, 0, 0
-                )
-                badge.setBackgroundResource(
-                    when {
-                        profile.mLastPingMs < 100 -> R.drawable.minab_ping_badge_fast
-                        profile.mLastPingMs < 300 -> R.drawable.minab_ping_badge_slow
-                        else -> R.drawable.minab_ping_badge_fail
-                    }
-                )
-                true
-            } else if (profile.mLastPingResult.isNotEmpty() && profile.mLastPingMs != 0L) {
-                badge.text = profile.mLastPingResult
-                badge.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    R.drawable.ic_minab_badge_ping, 0, 0, 0
-                )
-                badge.setBackgroundResource(R.drawable.minab_ping_badge_fail)
-                true
-            } else {
-                false
-            }
-
-            val realBadge = holder.realBadge
-            val realShown = if (profile.mLastRealMs > 0) {
-                realBadge.text = profile.mLastRealResult.ifEmpty {
-                    getString(R.string.minab_real_ms, profile.mLastRealMs)
-                }
-                realBadge.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    R.drawable.ic_minab_badge_real_ok, 0, 0, 0
-                )
-                realBadge.setBackgroundResource(
-                    when {
-                        profile.mLastRealMs < 2000 -> R.drawable.minab_ping_badge_fast
-                        profile.mLastRealMs < 4500 -> R.drawable.minab_ping_badge_slow
-                        else -> R.drawable.minab_real_badge_ok
-                    }
-                )
-                true
-            } else if (profile.mLastRealResult.isNotEmpty() && profile.mLastRealMs != 0L) {
-                realBadge.text = profile.mLastRealResult
-                realBadge.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    R.drawable.ic_minab_badge_real_fail, 0, 0, 0
-                )
-                realBadge.setBackgroundResource(R.drawable.minab_ping_badge_fail)
-                true
-            } else {
-                false
-            }
+            val uuid = profile.getUUIDString()
+            val pingShown = bindRowBadge(
+                badge = holder.pingBadge,
+                ms = profile.mLastPingMs,
+                result = profile.mLastPingResult,
+                isReal = false,
+                isStale = cachedStalePing.contains(uuid),
+                ctx = ctx
+            )
+            val realShown = bindRowBadge(
+                badge = holder.realBadge,
+                ms = profile.mLastRealMs,
+                result = profile.mLastRealResult,
+                isReal = true,
+                isStale = cachedStaleReal.contains(uuid),
+                ctx = ctx
+            )
 
             if (!pingShown && !realShown) {
                 holder.badges.visibility = View.GONE
@@ -2845,6 +2958,78 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
                 populateVpnList()
                 MinabProfileBus.notifyChanged()
             }
+        }
+
+        private fun bindRowBadge(
+            badge: TextView,
+            ms: Long,
+            result: String,
+            isReal: Boolean,
+            isStale: Boolean,
+            ctx: Context
+        ): Boolean {
+            if (ms > 0) {
+                badge.text = result.ifEmpty {
+                    if (isReal) getString(R.string.minab_real_ms, ms) else "$ms ms"
+                }
+                badge.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    if (isReal) R.drawable.ic_minab_badge_real_ok else R.drawable.ic_minab_badge_ping,
+                    0, 0, 0
+                )
+                if (isStale) {
+                    applyStaleBadgeStyle(badge, ctx)
+                } else {
+                    val bgRes = if (isReal) {
+                        when {
+                            ms < 2000 -> R.drawable.minab_ping_badge_fast
+                            ms < 4500 -> R.drawable.minab_ping_badge_slow
+                            else -> R.drawable.minab_real_badge_ok
+                        }
+                    } else {
+                        when {
+                            ms < 100 -> R.drawable.minab_ping_badge_fast
+                            ms < 300 -> R.drawable.minab_ping_badge_slow
+                            else -> R.drawable.minab_ping_badge_fail
+                        }
+                    }
+                    applyFreshBadgeStyle(badge, bgRes)
+                }
+                return true
+            } else if (result.isNotEmpty() && ms != 0L) {
+                badge.text = result
+                badge.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    if (isReal) R.drawable.ic_minab_badge_real_fail else R.drawable.ic_minab_badge_ping,
+                    0, 0, 0
+                )
+                if (isStale) {
+                    applyStaleBadgeStyle(badge, ctx)
+                } else {
+                    applyFreshBadgeStyle(badge, R.drawable.minab_ping_badge_fail)
+                }
+                return true
+            } else {
+                badge.alpha = 1f
+                return false
+            }
+        }
+
+        private fun applyStaleBadgeStyle(badge: TextView, ctx: Context) {
+            val staleTextColor = ContextCompat.getColor(ctx, R.color.minab_badge_stale_text)
+            badge.setBackgroundResource(R.drawable.minab_badge_stale)
+            badge.setTextColor(staleTextColor)
+            badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 7.2f)
+            badge.typeface = Typeface.create(badge.typeface, Typeface.NORMAL)
+            TextViewCompat.setCompoundDrawableTintList(badge, ColorStateList.valueOf(staleTextColor))
+            badge.alpha = 0.88f
+        }
+
+        private fun applyFreshBadgeStyle(badge: TextView, bgRes: Int) {
+            badge.setBackgroundResource(bgRes)
+            badge.setTextColor(Color.WHITE)
+            badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 8.5f)
+            badge.typeface = Typeface.create(badge.typeface, Typeface.BOLD)
+            TextViewCompat.setCompoundDrawableTintList(badge, ColorStateList.valueOf(Color.WHITE))
+            badge.alpha = 1f
         }
     }
 

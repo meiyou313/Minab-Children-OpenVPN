@@ -1,20 +1,17 @@
 ---
-name: Feature report
-about: Suggest an idea about a feature that might benefit this app
-title: ''
-labels: ''
+name: Feature request
+about: Suggest an improvement or new capability for Minab OpenVPN
+title: '[Feature]: '
+labels: enhancement
 assignees: ''
 
 ---
-<!-- To make issues more manageable, I would appreciate it if you fill out the following details as applicable: -->
 
-<!-- Note to other developers, please read the paragraph Note to developer in the README.md before opening an issue ->
+### Problem or Workflow Need
+Describe the multi-server, testing, grouping, or UX friction you encountered.
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is
+### Proposed Solution
+Explain how you imagine this feature working inside Minab OpenVPN (Home, Configs, Tests, Settings, etc.).
 
-**Describe the solution you would like to see in the app**
-A clear and concise description of what you want to happen.
-
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+### Alternatives Considered
+Any alternative behaviors or edge cases worth thinking through (e.g., duplicate handling, backups, night mode, RTL/LTR).
