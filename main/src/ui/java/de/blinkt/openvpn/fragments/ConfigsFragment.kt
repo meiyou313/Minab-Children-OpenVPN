@@ -19,6 +19,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.TypedValue
@@ -141,6 +142,16 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
     private val busListener = MinabProfileBus.Listener {
         if (isAdded) {
             refreshFromBus()
+        }
+    }
+
+    private val connectStateListener = MinabConnectState.Listener { affected ->
+        if (isAdded) {
+            if (affected.isEmpty()) {
+                configsAdapter?.notifyRowsUpdated()
+            } else {
+                configsAdapter?.notifyUuidsChanged(affected)
+            }
         }
     }
 
@@ -341,7 +352,11 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
 
     override fun onResume() {
         super.onResume()
+        lastLevel = VpnStatus.getLastLevel()
+        lastObservedActive = VpnStatus.isVPNActive()
+        lastObservedUuid = VpnStatus.getLastConnectedVPNProfile()
         VpnStatus.addStateListener(this)
+        MinabConnectState.addListener(connectStateListener)
         sortMode = MinabProfileBus.getSortMode(requireContext())
         updateSortButtonUi()
         realTestSettingsPanel?.refreshIfVisible()
@@ -360,30 +375,53 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
         val activeNow = VpnStatus.isVPNActive()
         val uuidNow = VpnStatus.getLastConnectedVPNProfile()
         if (level == lastLevel && activeNow == lastObservedActive && uuidNow == lastObservedUuid) return
+        val prevUuid = lastObservedUuid
         lastLevel = level
         lastObservedActive = activeNow
         lastObservedUuid = uuidNow
-        if (level == ConnectionStatus.LEVEL_CONNECTED ||
-            level == ConnectionStatus.LEVEL_NOTCONNECTED
-        ) {
-            MinabConnectState.clearPendingConnect()
-        }
+        MinabConnectState.onVpnStateUpdated(level, activeNow, uuidNow)
         activity?.runOnUiThread {
-            if (isAdded) configsAdapter?.notifyRowsUpdated()
+            if (!isAdded) return@runOnUiThread
+            val affected = HashSet<String>()
+            if (!prevUuid.isNullOrBlank()) affected.add(prevUuid)
+            if (!uuidNow.isNullOrBlank()) affected.add(uuidNow)
+            if (affected.isNotEmpty()) {
+                configsAdapter?.notifyUuidsChanged(affected)
+            } else {
+                configsAdapter?.notifyRowsUpdated()
+            }
         }
     }
 
     override fun setConnectedVPN(uuid: String?) {
+        val act = activity ?: return
+        act.runOnUiThread {
+            if (!isAdded) return@runOnUiThread
+            if (uuid != lastObservedUuid) {
+                val prev = lastObservedUuid
+                lastObservedUuid = uuid
+                val affected = HashSet<String>()
+                if (!prev.isNullOrBlank()) affected.add(prev)
+                if (!uuid.isNullOrBlank()) affected.add(uuid)
+                if (affected.isNotEmpty()) {
+                    configsAdapter?.notifyUuidsChanged(affected)
+                } else {
+                    configsAdapter?.notifyRowsUpdated()
+                }
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
+        MinabConnectState.removeListener(connectStateListener)
         VpnStatus.removeStateListener(this)
         searchDebounceHandler.removeCallbacks(searchDebounceRunnable)
     }
 
     override fun onDestroyView() {
         MinabProfileBus.removeListener(busListener)
+        MinabConnectState.removeListener(connectStateListener)
         listRefreshHandler.removeCallbacks(listRefreshRunnable)
         listRefreshPending = false
         recyclerView?.adapter = null
@@ -1900,12 +1938,12 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
 
     private fun startVPN(profile: VpnProfile) {
         MinabConnectState.markPendingConnect(profile.getUUIDString())
-        configsAdapter?.notifyRowsUpdated()
         ProfileManager.saveProfile(requireContext(), profile)
         val intent = Intent(requireContext(), LaunchVPN::class.java)
         intent.putExtra(LaunchVPN.EXTRA_KEY, profile.getUUID().toString())
         intent.putExtra(OpenVPNService.EXTRA_START_REASON, "configs real test")
         intent.putExtra(LaunchVPN.EXTRA_HIDELOG, true)
+        intent.putExtra(OpenVPNService.EXTRA_CONNECT_UPTIME, SystemClock.uptimeMillis())
         intent.action = Intent.ACTION_MAIN
         startActivity(intent)
     }
@@ -2014,6 +2052,19 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             }
         }
 
+        fun notifyUuidsChanged(uuids: Set<String>) {
+            if (items.isEmpty()) return
+            if (uuids.isEmpty()) {
+                notifyRowsUpdated()
+                return
+            }
+            for (i in items.indices) {
+                if (uuids.contains(items[i].getUUIDString())) {
+                    notifyItemChanged(i + 1)
+                }
+            }
+        }
+
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
             return when (viewType) {
                 VIEW_TYPE_HEADER -> {
@@ -2066,24 +2117,38 @@ class ConfigsFragment : Fragment(), VpnStatus.StateListener {
             holder.flag.setImageResource(FlagHelper.flagResForProfile(profile, ctx))
             holder.flag.visibility = View.VISIBLE
 
-            val activeUuid = VpnStatus.getLastConnectedVPNProfile()
-            val connected = VpnStatus.isVPNActive() &&
-                lastLevel == ConnectionStatus.LEVEL_CONNECTED &&
-                profile.getUUIDString() == activeUuid
-            val connecting = !connected && MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)
-            if (connecting) {
-                holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connecting)
-                holder.connecting.visibility = View.VISIBLE
-            } else if (connected) {
-                holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connected)
-                holder.connecting.visibility = View.GONE
-            } else {
-                if (selectableItemBgResId != 0) {
-                    holder.rowContent.setBackgroundResource(selectableItemBgResId)
-                } else {
-                    holder.rowContent.setBackgroundColor(Color.TRANSPARENT)
+            val rowState = MinabConnectState.getRowState(
+                profile.getUUIDString(),
+                VpnStatus.getLastLevel()
+            )
+            when (rowState) {
+                MinabConnectState.RowVisualState.DISCONNECTING -> {
+                    holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_disconnecting)
+                    holder.connecting.indeterminateTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(ctx, R.color.minab_orb_disconnecting_end)
+                    )
+                    holder.connecting.visibility = View.VISIBLE
                 }
-                holder.connecting.visibility = View.GONE
+                MinabConnectState.RowVisualState.TESTING,
+                MinabConnectState.RowVisualState.CONNECTING -> {
+                    holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connecting)
+                    holder.connecting.indeterminateTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(ctx, R.color.minab_busy)
+                    )
+                    holder.connecting.visibility = View.VISIBLE
+                }
+                MinabConnectState.RowVisualState.CONNECTED -> {
+                    holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connected)
+                    holder.connecting.visibility = View.GONE
+                }
+                MinabConnectState.RowVisualState.IDLE -> {
+                    if (selectableItemBgResId != 0) {
+                        holder.rowContent.setBackgroundResource(selectableItemBgResId)
+                    } else {
+                        holder.rowContent.setBackgroundColor(Color.TRANSPARENT)
+                    }
+                    holder.connecting.visibility = View.GONE
+                }
             }
 
             val pingShown = setConfigBadge(

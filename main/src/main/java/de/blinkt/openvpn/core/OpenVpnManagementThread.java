@@ -49,7 +49,7 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
 
     private pauseReason lastPauseReason = pauseReason.noNetwork;
     private PausedStateCallback mPauseCallback;
-    private boolean mShuttingDown;
+    private volatile boolean mShuttingDown = false;
     private final Runnable mResumeHoldRunnable = () -> {
         if (shouldBeRunning()) {
             releaseHoldCmd();
@@ -181,8 +181,16 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
         }
 
         try {
+            if (mShuttingDown) return;
             // Wait for a client to connect
             mSocket = mServerSocket.accept();
+            if (mShuttingDown) {
+                try {
+                    mSocket.close();
+                } catch (IOException ignored) {
+                }
+                return;
+            }
             InputStream instream = mSocket.getInputStream();
 
 
@@ -220,7 +228,8 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
                 pendingInput = processInput(pendingInput);
             }
         } catch (IOException e) {
-            if (!e.getMessage().equals("socket closed") && !e.getMessage().equals("Connection reset by peer"))
+            String msg = e.getMessage();
+            if (!mShuttingDown && !"socket closed".equals(msg) && !"Connection reset by peer".equals(msg))
                 VpnStatus.logException(e);
         }
         synchronized (active) {
@@ -399,6 +408,7 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
     }
 
     private void handleHold(String argument) {
+        if (mShuttingDown) return;
         mWaitingForRelease = true;
         int waittime = Integer.parseInt(argument.split(":")[1]);
         if (shouldBeRunning()) {
@@ -418,6 +428,7 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
 
     private void releaseHoldCmd() {
         mResumeHandler.removeCallbacks(mResumeHoldRunnable);
+        if (mShuttingDown) return;
         if ((System.currentTimeMillis() - mLastHoldRelease) < 5000) {
             try {
                 Thread.sleep(3000);
@@ -547,6 +558,7 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
     }
 
     private void processNeedCommand(String argument) {
+        if (mShuttingDown) return;
         int p1 = argument.indexOf('\'');
         int p2 = argument.indexOf('\'', p1 + 1);
 
@@ -878,10 +890,30 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
 
     @Override
     public boolean stopVPN(boolean replaceConnection) {
+        mShuttingDown = true;
+        mResumeHandler.removeCallbacks(mResumeHoldRunnable);
+        mResumeHandler.removeCallbacks(orbotStatusTimeOutRunnable);
+        LocalServerSocket ss = mServerSocket;
+        if (ss != null) {
+            try {
+                ss.close();
+            } catch (IOException ignored) {
+            }
+        }
+        LocalSocket ssl = mServerSocketLocal;
+        if (ssl != null) {
+            try {
+                ssl.close();
+            } catch (IOException ignored) {
+            }
+        }
         boolean stopSucceed = stopOpenVPN();
-        if (stopSucceed) {
-            mShuttingDown = true;
-
+        LocalSocket sock = mSocket;
+        if (sock != null) {
+            try {
+                sock.close();
+            } catch (IOException ignored) {
+            }
         }
         return stopSucceed;
     }

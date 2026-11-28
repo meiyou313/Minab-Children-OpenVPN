@@ -53,6 +53,14 @@ public final class MinabUiBridge {
                 boolean isDanger,
                 Runnable onClear
         );
+
+        default void setRealTestingUuid(String uuid) {}
+
+        default void setDisconnectingUuid(String uuid, long minPulseMs) {}
+
+        default void onPingServerStart(String uuid) {}
+
+        default void onPingServerEnd(String uuid) {}
     }
 
     private static volatile Handler sHandler;
@@ -118,5 +126,25 @@ public final class MinabUiBridge {
             Activity activity, String title, String message, boolean isDanger, Runnable onClear) {
         Handler h = getHandler();
         return h != null && h.showPendingCrashDialog(activity, title, message, isDanger, onClear);
+    }
+
+    public static void setRealTestingUuid(String uuid) {
+        Handler h = getHandler();
+        if (h != null) h.setRealTestingUuid(uuid);
+    }
+
+    public static void setDisconnectingUuid(String uuid, long minPulseMs) {
+        Handler h = getHandler();
+        if (h != null) h.setDisconnectingUuid(uuid, minPulseMs);
+    }
+
+    public static void onPingServerStart(String uuid) {
+        Handler h = getHandler();
+        if (h != null) h.onPingServerStart(uuid);
+    }
+
+    public static void onPingServerEnd(String uuid) {
+        Handler h = getHandler();
+        if (h != null) h.onPingServerEnd(uuid);
     }
 }

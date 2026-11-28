@@ -53,6 +53,7 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
      * pollStatus kept firing every 2 s forever — even after the
      * thread finished. Post and remove this exact instance. */
     private final Runnable pollStatusRunnable = this::pollStatus;
+    private volatile boolean mShuttingDown = false;
 
     public OpenVPNThreadv3(OpenVPNService openVpnService, VpnProfile vp) {
         mVp = vp;
@@ -184,6 +185,7 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
 
     @Override
     public int tun_builder_establish() {
+        if (mShuttingDown) return -1;
         return mService.openTun().detachFd();
     }
 
@@ -327,8 +329,10 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
 
     @Override
     public boolean stopVPN(boolean replaceConnection) {
+        mShuttingDown = true;
+        mHandler.removeCallbacks(pollStatusRunnable);
         mHandler.post(this::stop);
-        return false;
+        return true;
     }
 
     @Override
@@ -379,6 +383,7 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
 
     @Override
     public void event(ClientAPI_Event event) {
+        if (mShuttingDown) return;
         String name = event.getName();
         String info = event.getInfo();
         switch (name) {
@@ -476,6 +481,7 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
      * interval until run() removes it when the thread finishes.
      */
     private void pollStatus() {
+        if (mShuttingDown) return;
         ClientAPI_TransportStats t = transport_stats();
         long in = t.getBytesIn();
         long out = t.getBytesOut();

@@ -187,16 +187,21 @@ class MinabWidgetProvider : AppWidgetProvider() {
             } catch (_: Exception) {
                 ConnectionStatus.LEVEL_NOTCONNECTED
             }
+            val uuid = try {
+                VpnStatus.getLastConnectedVPNProfile()
+            } catch (_: Exception) {
+                null
+            }
+            val hasSelected = !uuid.isNullOrBlank()
             val state = when {
-                active && level == ConnectionStatus.LEVEL_CONNECTED -> WidgetState.CONNECTED
-                active || level == ConnectionStatus.LEVEL_START ||
+                active && level == ConnectionStatus.LEVEL_CONNECTED && hasSelected -> WidgetState.CONNECTED
+                (active && hasSelected) || level == ConnectionStatus.LEVEL_START ||
                     level == ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET ||
                     level == ConnectionStatus.LEVEL_CONNECTING_SERVER_REPLIED -> WidgetState.CONNECTING
                 else -> WidgetState.IDLE
             }
             val profile: VpnProfile? = try {
                 if (state != WidgetState.IDLE) {
-                    val uuid = VpnStatus.getLastConnectedVPNProfile()
                     uuid?.let { ProfileManager.getIfPresent(context, it) }
                         ?: MinabVpnControl.lastUsedProfile(context)
                 } else {

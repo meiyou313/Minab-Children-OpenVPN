@@ -120,6 +120,22 @@ object MinabUiBridgeImpl {
                 )
                 return true
             }
+
+            override fun setRealTestingUuid(uuid: String?) {
+                MinabConnectState.setRealTestingUuid(uuid)
+            }
+
+            override fun setDisconnectingUuid(uuid: String?, minPulseMs: Long) {
+                MinabConnectState.markDisconnecting(uuid, minPulseMs, 4000L)
+            }
+
+            override fun onPingServerStart(uuid: String?) {
+                MinabConnectState.onPingServerStart(uuid)
+            }
+
+            override fun onPingServerEnd(uuid: String?) {
+                MinabConnectState.onPingServerEnd(uuid)
+            }
         })
     }
 }

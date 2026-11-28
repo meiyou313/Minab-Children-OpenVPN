@@ -229,19 +229,22 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         }
     }
 
-    // Optimistic connecting & disconnecting transition hints for responsive orb feedback
-    private val orbTransitionHandler = Handler(Looper.getMainLooper())
-    private var optimisticConnectingUntilMs: Long = 0L
-    private var disconnectingUntilMs: Long = 0L
-    private val orbTransitionRefreshRunnable = Runnable {
-        if (isAdded) updateOrbState()
-    }
-
     @Volatile
     private var connectedPingTesting: Boolean = false
     private var lastLevel: ConnectionStatus? = null
     private var lastObservedActive: Boolean = false
     private var lastObservedUuid: String? = null
+
+    private val connectStateListener = MinabConnectState.Listener { affected ->
+        if (isAdded) {
+            if (affected.isEmpty()) {
+                homeAdapter?.notifyRowsUpdated()
+            } else {
+                homeAdapter?.notifyUuidsChanged(affected)
+            }
+            updateOrbState()
+        }
+    }
 
     // Search debounce & caches
     private val searchDebounceHandler = Handler(Looper.getMainLooper())
@@ -304,13 +307,8 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
                     mLastStatusMessage = newStatusMsg
                     mLastIntent = intent
 
-                    if (activeNow || level == ConnectionStatus.LEVEL_CONNECTED ||
-                        level == ConnectionStatus.LEVEL_START ||
-                        level == ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET ||
-                        level == ConnectionStatus.LEVEL_CONNECTING_SERVER_REPLIED
-                    ) {
-                        optimisticConnectingUntilMs = 0L
-                    }
+                    MinabConnectState.onVpnStateUpdated(level, activeNow, uuidNow)
+
                     // Subtle haptic cue when connection settles to connected or drops
                     if (prevLevel != ConnectionStatus.LEVEL_CONNECTED &&
                         level == ConnectionStatus.LEVEL_CONNECTED
@@ -324,20 +322,22 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
                     // If a previously connected VPN just dropped on its own, show
                     // a brief disconnecting visual pulse before settling to idle.
                     if (prevActive && !activeNow && !realTestActive &&
-                        SystemClock.uptimeMillis() >= disconnectingUntilMs
+                        !MinabConnectState.isDisconnectingNow()
                     ) {
-                        triggerDisconnectingTransition(550L)
+                        MinabConnectState.markDisconnecting(prevUuid, minPulseMs = 550L, maxDurationMs = 900L)
                     }
 
                     val stateChanged = prevLevel != level || prevActive != activeNow || prevUuid != uuidNow
                     val statusMsgChanged = prevStatusMsg != newStatusMsg
-                    if (level == ConnectionStatus.LEVEL_CONNECTED ||
-                        level == ConnectionStatus.LEVEL_NOTCONNECTED
-                    ) {
-                        MinabConnectState.clearPendingConnect()
-                    }
                     if (stateChanged) {
-                        homeAdapter?.notifyRowsUpdated()
+                        val affected = HashSet<String>()
+                        if (!prevUuid.isNullOrBlank()) affected.add(prevUuid)
+                        if (!uuidNow.isNullOrBlank()) affected.add(uuidNow)
+                        if (affected.isNotEmpty()) {
+                            homeAdapter?.notifyUuidsChanged(affected)
+                        } else {
+                            homeAdapter?.notifyRowsUpdated()
+                        }
                         updateOrbState()
                         MinabWidgetProvider.updateAllWidgets(activity)
                     } else if (statusMsgChanged) {
@@ -349,20 +349,6 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             }
         } catch (_: Exception) {
         }
-    }
-
-    private fun triggerDisconnectingTransition(durationMs: Long) {
-        optimisticConnectingUntilMs = 0L
-        disconnectingUntilMs = SystemClock.uptimeMillis() + durationMs
-        orbTransitionHandler.removeCallbacks(orbTransitionRefreshRunnable)
-        orbTransitionHandler.postDelayed(orbTransitionRefreshRunnable, durationMs + 30L)
-    }
-
-    private fun triggerOptimisticConnecting() {
-        disconnectingUntilMs = 0L
-        optimisticConnectingUntilMs = SystemClock.uptimeMillis() + 2600L
-        orbTransitionHandler.removeCallbacks(orbTransitionRefreshRunnable)
-        orbTransitionHandler.postDelayed(orbTransitionRefreshRunnable, 2650L)
     }
 
     private fun showUserRequestDialogIfNeeded(level: ConnectionStatus?, intent: Intent?): Boolean {
@@ -377,6 +363,23 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
     }
 
     override fun setConnectedVPN(uuid: String?) {
+        val act = activity ?: return
+        act.runOnUiThread {
+            if (!isAdded) return@runOnUiThread
+            if (uuid != lastObservedUuid) {
+                val prev = lastObservedUuid
+                lastObservedUuid = uuid
+                val affected = HashSet<String>()
+                if (!prev.isNullOrBlank()) affected.add(prev)
+                if (!uuid.isNullOrBlank()) affected.add(uuid)
+                if (affected.isNotEmpty()) {
+                    homeAdapter?.notifyUuidsChanged(affected)
+                } else {
+                    homeAdapter?.notifyRowsUpdated()
+                }
+                updateOrbState()
+            }
+        }
     }
 
     override fun updateByteCount(inBytes: Long, outBytes: Long, diffIn: Long, diffOut: Long) {
@@ -471,24 +474,25 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             Toast.makeText(requireContext(), R.string.minab_connect_locked_toast, Toast.LENGTH_SHORT).show()
             return
         }
-        if (VpnStatus.isVPNActive() && profile.getUUIDString() == VpnStatus.getLastConnectedVPNProfile()) {
+        val uuid = profile.getUUIDString()
+        val activeMatch = VpnStatus.isVPNActive() && uuid == VpnStatus.getLastConnectedVPNProfile()
+        val pendingMatch = uuid == MinabConnectState.getPendingConnectUuid()
+        if (activeMatch || pendingMatch) {
             if (lastLevel == ConnectionStatus.LEVEL_WAITING_FOR_USER_INPUT && mLastIntent != null) {
                 startActivity(mLastIntent!!)
             } else {
-                MinabConnectState.clearPendingConnect()
-                triggerDisconnectingTransition(750L)
+                MinabConnectState.markDisconnecting(uuid)
                 updateOrbState()
-                homeAdapter?.notifyRowsUpdated()
                 MinabVpnControl.disconnect(requireContext())
             }
         } else {
-            if (VpnStatus.isVPNActive()) MinabFailover.noteUserDisconnect()
+            if (VpnStatus.isVPNActive() || MinabConnectState.isPendingConnectNow()) {
+                MinabFailover.noteUserDisconnect()
+            }
             bestButtonHighlighted = false
             updateBestServerButtonHighlight()
-            MinabConnectState.markPendingConnect(profile.getUUIDString())
-            triggerOptimisticConnecting()
+            MinabConnectState.markPendingConnect(uuid)
             updateOrbState()
-            homeAdapter?.notifyRowsUpdated()
             startVPN(profile)
         }
     }
@@ -765,6 +769,10 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
     override fun onResume() {
         super.onResume()
         orbView?.setAnimationsEnabled(true)
+        lastLevel = VpnStatus.getLastLevel()
+        lastObservedActive = VpnStatus.isVPNActive()
+        lastObservedUuid = VpnStatus.getLastConnectedVPNProfile()
+        MinabConnectState.addListener(connectStateListener)
         MinabTestCoordinator.addListener(testStateListener)
         try {
             sortMode = MinabProfileBus.getSortMode(requireContext())
@@ -798,6 +806,7 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
         super.onPause()
         orbView?.setAnimationsEnabled(false)
         stopSessionTimer()
+        MinabConnectState.removeListener(connectStateListener)
         MinabTestCoordinator.removeListener(testStateListener)
         VpnStatus.removeStateListener(this)
         VpnStatus.removeByteCountListener(this)
@@ -806,8 +815,8 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
 
     override fun onDestroyView() {
         MinabProfileBus.removeListener(busListener)
+        MinabConnectState.removeListener(connectStateListener)
         stopSessionTimer()
-        orbTransitionHandler.removeCallbacks(orbTransitionRefreshRunnable)
         listRefreshHandler.removeCallbacks(listRefreshRunnable)
         listRefreshPending = false
         recyclerView?.adapter = null
@@ -1563,6 +1572,22 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             Toast.makeText(requireContext(), R.string.minab_connect_locked_toast, Toast.LENGTH_SHORT).show()
             return
         }
+        if (MinabConnectState.isDisconnectingNow()) {
+            MinabVpnControl.disconnect(requireContext())
+            return
+        }
+        if (VpnStatus.isVPNActive() || MinabConnectState.isPendingConnectNow()) {
+            if (lastLevel == ConnectionStatus.LEVEL_WAITING_FOR_USER_INPUT && mLastIntent != null) {
+                startActivity(mLastIntent!!)
+                return
+            }
+            val activeOrPendingUuid = VpnStatus.getLastConnectedVPNProfile()
+                ?: MinabConnectState.getPendingConnectUuid()
+            MinabConnectState.markDisconnecting(activeOrPendingUuid)
+            updateOrbState()
+            MinabVpnControl.disconnect(requireContext())
+            return
+        }
         val target = orbTargetProfile()
         if (target == null) {
             Toast.makeText(requireContext(), R.string.minab_no_profiles_yet, Toast.LENGTH_LONG).show()
@@ -1652,16 +1677,25 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             return
         }
 
-        val now = SystemClock.uptimeMillis()
         val active = VpnStatus.isVPNActive()
         val uuid = VpnStatus.getLastConnectedVPNProfile()
-        val isDisconnecting = now < disconnectingUntilMs
-        val isOptimisticConnecting = now < optimisticConnectingUntilMs
-        val isConnected = active && lastLevel == ConnectionStatus.LEVEL_CONNECTED
-        val isConnecting = !isDisconnecting && (
-            (active && !isConnected) ||
-                isOptimisticConnecting ||
-                MinabConnectState.isConnecting(uuid, lastLevel)
+        val levelNow = lastLevel ?: try {
+            VpnStatus.getLastLevel()
+        } catch (_: Exception) {
+            ConnectionStatus.LEVEL_NOTCONNECTED
+        }
+        val hasSelectedProfile = !uuid.isNullOrBlank() && try {
+            ProfileManager.getIfPresent(ctx, uuid) != null
+        } catch (_: Exception) {
+            false
+        }
+        val isDisconnecting = MinabConnectState.isDisconnectingNow()
+        val isConnected = !isDisconnecting && active &&
+            levelNow == ConnectionStatus.LEVEL_CONNECTED && hasSelectedProfile
+        val isConnecting = !isDisconnecting && !isConnected && (
+            (active && hasSelectedProfile) ||
+                MinabConnectState.isPendingConnectNow() ||
+                MinabConnectState.isConnecting(uuid, levelNow)
             )
 
         val orbState = when {
@@ -1698,13 +1732,19 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
 
         val nameView = connNameView
         val pingView = connPingView
-        val profile = if (active || isConnecting) uuid?.let {
+        val lookupUuid = when {
+            (active || isConnected || isConnecting) && !uuid.isNullOrBlank() -> uuid
+            MinabConnectState.isPendingConnectNow() -> MinabConnectState.getPendingConnectUuid()
+            isDisconnecting -> MinabConnectState.getDisconnectingUuid() ?: uuid
+            else -> null
+        }
+        val profile = lookupUuid?.let {
             try {
                 ProfileManager.getIfPresent(ctx, it)
             } catch (_: Exception) {
                 null
             }
-        } else null
+        }
 
         val shownProfile = profile ?: orbTargetProfile()
         nameView?.text = shownProfile?.mName ?: ""
@@ -1768,12 +1808,13 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             Toast.makeText(requireContext(), R.string.minab_best_none, Toast.LENGTH_LONG).show()
             return
         }
+        if (VpnStatus.isVPNActive() || MinabConnectState.isPendingConnectNow()) {
+            MinabFailover.noteUserDisconnect()
+        }
         bestButtonHighlighted = false
         updateBestServerButtonHighlight()
         MinabConnectState.markPendingConnect(best.getUUIDString())
-        triggerOptimisticConnecting()
         updateOrbState()
-        homeAdapter?.notifyRowsUpdated()
         startVPN(best)
     }
 
@@ -1799,15 +1840,22 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
 
     private fun updateIpInfo(uuid: String?) {
         if (connIpView == null) return
-        if (VpnStatus.isVPNActive()) {
-            val connected = lastLevel == ConnectionStatus.LEVEL_CONNECTED || lastLevel == null
-            if (!connected) return
+        val levelNow = lastLevel ?: try {
+            VpnStatus.getLastLevel()
+        } catch (_: Exception) {
+            ConnectionStatus.LEVEL_NOTCONNECTED
+        }
+        val trulyConnected = !MinabConnectState.isDisconnectingNow() &&
+            VpnStatus.isVPNActive() &&
+            levelNow == ConnectionStatus.LEVEL_CONNECTED &&
+            !uuid.isNullOrBlank()
+        if (trulyConnected) {
             val key = "conn:$uuid"
             if (ipCheckKey == key && ipCheckKeyConnected) return
             ipCheckKey = key
             ipCheckKeyConnected = true
             runIpCheck(key, uuid)
-        } else {
+        } else if (!VpnStatus.isVPNActive() && !MinabConnectState.isPendingConnectNow()) {
             if (ipCheckKey == "own") return
             ipCheckKey = "own"
             ipCheckKeyConnected = false
@@ -2459,11 +2507,13 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
     }
 
     private fun startVPN(profile: VpnProfile) {
+        MinabConnectState.markPendingConnect(profile.getUUIDString())
         ProfileManager.saveProfile(activity, profile)
         val intent = Intent(activity, LaunchVPN::class.java)
         intent.putExtra(LaunchVPN.EXTRA_KEY, profile.getUUID().toString())
         intent.putExtra(OpenVPNService.EXTRA_START_REASON, "main profile list")
         intent.putExtra(LaunchVPN.EXTRA_HIDELOG, true)
+        intent.putExtra(OpenVPNService.EXTRA_CONNECT_UPTIME, SystemClock.uptimeMillis())
         intent.action = Intent.ACTION_MAIN
         startActivity(intent)
     }
@@ -2594,6 +2644,19 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             }
         }
 
+        fun notifyUuidsChanged(uuids: Set<String>) {
+            if (items.isEmpty()) return
+            if (uuids.isEmpty()) {
+                notifyRowsUpdated()
+                return
+            }
+            for (i in items.indices) {
+                if (uuids.contains(items[i].getUUIDString())) {
+                    notifyItemChanged(i + 1)
+                }
+            }
+        }
+
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
             return when (viewType) {
                 VIEW_TYPE_HEADER -> {
@@ -2644,19 +2707,35 @@ class VPNProfileList : Fragment(), View.OnClickListener, StateListener, ByteCoun
             holder.rowIndex.text = (index + 1).toString()
 
             val activeUuid = VpnStatus.getLastConnectedVPNProfile()
-            val connected = VpnStatus.isVPNActive() &&
-                lastLevel == ConnectionStatus.LEVEL_CONNECTED &&
-                profile.getUUIDString() == activeUuid
-            val connecting = !connected && MinabConnectState.isConnecting(profile.getUUIDString(), lastLevel)
-            if (connecting) {
-                holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connecting)
-                holder.connecting.visibility = View.VISIBLE
-            } else if (connected) {
-                holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connected)
-                holder.connecting.visibility = View.GONE
-            } else {
-                holder.rowContent.setBackgroundColor(Color.TRANSPARENT)
-                holder.connecting.visibility = View.GONE
+            val rowState = MinabConnectState.getRowState(
+                profile.getUUIDString(),
+                VpnStatus.getLastLevel()
+            )
+            val connected = rowState == MinabConnectState.RowVisualState.CONNECTED
+            when (rowState) {
+                MinabConnectState.RowVisualState.DISCONNECTING -> {
+                    holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_disconnecting)
+                    holder.connecting.indeterminateTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(ctx, R.color.minab_orb_disconnecting_end)
+                    )
+                    holder.connecting.visibility = View.VISIBLE
+                }
+                MinabConnectState.RowVisualState.TESTING,
+                MinabConnectState.RowVisualState.CONNECTING -> {
+                    holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connecting)
+                    holder.connecting.indeterminateTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(ctx, R.color.minab_busy)
+                    )
+                    holder.connecting.visibility = View.VISIBLE
+                }
+                MinabConnectState.RowVisualState.CONNECTED -> {
+                    holder.rowContent.setBackgroundResource(R.drawable.minab_row_halo_connected)
+                    holder.connecting.visibility = View.GONE
+                }
+                MinabConnectState.RowVisualState.IDLE -> {
+                    holder.rowContent.setBackgroundColor(Color.TRANSPARENT)
+                    holder.connecting.visibility = View.GONE
+                }
             }
 
             holder.title.text = profile.mName ?: ""

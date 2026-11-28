@@ -5,6 +5,7 @@
 
 package de.blinkt.openvpn;
 
+import static de.blinkt.openvpn.core.OpenVPNService.EXTRA_CONNECT_UPTIME;
 import static de.blinkt.openvpn.core.OpenVPNService.EXTRA_START_REASON;
 
 import android.annotation.SuppressLint;
@@ -21,11 +22,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.text.method.PasswordTransformationMethod;
 import android.widget.EditText;
 
+import de.blinkt.openvpn.minab.MinabDisconnectSignal;
 import de.blinkt.openvpn.minab.MinabUiBridge;
 
 import java.io.IOException;
@@ -85,6 +88,7 @@ public class LaunchVPN extends Activity {
     private String mTransientAuthPW;
     private String mTransientCertOrPKCS12PW;
     private String mSelectedProfileReason;
+    private long mConnectRequestUptime = 0L;
 
     @Override
     public void onCreate(Bundle icicle) {
@@ -132,6 +136,12 @@ public class LaunchVPN extends Activity {
         // Check if we need to clear the log
         if (Preferences.getDefaultSharedPreferences(this).getBoolean(CLEARLOG, true))
             VpnStatus.clearLog();
+
+        mConnectRequestUptime = intent.getLongExtra(EXTRA_CONNECT_UPTIME, SystemClock.uptimeMillis());
+        if (mConnectRequestUptime > 0L && MinabDisconnectSignal.getLastUserDisconnectUptimeMs() >= mConnectRequestUptime) {
+            finish();
+            return;
+        }
 
         // we got called to be the starting point, most likely a shortcut
         String shortcutUUID = intent.getStringExtra(EXTRA_KEY);
@@ -249,8 +259,12 @@ public class LaunchVPN extends Activity {
 
                     if (!mhideLog && showLogWindow)
                         showLogWindow();
+                    if (mConnectRequestUptime > 0L && MinabDisconnectSignal.getLastUserDisconnectUptimeMs() >= mConnectRequestUptime) {
+                        finish();
+                        return;
+                    }
                     ProfileManager.updateLRU(this, mSelectedProfile);
-                    VPNLaunchHelper.startOpenVpn(mSelectedProfile, getBaseContext(), mSelectedProfileReason, true);
+                    VPNLaunchHelper.startOpenVpn(mSelectedProfile, getBaseContext(), mSelectedProfileReason, true, mConnectRequestUptime);
                     finish();
                 }
             } else if (resultCode == Activity.RESULT_CANCELED) {

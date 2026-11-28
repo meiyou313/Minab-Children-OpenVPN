@@ -40,6 +40,7 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.service.notification.StatusBarNotification;
 import android.system.OsConstants;
 import android.text.TextUtils;
@@ -61,6 +62,7 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.Vector;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import de.blinkt.openvpn.LaunchVPN;
 import de.blinkt.openvpn.R;
@@ -79,6 +81,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     public static final String EXTRA_DO_NOT_REPLACE_RUNNING_VPN = "de.blinkt.openvpn.DO_NOT_REPLACE_RUNNING_VPN";
 
     public static final String EXTRA_START_REASON = "de.blinkt.openvpn.startReason";
+    public static final String EXTRA_CONNECT_UPTIME = "de.blinkt.openvpn.CONNECT_UPTIME";
 
     public static final String DISCONNECT_VPN = "de.blinkt.openvpn.DISCONNECT_VPN";
     public static final String NOTIFICATION_CHANNEL_BG_ID = "openvpn_bg";
@@ -118,10 +121,21 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
     private DeviceStateReceiver mDeviceStateReceiver;
     private boolean mDisplayBytecount = false;
-    private boolean mStarting = false;
+    private volatile boolean mStarting = false;
     private volatile boolean mUserStopped = false;
+    private volatile long mLastUserStopUptimeMs = 0L;
+    private final AtomicLong mSessionGen = new AtomicLong(0L);
+    private volatile long mActiveSessionGen = 0L;
     private long mConnecttime;
     private OpenVPNManagement mManagement;
+
+    boolean isCurrentSession(long sessionGen) {
+        return sessionGen == 0L || sessionGen == mActiveSessionGen;
+    }
+
+    private boolean isStartAborted(long expectedGen) {
+        return mUserStopped || mSessionGen.get() != expectedGen;
+    }
     private final IBinder mBinder = new IOpenVPNServiceInternal.Stub() {
 
         @Override
@@ -251,6 +265,11 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         endVpnService();
     }
 
+    public void openvpnStopped(long sessionGen) {
+        if (!isCurrentSession(sessionGen)) return;
+        endVpnService();
+    }
+
     private boolean isAlwaysActiveEnabled()
     {
         SharedPreferences prefs = Preferences.getDefaultSharedPreferences(this);
@@ -272,6 +291,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         }
         synchronized (mProcessLock) {
             mProcessThread = null;
+            mOpenVPNThread = null;
         }
         VpnStatus.removeByteCountListener(this);
         unregisterDeviceStateReceiver(mDeviceStateReceiver);
@@ -281,7 +301,6 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         // too: it was never cleared (only set), so the UI kept
         // looking up a dead profile on every state update.
         VpnStatus.setConnectedVPNProfile(null);
-        mOpenVPNThread = null;
         if (!mStarting) {
             stopForeground(!mNotificationAlwaysVisible);
 
@@ -507,28 +526,57 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     public boolean stopVPN(boolean replaceConnection) throws RemoteException {
         if (!replaceConnection) {
             mUserStopped = true;
+            mLastUserStopUptimeMs = SystemClock.uptimeMillis();
+            final long stopGen = mSessionGen.incrementAndGet();
             keepVPNAlive.unscheduleKeepVPNAliveJobService(this);
             ProfileManager.setConnectedVpnProfileDisconnected(this);
+            OpenVPNManagement mgmt = getManagement();
+            boolean sent = mgmt != null && mgmt.stopVPN(false);
+            if (!sent) {
+                mCommandHandler.post(() -> {
+                    if (mSessionGen.get() != stopGen) return;
+                    mStarting = false;
+                    forceStopOpenVpnProcess();
+                    VpnStatus.updateStateString("NOPROCESS", "No process running.",
+                            R.string.state_noprocess, ConnectionStatus.LEVEL_NOTCONNECTED);
+                    endVpnService();
+                });
+            } else {
+                // Watchdog: if OpenVPN is blocked on DNS/TCP connect and ignores
+                // management SIGINT, terminate cleanly within 450 ms.
+                mCommandHandler.postDelayed(() -> {
+                    if (mSessionGen.get() != stopGen) return;
+                    boolean alive;
+                    synchronized (mProcessLock) {
+                        alive = mProcessThread != null && mProcessThread.isAlive();
+                    }
+                    if (alive || VpnStatus.isVPNActive()) {
+                        mStarting = false;
+                        forceStopOpenVpnProcess();
+                        VpnStatus.updateStateString("NOPROCESS", "No process running.",
+                                R.string.state_noprocess, ConnectionStatus.LEVEL_NOTCONNECTED);
+                        endVpnService();
+                    }
+                }, 450L);
+            }
+            return true;
         }
         OpenVPNManagement mgmt = getManagement();
-        if (mgmt != null) {
-            return mgmt.stopVPN(replaceConnection);
-        } else if (!replaceConnection) {
-            mCommandHandler.post(() -> {
-                mStarting = false;
-                forceStopOpenVpnProcess();
-                endVpnService();
-            });
-            return true;
-        } else {
-            return false;
-        }
+        return mgmt != null && mgmt.stopVPN(true);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.getBooleanExtra(ALWAYS_SHOW_NOTIFICATION, false))
             mNotificationAlwaysVisible = true;
+
+        if (intent != null && DISCONNECT_VPN.equals(intent.getAction())) {
+            try {
+                stopVPN(false);
+            } catch (RemoteException ignored) {
+            }
+            return START_NOT_STICKY;
+        }
 
         VpnStatus.addStateListener(this);
         VpnStatus.addByteCountListener(this);
@@ -553,7 +601,17 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         }
 
         if (intent != null && intent.hasExtra(EXTRA_PROFILEUUID)) {
+            long reqUptime = intent.getLongExtra(EXTRA_CONNECT_UPTIME, 0L);
+            if (mUserStopped && reqUptime > 0L && reqUptime <= mLastUserStopUptimeMs) {
+                VpnStatus.logDebug("Ignoring stale VPN start intent predating user disconnect");
+                stopSelf(startId);
+                return START_NOT_STICKY;
+            }
             mUserStopped = false;
+            String reqUuid = intent.getStringExtra(EXTRA_PROFILEUUID);
+            if (reqUuid != null && !reqUuid.isEmpty()) {
+                VpnStatus.setConnectedVPNProfile(reqUuid);
+            }
         } else if (mUserStopped) {
             stopSelf(startId);
             return START_NOT_STICKY;
@@ -571,7 +629,8 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         }
 
         /* start the OpenVPN process itself in a background thread */
-        mCommandHandler.post(() -> startOpenVPN(intent, startId));
+        final long myGen = mSessionGen.incrementAndGet();
+        mCommandHandler.post(() -> startOpenVPN(intent, startId, myGen));
 
         return START_NOT_STICKY;
     }
@@ -666,13 +725,18 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
 
 
-    private void startOpenVPN(Intent intent, int startId) {
-        if (mUserStopped && (intent == null || !intent.hasExtra(EXTRA_PROFILEUUID))) {
+    private void startOpenVPN(Intent intent, int startId, long expectedGen) {
+        if (isStartAborted(expectedGen)) {
             stopSelf(startId);
             return;
         }
         VpnProfile vp = fetchVPNProfile(intent);
         if (vp == null) {
+            stopSelf(startId);
+            return;
+        }
+
+        if (isStartAborted(expectedGen)) {
             stopSelf(startId);
             return;
         }
@@ -719,6 +783,11 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         // An old running VPN should now be exited
         mStarting = false;
 
+        if (isStartAborted(expectedGen)) {
+            endVpnService();
+            return;
+        }
+
         // Start a new session by creating a new thread.
         boolean useOpenVPN3 = VpnProfile.doUseOpenVPN3(this);
 
@@ -727,6 +796,11 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             // start a Thread that handles incoming messages of the management socket
             OpenVpnManagementThread ovpnManagementThread = new OpenVpnManagementThread(mProfile, this);
             if (ovpnManagementThread.openManagementInterface(this)) {
+                if (isStartAborted(expectedGen)) {
+                    ovpnManagementThread.stopVPN(false);
+                    endVpnService();
+                    return;
+                }
                 Thread mSocketManagerThread = new Thread(ovpnManagementThread, "OpenVPNManagementThread");
                 mSocketManagerThread.start();
                 mManagement = ovpnManagementThread;
@@ -743,10 +817,23 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             processThread = (Runnable) mOpenVPN3;
             mManagement = mOpenVPN3;
         } else {
-            processThread = new OpenVPNThread(this, argv, nativeLibraryDirectory, tmpDir);
+            OpenVPNThread ovpnThread = new OpenVPNThread(this, argv, nativeLibraryDirectory, tmpDir);
+            ovpnThread.setSessionGen(expectedGen);
+            processThread = ovpnThread;
+        }
+
+        if (isStartAborted(expectedGen)) {
+            if (mManagement != null) {
+                mManagement.stopVPN(false);
+                mManagement = null;
+            }
+            endVpnService();
+            return;
         }
 
         synchronized (mProcessLock) {
+            mOpenVPNThread = processThread;
+            mActiveSessionGen = expectedGen;
             mProcessThread = new Thread(processThread, "OpenVPNProcessThread");
             mProcessThread.start();
         }
@@ -761,10 +848,20 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             }
         }
 
+        if (isStartAborted(expectedGen)) {
+            if (mManagement != null) {
+                mManagement.stopVPN(false);
+            }
+            forceStopOpenVpnProcess();
+            endVpnService();
+            return;
+        }
+
         final DeviceStateReceiver oldDeviceStateReceiver = mDeviceStateReceiver;
         final DeviceStateReceiver newDeviceStateReceiver = new DeviceStateReceiver(mManagement);
 
         guiHandler.post(() -> {
+            if (isStartAborted(expectedGen)) return;
             if (oldDeviceStateReceiver != null)
                 unregisterDeviceStateReceiver(oldDeviceStateReceiver);
 
@@ -777,15 +874,20 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     private void stopOldOpenVPNProcess(OpenVPNManagement management,
                                        Runnable managementThread) {
         if (management != null) {
-            if (managementThread != null)
+            if (managementThread instanceof OpenVPNThread)
                 ((OpenVPNThread) managementThread).setReplaceConnection();
-            if (management.stopVPN(true)) {
-                // an old was asked to exit, wait 1s
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    //ignore
-                }
+            management.stopVPN(true);
+        }
+
+        Thread procThread;
+        synchronized (mProcessLock) {
+            procThread = mProcessThread;
+        }
+        if (procThread != null) {
+            try {
+                procThread.join(350);
+            } catch (InterruptedException e) {
+                // ignore
             }
         }
 
@@ -793,14 +895,21 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     }
 
     public void forceStopOpenVpnProcess() {
+        Thread procThread;
+        Runnable ovpnThread;
         synchronized (mProcessLock) {
-            if (mProcessThread != null) {
-                mProcessThread.interrupt();
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    //ignore
-                }
+            procThread = mProcessThread;
+            ovpnThread = mOpenVPNThread;
+        }
+        if (ovpnThread instanceof OpenVPNThread) {
+            ((OpenVPNThread) ovpnThread).stopProcess();
+        }
+        if (procThread != null) {
+            procThread.interrupt();
+            try {
+                procThread.join(400);
+            } catch (InterruptedException e) {
+                // ignore
             }
         }
     }
@@ -834,7 +943,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     @Override
     public void onDestroy() {
         synchronized (mProcessLock) {
-            if (mProcessThread != null) {
+            if (mProcessThread != null && mManagement != null) {
                 mManagement.stopVPN(true);
             }
         }
@@ -873,6 +982,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     }
 
     public ParcelFileDescriptor openTun() {
+        if (mUserStopped) return null;
         ParcelFileDescriptor pfd = openTun(tunConfig);
 
         // Reset information

@@ -157,21 +157,31 @@ public final class PingTester {
 
     private final ExecutorService pool = Executors.newFixedThreadPool(THREADS);
     private final List<Future<?>> futures = new ArrayList<>();
+    private final List<String> submittedUuids = new ArrayList<>();
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
     /** Test all given profiles in parallel. Results via the listener. */
     public synchronized void testAll(List<VpnProfile> profiles, PingListener listener) {
         cancelled.set(false);
         futures.clear();
+        submittedUuids.clear();
         if (profiles == null || profiles.isEmpty()) {
             listener.onFinished(false);
             return;
         }
         for (VpnProfile profile : profiles) {
+            final String uuid = profile.getUUIDString();
+            if (uuid != null) submittedUuids.add(uuid);
             futures.add(pool.submit(() -> {
                 if (cancelled.get()) return;
-                Result r = testOne(profile);
-                if (!cancelled.get()) listener.onResult(r);
+                MinabUiBridge.onPingServerStart(uuid);
+                try {
+                    if (cancelled.get()) return;
+                    Result r = testOne(profile);
+                    if (!cancelled.get()) listener.onResult(r);
+                } finally {
+                    MinabUiBridge.onPingServerEnd(uuid);
+                }
             }));
         }
         pool.submit(() -> {
@@ -183,6 +193,7 @@ public final class PingTester {
                     break;
                 }
             }
+            clearSubmittedPingIndicators();
             listener.onFinished(cancelled.get());
         });
     }
@@ -191,6 +202,13 @@ public final class PingTester {
     public synchronized void cancel() {
         cancelled.set(true);
         for (Future<?> f : futures) f.cancel(true);
+        clearSubmittedPingIndicators();
+    }
+
+    private synchronized void clearSubmittedPingIndicators() {
+        for (String uuid : submittedUuids) {
+            MinabUiBridge.onPingServerEnd(uuid);
+        }
     }
 
     public void shutdown() {

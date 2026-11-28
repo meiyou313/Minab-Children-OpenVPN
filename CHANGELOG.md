@@ -2,6 +2,12 @@
 
 All notable changes, newest first. Each GitHub release shows only its own version's notes.
 
+New in v0.9.8.1 — critical stability, instant halos & clean disconnect hotfix:
+- Fixed Diagnostics & Debug Logs crash: resolved an immediate NullPointerException in `BaseActivity.setUpEdgeEdgeInsetsListener` caused by a missing `statusbar_background` view in `minab_diagnostics.xml`, and added null-safe inset guards across all activities.
+- Instant zero-lag row halos & spinner states: implemented `setConnectedVPN(...)` listeners, synchronous main-thread `MinabConnectState` updates for targeted RecyclerView row refreshes, active test indicators during Ping Test and Real Test, and a new coral disconnecting halo (`minab_row_halo_disconnecting`).
+- Instant Disconnect while Connecting: tapping the orb or active server row during `CONNECTING` now immediately enters `DISCONNECTING`, aborts in-flight `LaunchVPN` / `OpenVPNService` starts, closes management sockets cleanly, and enforces a 450 ms watchdog native-process termination.
+- Eliminated ghost auto-reconnect & false Connected state: fixed `OpenVPNService` never assigning `mOpenVPNThread`, ignoring `mUserStopped` on queued `EXTRA_PROFILEUUID` intents, and clearing UUIDs on replaced threads; guarded `OpenVpnManagementThread` / `OpenVPNThreadv3` / `keepVPNAlive`; and ensured UI/widgets never show `CONNECTED` (or own IP under `CONNECTED`) without a valid selected profile.
+
 New in v0.9.8 — unique multi-group servers, standardized zero-credential exports, Smart Tools ✨ menu, dead-server cleanup, redesigned FAQ & local Diagnostics Center:
 - Unique Multi-Group Profiles: each server is stored once (no duplicate cloning across groups), can belong to multiple groups (`Add to group`, `Manage groups`, `Move to group`), displays `[Group1 · Group2]` badges, keeps favorites/credentials/test results synced globally, offers a 3-way `Remove from <group>` vs `Delete permanently` prompt inside groups, and upgrades `Remove duplicates` to merge groups & favorites onto the best-tested keeper.
 - Top Bar & Smart Tools (`✨`): removed OpenVPN Log and redundant Settings icon from the top toolbar; added a Configs-only `✨` Smart Tools button with a green attention dot when maintenance exists (Re-detect IP, Clean empty auto/manual groups, Smart Remove duplicates, Dead never-working servers, Delete failed servers, and Manage categories — while also keeping Manage categories on the chips bar).

@@ -42,6 +42,10 @@ public class keepVPNAlive extends JobService implements VpnStatus.StateListener 
     @Override
     public boolean onStartJob(JobParameters jobParameters) {
         if (mLevel == ConnectionStatus.UNKNOWN_LEVEL || mLevel == ConnectionStatus.LEVEL_NOTCONNECTED) {
+            if (ProfileManager.getLastConnectedProfile(this) == null) {
+                unscheduleKeepVPNAliveJobService(this);
+                return false;
+            }
             String vpnUUID = jobParameters.getExtras().getString(LaunchVPN.EXTRA_KEY);
             VpnProfile vp = ProfileManager.get(this, vpnUUID);
             if (vp == null) {

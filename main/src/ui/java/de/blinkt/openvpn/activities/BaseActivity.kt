@@ -51,16 +51,24 @@ abstract class BaseActivity : AppCompatActivity() {
         contentViewId: Int = R.id.root_linear_layout,
         setupBottom: Boolean = true
     ) {
-        val contentView = rootView.findViewById<View>(contentViewId)
+        val contentView = rootView.findViewById<View?>(contentViewId) ?: return
+        val activityRoot = window?.decorView
 
         ViewCompat.setOnApplyWindowInsetsListener(contentView) { v, windowInsets ->
             val insets =
                 windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            val statusbarbg = findViewById<View>(R.id.statusbar_background);
+            val statusbarbg = rootView.findViewById<View?>(R.id.statusbar_background)
+                ?: activityRoot?.findViewById<View?>(R.id.statusbar_background)
 
             val statusBarInsets = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
 
-            statusbarbg.layoutParams.height = statusBarInsets.top
+            if (statusbarbg != null) {
+                val lp = statusbarbg.layoutParams
+                if (lp != null && lp.height != statusBarInsets.top) {
+                    lp.height = statusBarInsets.top
+                    statusbarbg.layoutParams = lp
+                }
+            }
 
 
             v.updateLayoutParams<ViewGroup.MarginLayoutParams> {

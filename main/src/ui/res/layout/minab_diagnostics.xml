@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/minab_diag_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/minab_surface"
-    android:orientation="vertical"
-    android:padding="14dp">
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/minab_diag_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/minab_surface"
+        android:orientation="vertical"
+        android:padding="14dp">
 
     <!-- Strictly local-only privacy reassurance banner -->
     <LinearLayout
@@ -267,4 +271,12 @@
             android:textColor="@color/minab_danger"
             android:textSize="11.5sp" />
     </LinearLayout>
-</LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/statusbar_background"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@color/primary_dark" />
+
+</FrameLayout>

@@ -6,6 +6,7 @@
 package de.blinkt.openvpn.core;
 
 import android.annotation.SuppressLint;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -45,7 +46,9 @@ public class OpenVPNThread implements Runnable {
     private OutputStream mOutputStream;
 
     private String[] mArgv;
-    private Process mProcess;
+    private volatile Process mProcess;
+    private volatile boolean mStopRequested = false;
+    private long mSessionGen = 0L;
     private String mNativeDir;
     private String mTmpDir;
     private OpenVPNService mService;
@@ -60,8 +63,22 @@ public class OpenVPNThread implements Runnable {
         mStreamFuture = new FutureTask<>(() -> mOutputStream);
     }
 
+    void setSessionGen(long sessionGen) {
+        mSessionGen = sessionGen;
+    }
+
     public void stopProcess() {
-        mProcess.destroy();
+        mStopRequested = true;
+        Process p = mProcess;
+        if (p != null) {
+            p.destroy();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    p.destroyForcibly();
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     void setReplaceConnection()
@@ -92,7 +109,9 @@ public class OpenVPNThread implements Runnable {
                 VpnStatus.logError("Process exited with exit value " + exitvalue);
             }
 
-            if (!mNoProcessExitStatus)
+            boolean isCurrent = mService.isCurrentSession(mSessionGen);
+
+            if (!mNoProcessExitStatus && isCurrent)
                 VpnStatus.updateStateString("NOPROCESS", "No process running.", R.string.state_noprocess, ConnectionStatus.LEVEL_NOTCONNECTED);
 
             if (mDumpPath != null) {
@@ -110,8 +129,8 @@ public class OpenVPNThread implements Runnable {
                 }
             }
 
-            if (!mNoProcessExitStatus)
-                mService.openvpnStopped();
+            if (!mNoProcessExitStatus && isCurrent)
+                mService.openvpnStopped(mSessionGen);
             Log.i(TAG, "Exiting");
         }
     }
@@ -131,7 +150,16 @@ public class OpenVPNThread implements Runnable {
 
         pb.redirectErrorStream(true);
         try {
+            if (mStopRequested) {
+                mStreamFuture.cancel(true);
+                return;
+            }
             mProcess = pb.start();
+            if (mStopRequested) {
+                mStreamFuture.cancel(true);
+                stopProcess();
+                return;
+            }
             // Close the output, since we don't need it
 
             InputStream in = mProcess.getInputStream();

@@ -185,7 +185,10 @@ public class RealTester implements VpnStatus.StateListener {
         Thread w = worker;
         if (w != null) w.interrupt();
         if (pingTester != null) pingTester.cancel();
-        if (myGeneration == generation) requestDisconnect();
+        if (myGeneration == generation) {
+            MinabUiBridge.setRealTestingUuid(null);
+            requestDisconnect();
+        }
     }
 
     /** Minab Beta v0.9.6.3 (fix #3) — stop whatever real test is
@@ -306,6 +309,7 @@ public class RealTester implements VpnStatus.StateListener {
                     continue;
                 }
                 realCurrentName = profile.mName;
+                MinabUiBridge.setRealTestingUuid(profile.getUUIDString());
                 postRealProgress();
                 // Minab v0.8: fast pre-check — a server that is
                 // PROVABLY dead is skipped in ~2 s instead of burning
@@ -360,6 +364,7 @@ public class RealTester implements VpnStatus.StateListener {
                 // generation: an older, cancelled run must never
                 // disconnect a newer run's server.
                 if (myRunId == runId && VpnStatus.isVPNActive()) {
+                    MinabUiBridge.setDisconnectingUuid(profile.getUUIDString(), 0L);
                     requestDisconnect();
                     waitForDisconnected(10_000);
                 }
@@ -367,6 +372,7 @@ public class RealTester implements VpnStatus.StateListener {
             // Leave no VPN up behind the run.
             if (myRunId == runId && VpnStatus.isVPNActive()) {
                 MinabDisconnectSignal.markUserDisconnect(appContext);
+                MinabUiBridge.setDisconnectingUuid(VpnStatus.getLastConnectedVPNProfile(), 0L);
                 requestDisconnect();
                 waitForDisconnected(5_000);
             }
@@ -374,8 +380,13 @@ public class RealTester implements VpnStatus.StateListener {
         } finally {
             MinabDisconnectSignal.markUserDisconnect(appContext);
             VpnStatus.removeStateListener(this);
+            boolean isStillNewest;
             synchronized (LOCK) {
+                isStillNewest = (current == this || myGeneration == generation);
                 if (current == this) current = null;
+            }
+            if (isStillNewest) {
+                MinabUiBridge.setRealTestingUuid(null);
             }
             active = false;
             final boolean wasCancelled = !finishedOk;

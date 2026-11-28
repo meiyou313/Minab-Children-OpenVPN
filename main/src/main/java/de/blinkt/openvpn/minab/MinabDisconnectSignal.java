@@ -11,11 +11,13 @@
 package de.blinkt.openvpn.minab;
 
 import android.content.Context;
+import android.os.SystemClock;
 
 import de.blinkt.openvpn.core.keepVPNAlive;
 
 public final class MinabDisconnectSignal {
     private static volatile Runnable userDisconnectListener = null;
+    private static volatile long lastUserDisconnectUptimeMs = 0L;
 
     private MinabDisconnectSignal() {
     }
@@ -24,7 +26,12 @@ public final class MinabDisconnectSignal {
         userDisconnectListener = listener;
     }
 
+    public static long getLastUserDisconnectUptimeMs() {
+        return lastUserDisconnectUptimeMs;
+    }
+
     public static void markUserDisconnect(Context context) {
+        lastUserDisconnectUptimeMs = SystemClock.uptimeMillis();
         Runnable l = userDisconnectListener;
         if (l != null) {
             try {

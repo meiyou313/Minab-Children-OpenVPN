@@ -8,6 +8,7 @@ package de.blinkt.openvpn.core;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.os.SystemClock;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -101,8 +102,15 @@ public class VPNLaunchHelper {
 
 
     public static void startOpenVpn(VpnProfile startprofile, Context context, String startReason, boolean replace_running_vpn) {
+        startOpenVpn(startprofile, context, startReason, replace_running_vpn, SystemClock.uptimeMillis());
+    }
+
+    public static void startOpenVpn(VpnProfile startprofile, Context context, String startReason, boolean replace_running_vpn, long connectUptimeMs) {
         Intent startVPN = startprofile.getStartServiceIntent(context, startReason, replace_running_vpn);
         if (startVPN != null) {
+            if (connectUptimeMs > 0L) {
+                startVPN.putExtra(OpenVPNService.EXTRA_CONNECT_UPTIME, connectUptimeMs);
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 //noinspection NewApi
                 context.startForegroundService(startVPN);

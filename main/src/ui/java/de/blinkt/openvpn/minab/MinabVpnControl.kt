@@ -32,6 +32,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.RemoteException
+import android.os.SystemClock
 import de.blinkt.openvpn.LaunchVPN
 import de.blinkt.openvpn.R
 import de.blinkt.openvpn.VpnProfile
@@ -44,6 +45,7 @@ object MinabVpnControl {
 
     /** Connect a profile — the same LaunchVPN path as Home's startVPN. */
     fun connect(context: Context, profile: VpnProfile) {
+        MinabConnectState.markPendingConnect(profile.getUUIDString())
         try {
             ProfileManager.saveProfile(context, profile)
         } catch (e: Exception) {
@@ -52,6 +54,7 @@ object MinabVpnControl {
         intent.putExtra(LaunchVPN.EXTRA_KEY, profile.getUUID().toString())
         intent.putExtra(OpenVPNService.EXTRA_START_REASON, "minab")
         intent.putExtra(LaunchVPN.EXTRA_HIDELOG, true)
+        intent.putExtra(OpenVPNService.EXTRA_CONNECT_UPTIME, SystemClock.uptimeMillis())
         intent.action = Intent.ACTION_MAIN
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
@@ -64,6 +67,12 @@ object MinabVpnControl {
     fun disconnect(context: Context) {
         MinabFailover.noteUserDisconnect()
         val appContext = context.applicationContext
+        val targetUuid = try {
+            VpnStatus.getLastConnectedVPNProfile()
+        } catch (_: Exception) {
+            null
+        } ?: MinabConnectState.getPendingConnectUuid()
+        MinabConnectState.markDisconnecting(targetUuid)
         MinabDisconnectSignal.markUserDisconnect(appContext)
         val intent = Intent(appContext, OpenVPNService::class.java)
         intent.action = OpenVPNService.START_SERVICE
